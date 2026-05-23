@@ -1,0 +1,62 @@
+﻿[
+    {
+        "Index":  "01",
+        "Title":  "对话页 - 导航样式全局统一优化",
+        "ScreenId":  "0404d8cdb93b49ebb159c8aacb30c543",
+        "Width":  "2560",
+        "Height":  "2048",
+        "Screenshot":  27631,
+        "Html":  0,
+        "Dir":  "C:\\Users\\Sean\\Documents\\量化平台策略生成\\stitch-export-4418837434022442004\\01-chat-page-nav-unified"
+    },
+    {
+        "Index":  "02",
+        "Title":  "代码解析页 - 导航样式全局统一优化",
+        "ScreenId":  "3594290cac5648cf92d7aeef410a2291",
+        "Width":  "2560",
+        "Height":  "2048",
+        "Screenshot":  28576,
+        "Html":  16907,
+        "Dir":  "C:\\Users\\Sean\\Documents\\量化平台策略生成\\stitch-export-4418837434022442004\\02-code-analysis-nav-unified"
+    },
+    {
+        "Index":  "03",
+        "Title":  "更多页 - 导航样式全局统一优化",
+        "ScreenId":  "4aa0e7a35bbf4a0c9ed34f2724bae559",
+        "Width":  "2562",
+        "Height":  "2048",
+        "Screenshot":  25066,
+        "Html":  21150,
+        "Dir":  "C:\\Users\\Sean\\Documents\\量化平台策略生成\\stitch-export-4418837434022442004\\03-more-page-nav-unified"
+    },
+    {
+        "Index":  "04",
+        "Title":  "平台代码转换 - 导航样式全局统一优化",
+        "ScreenId":  "805a1ac4854f4d83be8eaadbd9c214e6",
+        "Width":  "2560",
+        "Height":  "2048",
+        "Screenshot":  42921,
+        "Html":  21039,
+        "Dir":  "C:\\Users\\Sean\\Documents\\量化平台策略生成\\stitch-export-4418837434022442004\\04-platform-code-convert-nav-unified"
+    },
+    {
+        "Index":  "05",
+        "Title":  "登录弹窗 - 轻量化 LightQuant",
+        "ScreenId":  "979016baec63481a9386039e5067ab75",
+        "Width":  "2560",
+        "Height":  "2048",
+        "Screenshot":  17640,
+        "Html":  12978,
+        "Dir":  "C:\\Users\\Sean\\Documents\\量化平台策略生成\\stitch-export-4418837434022442004\\05-login-modal-lightquant"
+    },
+    {
+        "Index":  "06",
+        "Title":  "首页 - 导航样式全局统一优化",
+        "ScreenId":  "a3ff7a3f97994d4199e757d9512bfdab",
+        "Width":  "2560",
+        "Height":  "2048",
+        "Screenshot":  0,
+        "Html":  15807,
+        "Dir":  "C:\\Users\\Sean\\Documents\\量化平台策略生成\\stitch-export-4418837434022442004\\06-home-page-nav-unified"
+    }
+]

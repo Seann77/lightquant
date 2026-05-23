@@ -1,0 +1,248 @@
+<!DOCTYPE html><html class="h-full" lang="zh-CN" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>代码翻译解析页 - LightQuant</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "storm-deep": "#356373",
+                        "error": "#ba1a1a",
+                        "bloom-coral": "#ff5050",
+                        "on-tertiary": "#ffffff",
+                        "on-tertiary-fixed-variant": "#862300",
+                        "surface-container-lowest": "#ffffff",
+                        "canvas": "#ffffff",
+                        "secondary-container": "#e2dfde",
+                        "primary": "#0036a4",
+                        "outline": "#747686",
+                        "surface-bright": "#faf8ff",
+                        "cloud": "#f7f7f7",
+                        "tertiary-container": "#a52d00",
+                        "on-secondary-container": "#636262",
+                        "primary-soft": "#c9e0fc",
+                        "on-primary-container": "#c2ceff",
+                        "inverse-surface": "#2e3039",
+                        "storm-mist": "#8ebdce",
+                        "surface-dim": "#d9d9e5",
+                        "surface-container": "#ededf9",
+                        "fog": "#e8e8e8",
+                        "bloom-wine": "#5a1313",
+                        "secondary": "#5f5e5e",
+                        "secondary-fixed": "#e5e2e1",
+                        "on-error-container": "#93000a",
+                        "surface-tint": "#1451de",
+                        "on-surface-variant": "#434655",
+                        "paper": "#ffffff",
+                        "surface-container-highest": "#e2e1ed",
+                        "on-secondary-fixed-variant": "#474746",
+                        "on-secondary-fixed": "#1c1b1b",
+                        "tertiary-fixed": "#ffdbd1",
+                        "secondary-fixed-dim": "#c8c6c5",
+                        "primary-fixed": "#dce1ff",
+                        "on-primary-fixed-variant": "#003bb0",
+                        "tertiary-fixed-dim": "#ffb59f",
+                        "inverse-on-surface": "#f0f0fc",
+                        "primary-fixed-dim": "#b6c4ff",
+                        "on-background": "#191b23",
+                        "on-surface": "#191b23",
+                        "surface-variant": "#e2e1ed",
+                        "bloom-deep": "#b3262b",
+                        "charcoal": "#3d3d3d",
+                        "on-primary-fixed": "#00164f",
+                        "surface": "#faf8ff",
+                        "ink-deep": "#000000",
+                        "on-tertiary-fixed": "#3a0a00",
+                        "tertiary": "#7c2000",
+                        "on-tertiary-container": "#ffc1b0",
+                        "graphite": "#636363",
+                        "storm-sea": "#7fadbe",
+                        "ink-soft": "#292929",
+                        "steel": "#c2c2c2",
+                        "on-primary": "#ffffff",
+                        "ink": "#1a1a1a",
+                        "surface-container-low": "#f3f2ff",
+                        "primary-bright": "#296ef9",
+                        "inverse-primary": "#b6c4ff",
+                        "bloom-rose": "#f9d4d2",
+                        "on-error": "#ffffff",
+                        "outline-variant": "#c3c5d7",
+                        "primary-deep": "#0e3191",
+                        "surface-container-high": "#e7e7f3",
+                        "background": "#faf8ff",
+                        "error-container": "#ffdad6",
+                        "primary-container": "#024ad8",
+                        "on-secondary": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xxs": "4px",
+                        "xl": "24px",
+                        "sm": "12px",
+                        "xs": "8px",
+                        "xxl": "32px",
+                        "md": "16px",
+                        "lg": "20px",
+                        "section": "80px"
+                    },
+                    "fontFamily": {
+                        "display-xl": ["manrope"],
+                        "button-sm": ["manrope"],
+                        "link-md": ["manrope"],
+                        "display-lg": ["manrope"],
+                        "button-md": ["manrope"],
+                        "caption-md": ["manrope"],
+                        "display-xs": ["manrope"],
+                        "body-lg": ["manrope"],
+                        "price-md": ["manrope"],
+                        "body-emphasis": ["manrope"],
+                        "display-sm": ["manrope"],
+                        "caption-sm": ["manrope"],
+                        "display-xxl": ["manrope"],
+                        "display-md": ["manrope"],
+                        "body-md": ["manrope"],
+                        "caption-bold": ["manrope"]
+                    },
+                    "fontSize": {
+                        "display-xl": ["56px", { "lineHeight": "1.0", "fontWeight": "500" }],
+                        "button-sm": ["12.6px", { "lineHeight": "1.0", "letterSpacing": "0.126px", "fontWeight": "700" }],
+                        "link-md": ["16px", { "lineHeight": "1.38", "fontWeight": "500" }],
+                        "display-lg": ["44px", { "lineHeight": "1.0", "fontWeight": "500" }],
+                        "button-md": ["14px", { "lineHeight": "1.4", "letterSpacing": "0.7px", "fontWeight": "600" }],
+                        "caption-md": ["14px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "display-xs": ["20px", { "lineHeight": "1.0", "fontWeight": "500" }],
+                        "body-lg": ["18px", { "lineHeight": "1.33", "fontWeight": "400" }],
+                        "price-md": ["24px", { "lineHeight": "1.17", "fontWeight": "500" }],
+                        "body-emphasis": ["16px", { "lineHeight": "1.38", "fontWeight": "500" }],
+                        "display-sm": ["24px", { "lineHeight": "1.17", "fontWeight": "500" }],
+                        "caption-sm": ["12px", { "lineHeight": "1.33", "fontWeight": "400" }],
+                        "display-xxl": ["72px", { "lineHeight": "1.0", "fontWeight": "500" }],
+                        "display-md": ["32px", { "lineHeight": "1.0", "fontWeight": "500" }],
+                        "body-md": ["16px", { "lineHeight": "1.38", "fontWeight": "400" }],
+                        "caption-bold": ["14px", { "lineHeight": "1.3", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Manrope', sans-serif; }
+        .bg-diagonal-texture {
+            background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(2, 74, 216, 0.02) 10px, rgba(2, 74, 216, 0.02) 11px);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background h-full flex overflow-hidden">
+<!-- SideNavBar Component -->
+<aside class="hidden md:flex flex-col h-screen w-64 border-r border-steel dark:border-outline bg-cloud dark:bg-inverse-surface p-md gap-xs flex-shrink-0">
+<!-- Brand/Header -->
+<div class="mb-xxl pt-sm px-xs"><div class="flex items-center justify-between w-full"><div class="flex items-center gap-sm"><img alt="LightQuant Logo" class="w-8 h-8 rounded-md" src="https://lh3.googleusercontent.com/aida/ADBb0ugiJeBxoNh6jce_gTk8sp0_1twpOD98WM1Qa-nE2xNIY4fLD3DFMIyhMcZ1WWXI0EA_BP-lTc2E7BQuzmQ8wSMeZlDawpr4gbgP0fSvFTa6M9rS2dgJgzS2ZNLhXVT37pYGXHx77k8Y0bINPKsNdqKbI3fbzL-a-fAT7RzZ-S6hCzYGDGDrgEASmb1gESeSVFIQ3jJBWFWsFjzG8oSi2jKG-0mYB6pHHo49Fk6Ph-q7B5rvw642EAUxqw"><h1 class="font-display-xs text-display-xs font-bold text-ink dark:text-paper">LightQuant</h1></div><button class="text-secondary hover:text-primary transition-colors flex items-center justify-center"><span class="material-symbols-outlined">menu_open</span></button></div></div>
+<!-- CTA -->
+<div class="px-xs mb-sm">
+</div>
+<!-- Main Nav Links -->
+<nav class="flex flex-col gap-xxs font-body-emphasis text-body-emphasis mt-md"><a class="flex items-center gap-sm px-sm py-sm text-secondary dark:text-secondary-fixed-dim hover:bg-fog dark:hover:bg-charcoal/50 rounded-lg transition-all" href="#"><span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 0;">auto_awesome</span><span class="">策略生成</span></a><a class="flex items-center gap-sm px-sm py-sm text-secondary dark:text-secondary-fixed-dim hover:bg-fog dark:hover:bg-charcoal/50 rounded-lg transition-all" href="#"><span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 0;">code</span><span class="">代码转换</span></a><a class="flex items-center gap-sm px-sm py-sm bg-paper dark:bg-charcoal text-primary dark:text-primary-bright rounded-lg font-bold scale-[0.98] transition-transform" href="#"><span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 1;">translate</span><span class="">代码翻译解析</span></a><a class="flex items-center gap-sm px-sm py-sm text-secondary dark:text-secondary-fixed-dim hover:bg-fog dark:hover:bg-charcoal/50 rounded-lg transition-all" href="#"><span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 0;">grid_view</span><span class="">更多功能</span></a></nav>
+<!-- Header subtext/Recent section -->
+<div class="flex-1 overflow-y-auto mt-md">
+<div class="px-xs mb-sm flex items-center justify-between">
+<h3 class="font-caption-bold text-caption-bold text-ink dark:text-paper">最近</h3>
+</div>
+<div class="flex flex-col gap-xs font-caption-md text-caption-md text-secondary">
+<a class="px-sm py-xs hover:bg-fog rounded-md truncate transition-colors" href="#">双均线策略修改</a>
+<a class="px-sm py-xs hover:bg-fog rounded-md truncate transition-colors" href="#">PTrade 策略生成</a>
+</div>
+</div>
+<!-- Footer Links -->
+<div class="mt-auto border-t border-steel pt-sm flex flex-col gap-xxs font-body-emphasis text-body-emphasis"><div class="flex items-center gap-sm px-sm py-md mb-xs border-b border-steel/30"><div class="w-10 h-10 rounded-full bg-primary-soft flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-primary">person</span></div><div class="min-w-0 flex-1"><div class="text-ink dark:text-paper font-body-emphasis truncate">量化探索者</div><div class="text-secondary dark:text-secondary-fixed-dim font-caption-md">可用积分: <span class="text-primary-bright font-bold">500</span></div></div></div>
+</div>
+</aside>
+<!-- Main Canvas -->
+<main class="flex-1 overflow-y-auto bg-background bg-diagonal-texture relative"><header class="h-16 flex items-center justify-between px-xl border-b border-steel backdrop-blur-sm z-20 flex-shrink-0 sticky top-0 w-full bg-paper"><div class="absolute top-0 left-0 right-0 h-0.5 bg-primary"></div><div class="flex items-center gap-sm flex-1"><button class="md:hidden text-ink hover:text-primary transition-colors p-xs"><span class="material-symbols-outlined">menu</span></button></div><div class="flex items-center gap-md flex-1 justify-end"><div class="flex items-center gap-lg"><button class="text-secondary hover:text-primary transition-colors flex items-center gap-xs px-sm py-xs rounded hover:bg-surface-container"><span class="material-symbols-outlined text-[20px]">group</span><span class="font-button-sm text-button-sm">加入微信群</span></button><div class="flex items-center gap-xs text-secondary"></div></div></div></header>
+<div class="max-w-[1280px] mx-auto px-md md:px-xxl pb-xxl mt-xxl flex flex-col items-center">
+<!-- Centered Title Section -->
+<header class="text-center mb-xl w-full max-w-3xl">
+<h2 class="font-display-lg text-display-lg text-ink font-bold mb-sm tracking-tight">代码翻译解析</h2>
+<p class="font-body-lg text-body-lg text-secondary mb-xs">将策略代码翻译成清晰的自然语言说明，并识别逻辑结构与潜在风险</p>
+<p class="font-caption-md text-caption-md text-primary-bright bg-primary-soft/50 inline-block px-sm py-xxs rounded-full">支持 PTrade、聚宽、QMT 策略代码</p>
+</header>
+<!-- Main Operation Area -->
+<div class="w-full max-w-4xl bg-paper p-xl rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.04)] border border-surface-container mb-xxl">
+<!-- Configuration Row -->
+<div class="flex flex-wrap items-center gap-md mb-md">
+<div class="flex items-center gap-xs">
+<span class="font-caption-bold text-caption-bold text-ink">代码平台:</span>
+<select class="bg-surface-container-low border border-steel rounded-md text-body-md py-1 px-2 focus:ring-primary focus:border-primary">
+<option>自动识别</option>
+<option>PTrade</option>
+<option>聚宽</option>
+<option>QMT</option>
+</select>
+</div>
+<div class="flex items-center gap-xs">
+</div>
+<div class="flex items-center gap-xs">
+</div>
+<div class="ml-auto">
+<button class="flex items-center gap-xs text-primary hover:bg-primary-soft/50 px-sm py-1 rounded-md transition-colors font-button-md">
+<span class="material-symbols-outlined text-[18px]">upload_file</span>
+                上传 .py / .txt&nbsp;</button>
+</div>
+</div>
+<!-- Code Input -->
+<div class="relative w-full h-64 border border-outline-variant rounded-lg overflow-hidden bg-[#fafafa] mb-md focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all">
+<div class="absolute left-0 top-0 bottom-0 w-10 bg-surface-container-lowest border-r border-outline-variant flex flex-col items-center pt-sm text-outline font-mono text-caption-sm select-none">
+<span class="">1</span><span class="">2</span><span class="">3</span><span class="">4</span><span class="">5</span>
+</div>
+<textarea class="w-full h-full pl-12 pr-md py-sm bg-transparent border-none focus:ring-0 resize-none font-mono text-body-md text-ink placeholder-outline" placeholder="请粘贴需要解析的策略代码..."></textarea>
+</div>
+<!-- Actions -->
+<div class="flex items-center justify-between">
+<span class="font-caption-md text-caption-md text-secondary flex items-center gap-xxs">
+<span class="material-symbols-outlined text-[16px] text-primary-bright">toll</span>
+            每次解析消耗 100 积分
+        </span>
+<div class="flex gap-sm">
+<button class="px-md py-2 border border-steel text-secondary hover:text-ink hover:bg-surface-container-low rounded-md font-button-md transition-colors">
+                清空内容
+            </button>
+<button class="px-xl py-2 bg-primary text-white hover:bg-primary-container rounded-md font-button-md shadow-sm transition-colors flex items-center gap-xs">
+<span class="material-symbols-outlined text-[18px]">play_arrow</span>
+                开始解析
+            </button>
+</div>
+</div>
+</div>
+<!-- Analysis Results Area -->
+<div class="w-full max-w-4xl">
+<!-- Tabs -->
+<div class="flex border-b border-steel mb-xl overflow-x-auto hide-scrollbar">
+<button class="px-md py-sm font-button-md text-primary border-b-2 border-primary whitespace-nowrap">策略概览</button>
+<button class="px-md py-sm font-button-md text-secondary hover:text-ink whitespace-nowrap">交易逻辑</button>
+<button class="px-md py-sm font-button-md text-secondary hover:text-ink whitespace-nowrap">关键参数</button>
+<button class="px-md py-sm font-button-md text-secondary hover:text-ink whitespace-nowrap">风险提醒</button>
+<button class="px-md py-sm font-button-md text-secondary hover:text-ink whitespace-nowrap">优化建议</button>
+</div>
+<!-- Empty State -->
+<div class="bg-paper p-xxl rounded-xl border border-steel border-dashed flex flex-col items-center justify-center min-h-[300px] text-center">
+<div class="w-16 h-16 bg-surface-container-low rounded-full flex items-center justify-center mb-md">
+<span class="material-symbols-outlined text-[32px] text-outline">analytics</span>
+</div>
+<h3 class="font-body-emphasis text-body-emphasis text-ink mb-xs">解析结果将在这里显示</h3>
+<p class="font-caption-md text-caption-md text-secondary max-w-sm">粘贴您的策略代码并点击“开始解析”，系统将自动生成详细的说明报告。</p>
+</div>
+</div>
+</div>
+</main>
+
+
+</body></html>

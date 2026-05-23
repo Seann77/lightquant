@@ -1,0 +1,112 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-manrope: Manrope;
+  --app-sidebar-width: 256px;
+  --app-topbar-height: 64px;
+  --app-shell-blue-line: 2px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: #faf8ff;
+  color: #191b23;
+  font-family:
+    Manrope,
+    "Microsoft YaHei",
+    "PingFang SC",
+    Arial,
+    sans-serif;
+  overflow-x: hidden;
+}
+
+h1,
+h2,
+h3,
+p,
+a,
+span,
+li,
+button,
+label,
+input,
+textarea {
+  overflow-wrap: anywhere;
+}
+
+@layer utilities {
+  .chevron-bg {
+    background-image: linear-gradient(
+      135deg,
+      rgba(41, 110, 249, 0.03) 25%,
+      transparent 25%,
+      transparent 50%,
+      rgba(41, 110, 249, 0.03) 50%,
+      rgba(41, 110, 249, 0.03) 75%,
+      transparent 75%,
+      transparent
+    );
+    background-size: 64px 64px;
+  }
+
+  .bg-surface-pattern {
+    background-image: linear-gradient(
+      135deg,
+      rgba(41, 110, 249, 0.03) 25%,
+      transparent 25%,
+      transparent 50%,
+      rgba(41, 110, 249, 0.03) 50%,
+      rgba(41, 110, 249, 0.03) 75%,
+      transparent 75%,
+      transparent
+    );
+    background-color: #faf8ff;
+    background-size: 64px 64px;
+  }
+
+  .bg-diagonal-texture {
+    background-image: linear-gradient(
+      135deg,
+      rgba(41, 110, 249, 0.035) 25%,
+      transparent 25%,
+      transparent 50%,
+      rgba(41, 110, 249, 0.035) 50%,
+      rgba(41, 110, 249, 0.035) 75%,
+      transparent 75%,
+      transparent
+    );
+    background-size: 64px 64px;
+  }
+
+  .app-scrollbar {
+    scrollbar-color: #c3c5d7 transparent;
+    scrollbar-width: thin;
+  }
+}
+
+.material-symbols-outlined {
+  direction: ltr;
+  display: inline-block;
+  font-family: "Material Symbols Outlined";
+  font-feature-settings: "liga";
+  font-style: normal;
+  font-weight: normal;
+  letter-spacing: normal;
+  line-height: 1;
+  text-transform: none;
+  white-space: nowrap;
+  word-wrap: normal;
+  -webkit-font-feature-settings: "liga";
+  -webkit-font-smoothing: antialiased;
+}
