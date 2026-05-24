@@ -1,14 +1,30 @@
 import { randomUUID } from "crypto";
-import type { CreditAccount, CreditLedger, PaymentTransaction, RechargeOrder, RechargePlan, SmsCodeRecord, User } from "@/server/domain";
 import type {
+  AiTask,
+  AiTaskResult,
+  CreditAccount,
+  CreditLedger,
+  CreditReservation,
+  PaymentTransaction,
+  RechargeOrder,
+  RechargePlan,
+  SmsCodeRecord,
+  User
+} from "@/server/domain";
+import type {
+  AiTaskPage,
   AppliedCreditLedger,
   ApplyCreditLedgerInput,
+  CreateAiTaskInput,
+  CreateAiTaskResultInput,
+  CreateCreditReservationInput,
   CreatePaymentTransactionInput,
   CreateRechargeOrderInput,
   CreateSmsCodeInput,
   CreateUserInput,
   LedgerPage,
-  LightQuantRepository
+  LightQuantRepository,
+  UpdateAiTaskInput
 } from "@/server/repositories/types";
 
 const MOCK_PLAN_TIMESTAMP = "2026-01-01T00:00:00.000Z";
@@ -69,6 +85,12 @@ export class MockLightQuantRepository implements LightQuantRepository {
   private readonly ordersByClientRequestId = new Map<string, string>();
   private readonly paymentTransactions = new Map<string, PaymentTransaction>();
   private readonly paymentTransactionsByIdempotencyKey = new Map<string, string>();
+  private readonly aiTasks = new Map<string, AiTask>();
+  private readonly aiTasksByClientRequestId = new Map<string, string>();
+  private readonly aiTaskResults = new Map<string, AiTaskResult>();
+  private readonly creditReservations = new Map<string, CreditReservation>();
+  private readonly creditReservationsByIdempotencyKey = new Map<string, string>();
+  private readonly creditReservationsByTaskId = new Map<string, string>();
 
   async createSmsCode(input: CreateSmsCodeInput) {
     const record: SmsCodeRecord = {
@@ -301,6 +323,123 @@ export class MockLightQuantRepository implements LightQuantRepository {
     this.paymentTransactionsByIdempotencyKey.set(transaction.idempotencyKey, transaction.id);
 
     return transaction;
+  }
+
+  async findAiTaskById(id: string) {
+    return this.aiTasks.get(id) ?? null;
+  }
+
+  async findAiTaskByClientRequestId(userId: string, clientRequestId: string) {
+    const taskId = this.aiTasksByClientRequestId.get(clientRequestKey(userId, clientRequestId));
+    return taskId ? this.findAiTaskById(taskId) : null;
+  }
+
+  async createAiTask(input: CreateAiTaskInput) {
+    const task: AiTask = {
+      id: randomUUID(),
+      ...input
+    };
+
+    this.aiTasks.set(task.id, task);
+    this.aiTasksByClientRequestId.set(clientRequestKey(task.userId, task.clientRequestId), task.id);
+
+    return task;
+  }
+
+  async updateAiTask(taskId: string, input: UpdateAiTaskInput) {
+    const task = this.aiTasks.get(taskId);
+
+    if (!task) {
+      throw new Error("AI task not found");
+    }
+
+    const updated: AiTask = {
+      ...task,
+      status: input.status,
+      errorCode: input.errorCode === undefined ? task.errorCode : input.errorCode,
+      errorMessage: input.errorMessage === undefined ? task.errorMessage : input.errorMessage,
+      startedAt: input.startedAt === undefined ? task.startedAt : input.startedAt,
+      finishedAt: input.finishedAt === undefined ? task.finishedAt : input.finishedAt,
+      updatedAt: input.updatedAt
+    };
+
+    this.aiTasks.set(taskId, updated);
+    return updated;
+  }
+
+  async createAiTaskResult(input: CreateAiTaskResultInput) {
+    this.aiTaskResults.set(input.taskId, input);
+    return input;
+  }
+
+  async findAiTaskResult(taskId: string) {
+    return this.aiTaskResults.get(taskId) ?? null;
+  }
+
+  async listAiTasks(userId: string, pagination: { page: number; pageSize: number }, filters: { type?: AiTask["type"]; status?: AiTask["status"] }): Promise<AiTaskPage> {
+    const items = [...this.aiTasks.values()]
+      .filter((task) => task.userId === userId)
+      .filter((task) => (filters.type ? task.type === filters.type : true))
+      .filter((task) => (filters.status ? task.status === filters.status : true))
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+    const start = (pagination.page - 1) * pagination.pageSize;
+
+    return {
+      items: items.slice(start, start + pagination.pageSize),
+      total: items.length
+    };
+  }
+
+  async findCreditReservationByIdempotencyKey(idempotencyKey: string) {
+    const reservationId = this.creditReservationsByIdempotencyKey.get(idempotencyKey);
+    return reservationId ? this.creditReservations.get(reservationId) ?? null : null;
+  }
+
+  async findCreditReservationByTaskId(taskId: string) {
+    const reservationId = this.creditReservationsByTaskId.get(taskId);
+    return reservationId ? this.creditReservations.get(reservationId) ?? null : null;
+  }
+
+  async createCreditReservation(input: CreateCreditReservationInput) {
+    const existing = await this.findCreditReservationByIdempotencyKey(input.idempotencyKey);
+
+    if (existing) {
+      return existing;
+    }
+
+    const reservation: CreditReservation = {
+      id: randomUUID(),
+      ...input
+    };
+
+    this.creditReservations.set(reservation.id, reservation);
+    this.creditReservationsByIdempotencyKey.set(reservation.idempotencyKey, reservation.id);
+    this.creditReservationsByTaskId.set(reservation.taskId, reservation.id);
+
+    return reservation;
+  }
+
+  async updateCreditReservationStatus(id: string, status: CreditReservation["status"], updatedAt: string) {
+    const reservation = this.creditReservations.get(id);
+
+    if (!reservation) {
+      throw new Error("Credit reservation not found");
+    }
+
+    const updated: CreditReservation = {
+      ...reservation,
+      status,
+      updatedAt
+    };
+
+    this.creditReservations.set(id, updated);
+    return updated;
+  }
+
+  async getActiveReservedAmount(userId: string) {
+    return [...this.creditReservations.values()]
+      .filter((reservation) => reservation.userId === userId && reservation.status === "RESERVED")
+      .reduce((total, reservation) => total + reservation.amount, 0);
   }
 }
 
