@@ -109,3 +109,56 @@ export type PaymentTransaction = {
   idempotencyKey: string;
   createdAt: string;
 };
+
+export type AiTaskType = "strategy_generation" | "code_conversion" | "code_analysis";
+export type AiTaskStatus = "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+export type CreditReservationStatus = "RESERVED" | "CONFIRMED" | "RELEASED";
+
+export type AiTask = {
+  id: string;
+  userId: string;
+  type: AiTaskType;
+  status: AiTaskStatus;
+  sourcePlatform: string | null;
+  targetPlatform: string | null;
+  prompt: string | null;
+  inputCode: string | null;
+  costPoints: number;
+  clientRequestId: string;
+  requestId: string;
+  errorCode: string | null;
+  errorMessage: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AiTaskResult = {
+  taskId: string;
+  resultType: AiTaskType;
+  generatedCode: string | null;
+  explanation: string | null;
+  migrationNotes: string | null;
+  riskWarnings: string[];
+  reportJson: Record<string, unknown> | null;
+  model: string;
+  tokenUsage: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+  createdAt: string;
+};
+
+export type CreditReservation = {
+  id: string;
+  userId: string;
+  taskId: string;
+  amount: number;
+  status: CreditReservationStatus;
+  idempotencyKey: string;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+};

@@ -1,8 +1,14 @@
 import type {
+  AiTask,
+  AiTaskResult,
+  AiTaskStatus,
+  AiTaskType,
   CreditAccount,
   CreditLedger,
   CreditLedgerDirection,
   CreditLedgerType,
+  CreditReservation,
+  CreditReservationStatus,
   OrderStatus,
   Pagination,
   PayChannel,
@@ -78,6 +84,47 @@ export type CreatePaymentTransactionInput = {
   createdAt: string;
 };
 
+export type CreateAiTaskInput = {
+  userId: string;
+  type: AiTaskType;
+  status: AiTaskStatus;
+  sourcePlatform: string | null;
+  targetPlatform: string | null;
+  prompt: string | null;
+  inputCode: string | null;
+  costPoints: number;
+  clientRequestId: string;
+  requestId: string;
+  errorCode: string | null;
+  errorMessage: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type UpdateAiTaskInput = {
+  status: AiTaskStatus;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  updatedAt: string;
+};
+
+export type CreateAiTaskResultInput = AiTaskResult;
+
+export type CreateCreditReservationInput = {
+  userId: string;
+  taskId: string;
+  amount: number;
+  status: CreditReservationStatus;
+  idempotencyKey: string;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type LedgerPage = {
   items: CreditLedger[];
   total: number;
@@ -87,6 +134,11 @@ export type AppliedCreditLedger = {
   account: CreditAccount;
   ledger: CreditLedger;
   duplicated: boolean;
+};
+
+export type AiTaskPage = {
+  items: AiTask[];
+  total: number;
 };
 
 export interface LightQuantRepository {
@@ -111,4 +163,16 @@ export interface LightQuantRepository {
   markOrderPaid(orderId: string, paidAt: string): Promise<RechargeOrder>;
   findPaymentTransactionByIdempotencyKey(idempotencyKey: string): Promise<PaymentTransaction | null>;
   createPaymentTransaction(input: CreatePaymentTransactionInput): Promise<PaymentTransaction>;
+  findAiTaskById(id: string): Promise<AiTask | null>;
+  findAiTaskByClientRequestId(userId: string, clientRequestId: string): Promise<AiTask | null>;
+  createAiTask(input: CreateAiTaskInput): Promise<AiTask>;
+  updateAiTask(taskId: string, input: UpdateAiTaskInput): Promise<AiTask>;
+  createAiTaskResult(input: CreateAiTaskResultInput): Promise<AiTaskResult>;
+  findAiTaskResult(taskId: string): Promise<AiTaskResult | null>;
+  listAiTasks(userId: string, pagination: Pagination, filters: { type?: AiTaskType; status?: AiTaskStatus }): Promise<AiTaskPage>;
+  findCreditReservationByIdempotencyKey(idempotencyKey: string): Promise<CreditReservation | null>;
+  findCreditReservationByTaskId(taskId: string): Promise<CreditReservation | null>;
+  createCreditReservation(input: CreateCreditReservationInput): Promise<CreditReservation>;
+  updateCreditReservationStatus(id: string, status: CreditReservationStatus, updatedAt: string): Promise<CreditReservation>;
+  getActiveReservedAmount(userId: string): Promise<number>;
 }

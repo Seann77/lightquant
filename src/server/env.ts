@@ -2,6 +2,7 @@ export class ServerConfigError extends Error {}
 
 export type DataMode = "mock" | "database";
 export type PaymentMode = "mock" | "wechat" | "alipay";
+export type AiProviderMode = "mock" | "openai" | "deepseek" | "dashscope";
 
 export function getDataMode(): DataMode {
   const mode = process.env.LIGHTQUANT_DATA_MODE ?? (process.env.NODE_ENV === "production" ? "database" : "mock");
@@ -57,4 +58,28 @@ export function getPaymentMode(): PaymentMode {
 
 export function isMockPaymentEnabled() {
   return process.env.PAYMENT_MOCK_ENABLED !== "false";
+}
+
+export function getAiProviderMode(): AiProviderMode {
+  const provider = process.env.LIGHTQUANT_AI_PROVIDER ?? (process.env.NODE_ENV === "production" ? "openai" : "mock");
+
+  if (provider !== "mock" && provider !== "openai" && provider !== "deepseek" && provider !== "dashscope") {
+    throw new ServerConfigError("LIGHTQUANT_AI_PROVIDER must be mock, openai, deepseek, or dashscope");
+  }
+
+  if (process.env.NODE_ENV === "production" && provider === "mock") {
+    throw new ServerConfigError("LIGHTQUANT_AI_PROVIDER=mock is not allowed in production");
+  }
+
+  return provider;
+}
+
+export function getAiModelName() {
+  return process.env.LIGHTQUANT_AI_MODEL || "lightquant-mock-model";
+}
+
+export function getAiTaskTimeoutMs() {
+  const value = Number(process.env.AI_TASK_TIMEOUT_MS ?? "60000");
+
+  return Number.isFinite(value) && value > 0 ? value : 60000;
 }
