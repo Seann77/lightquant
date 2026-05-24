@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getAuthSecret } from "@/server/env";
+import { ApiError } from "@/server/http/api-response";
 
 const SESSION_COOKIE = "lightquant_session";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
@@ -56,6 +57,16 @@ export async function getSessionUserId() {
   return session?.userId ?? null;
 }
 
+export async function requireSessionUserId() {
+  const userId = await getSessionUserId();
+
+  if (!userId) {
+    throw new ApiError("UNAUTHORIZED", "请先登录", 401);
+  }
+
+  return userId;
+}
+
 export function setSessionCookie(response: NextResponse, userId: string) {
   response.cookies.set({
     name: SESSION_COOKIE,
@@ -90,4 +101,3 @@ function safeEqual(left: string, right: string) {
 
   return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
 }
-

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { CreditActionPopover } from "@/components/shell/CreditActionPopover";
 import { Logo } from "@/components/shell/Logo";
 import { LoginModal } from "@/components/shell/LoginModal";
@@ -99,32 +99,22 @@ export function AppShell({ children }: AppShellProps) {
   const isLoggedIn = Boolean(currentUser);
   const userPoints = currentUser?.creditAccount.balance ?? 0;
 
-  useEffect(() => {
-    let cancelled = false;
+  const refreshCurrentUser = useCallback(async () => {
+    try {
+      const response = await fetch("/api/v1/me", {
+        cache: "no-store"
+      });
+      const payload = (await response.json()) as ApiResponse<CurrentUserData>;
 
-    async function loadCurrentUser() {
-      try {
-        const response = await fetch("/api/v1/me", {
-          cache: "no-store"
-        });
-        const payload = (await response.json()) as ApiResponse<CurrentUserData>;
-
-        if (!cancelled) {
-          setCurrentUser(payload.success ? payload.data : null);
-        }
-      } catch {
-        if (!cancelled) {
-          setCurrentUser(null);
-        }
-      }
+      setCurrentUser(payload.success ? payload.data : null);
+    } catch {
+      setCurrentUser(null);
     }
-
-    void loadCurrentUser();
-
-    return () => {
-      cancelled = true;
-    };
   }, []);
+
+  useEffect(() => {
+    void refreshCurrentUser();
+  }, [refreshCurrentUser]);
 
   function handleCreditStatusClick() {
     if (isLoggedIn) {
@@ -246,7 +236,7 @@ export function AppShell({ children }: AppShellProps) {
       </div>
 
       <LoginModal onClose={() => setLoginOpen(false)} onLoginSuccess={handleLoginSuccess} open={loginOpen} />
-      <RechargeModal onClose={() => setRechargeOpen(false)} open={rechargeOpen} points={userPoints} />
+      <RechargeModal onClose={() => setRechargeOpen(false)} onRechargeSuccess={refreshCurrentUser} open={rechargeOpen} points={userPoints} />
       <WechatQrModal onClose={() => setWechatOpen(false)} open={wechatOpen} />
     </div>
   );

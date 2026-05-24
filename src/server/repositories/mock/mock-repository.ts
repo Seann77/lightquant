@@ -1,13 +1,59 @@
 import { randomUUID } from "crypto";
-import type { CreditAccount, CreditLedger, SmsCodeRecord, User } from "@/server/domain";
+import type { CreditAccount, CreditLedger, PaymentTransaction, RechargeOrder, RechargePlan, SmsCodeRecord, User } from "@/server/domain";
 import type {
   AppliedCreditLedger,
   ApplyCreditLedgerInput,
+  CreatePaymentTransactionInput,
+  CreateRechargeOrderInput,
   CreateSmsCodeInput,
   CreateUserInput,
   LedgerPage,
   LightQuantRepository
 } from "@/server/repositories/types";
+
+const MOCK_PLAN_TIMESTAMP = "2026-01-01T00:00:00.000Z";
+
+const mockRechargePlans: RechargePlan[] = [
+  {
+    id: "starter",
+    name: "入门包",
+    description: "适合轻量体验与少量策略生成",
+    priceCents: 990,
+    points: 1000,
+    bonusPoints: 0,
+    totalPoints: 1000,
+    enabled: true,
+    sort: 10,
+    createdAt: MOCK_PLAN_TIMESTAMP,
+    updatedAt: MOCK_PLAN_TIMESTAMP
+  },
+  {
+    id: "standard",
+    name: "标准包",
+    description: "推荐日常使用，含 500 赠送积分",
+    priceCents: 2990,
+    points: 3000,
+    bonusPoints: 500,
+    totalPoints: 3500,
+    enabled: true,
+    sort: 20,
+    createdAt: MOCK_PLAN_TIMESTAMP,
+    updatedAt: MOCK_PLAN_TIMESTAMP
+  },
+  {
+    id: "pro",
+    name: "专业包",
+    description: "适合高频转换与策略迭代，含 1,000 赠送积分",
+    priceCents: 5990,
+    points: 7000,
+    bonusPoints: 1000,
+    totalPoints: 8000,
+    enabled: true,
+    sort: 30,
+    createdAt: MOCK_PLAN_TIMESTAMP,
+    updatedAt: MOCK_PLAN_TIMESTAMP
+  }
+];
 
 export class MockLightQuantRepository implements LightQuantRepository {
   private readonly users = new Map<string, User>();
@@ -17,6 +63,12 @@ export class MockLightQuantRepository implements LightQuantRepository {
   private readonly creditAccounts = new Map<string, CreditAccount>();
   private readonly creditLedger = new Map<string, CreditLedger>();
   private readonly ledgerByIdempotencyKey = new Map<string, string>();
+  private readonly rechargePlans = new Map<string, RechargePlan>(mockRechargePlans.map((plan) => [plan.id, plan]));
+  private readonly orders = new Map<string, RechargeOrder>();
+  private readonly ordersByOrderNo = new Map<string, string>();
+  private readonly ordersByClientRequestId = new Map<string, string>();
+  private readonly paymentTransactions = new Map<string, PaymentTransaction>();
+  private readonly paymentTransactionsByIdempotencyKey = new Map<string, string>();
 
   async createSmsCode(input: CreateSmsCodeInput) {
     const record: SmsCodeRecord = {
@@ -172,5 +224,86 @@ export class MockLightQuantRepository implements LightQuantRepository {
       total: allItems.length
     };
   }
+
+  async listEnabledRechargePlans() {
+    return [...this.rechargePlans.values()]
+      .filter((plan) => plan.enabled)
+      .sort((left, right) => left.sort - right.sort);
+  }
+
+  async findRechargePlanById(id: string) {
+    return this.rechargePlans.get(id) ?? null;
+  }
+
+  async findOrderById(id: string) {
+    return this.orders.get(id) ?? null;
+  }
+
+  async findOrderByOrderNo(orderNo: string) {
+    const orderId = this.ordersByOrderNo.get(orderNo);
+    return orderId ? this.findOrderById(orderId) : null;
+  }
+
+  async findRechargeOrderByClientRequestId(userId: string, clientRequestId: string) {
+    const orderId = this.ordersByClientRequestId.get(clientRequestKey(userId, clientRequestId));
+    return orderId ? this.findOrderById(orderId) : null;
+  }
+
+  async createRechargeOrder(input: CreateRechargeOrderInput) {
+    const order: RechargeOrder = {
+      id: randomUUID(),
+      ...input
+    };
+
+    this.orders.set(order.id, order);
+    this.ordersByOrderNo.set(order.orderNo, order.id);
+    this.ordersByClientRequestId.set(clientRequestKey(order.userId, order.clientRequestId), order.id);
+
+    return order;
+  }
+
+  async markOrderPaid(orderId: string, paidAt: string) {
+    const order = this.orders.get(orderId);
+
+    if (!order) {
+      throw new Error("Order not found");
+    }
+
+    const updated: RechargeOrder = {
+      ...order,
+      status: "PAID",
+      paidAt,
+      updatedAt: paidAt
+    };
+
+    this.orders.set(orderId, updated);
+    return updated;
+  }
+
+  async findPaymentTransactionByIdempotencyKey(idempotencyKey: string) {
+    const transactionId = this.paymentTransactionsByIdempotencyKey.get(idempotencyKey);
+    return transactionId ? this.paymentTransactions.get(transactionId) ?? null : null;
+  }
+
+  async createPaymentTransaction(input: CreatePaymentTransactionInput) {
+    const existing = await this.findPaymentTransactionByIdempotencyKey(input.idempotencyKey);
+
+    if (existing) {
+      return existing;
+    }
+
+    const transaction: PaymentTransaction = {
+      id: randomUUID(),
+      ...input
+    };
+
+    this.paymentTransactions.set(transaction.id, transaction);
+    this.paymentTransactionsByIdempotencyKey.set(transaction.idempotencyKey, transaction.id);
+
+    return transaction;
+  }
 }
 
+function clientRequestKey(userId: string, clientRequestId: string) {
+  return `${userId}:${clientRequestId}`;
+}

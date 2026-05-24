@@ -9,6 +9,9 @@ export type ApiErrorCode =
   | "VALIDATION_ERROR"
   | "RATE_LIMITED"
   | "IDEMPOTENCY_CONFLICT"
+  | "PAYMENT_CONFIG_ERROR"
+  | "ORDER_ALREADY_PAID"
+  | "PAYMENT_AMOUNT_MISMATCH"
   | "INTERNAL_ERROR";
 
 export class ApiError extends Error {
@@ -84,4 +87,3 @@ function normalizeError(error: unknown): { code: ApiErrorCode; message: string; 
     status: 500
   };
 }
-

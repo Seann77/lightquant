@@ -60,3 +60,52 @@ export type Pagination = {
   pageSize: number;
 };
 
+export type PayChannel = "wechat" | "alipay" | "mock";
+export type PaymentProvider = "wechat" | "alipay" | "mock";
+export type OrderStatus = "PENDING" | "PAID" | "CLOSED" | "FAILED";
+export type PaymentTransactionStatus = "NOTIFIED" | "VERIFIED" | "DUPLICATE" | "FAILED";
+
+export type RechargePlan = {
+  id: string;
+  name: string;
+  description: string;
+  priceCents: number;
+  points: number;
+  bonusPoints: number;
+  totalPoints: number;
+  enabled: boolean;
+  sort: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type RechargeOrder = {
+  id: string;
+  orderNo: string;
+  userId: string;
+  planId: string;
+  amountCents: number;
+  points: number;
+  bonusPoints: number;
+  totalPoints: number;
+  payChannel: PayChannel;
+  status: OrderStatus;
+  clientRequestId: string;
+  paidAt: string | null;
+  closedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PaymentTransaction = {
+  id: string;
+  orderId: string;
+  provider: PaymentProvider;
+  providerTradeNo: string;
+  notifyId: string;
+  amountCents: number;
+  status: PaymentTransactionStatus;
+  rawPayload: Record<string, unknown>;
+  idempotencyKey: string;
+  createdAt: string;
+};

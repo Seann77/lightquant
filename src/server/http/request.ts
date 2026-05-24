@@ -35,6 +35,22 @@ export function getStringField(body: Record<string, unknown>, field: string, req
   throw new ApiError("VALIDATION_ERROR", `${field} 参数不正确`, 400);
 }
 
+export function getNumberField(body: Record<string, unknown>, field: string): number;
+export function getNumberField(body: Record<string, unknown>, field: string, required: false): number | undefined;
+export function getNumberField(body: Record<string, unknown>, field: string, required = true) {
+  const value = body[field];
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (!required && value === undefined) {
+    return undefined;
+  }
+
+  throw new ApiError("VALIDATION_ERROR", `${field} 参数不正确`, 400);
+}
+
 export function getClientIp(request: NextRequest) {
   const forwardedFor = request.headers.get("x-forwarded-for");
 

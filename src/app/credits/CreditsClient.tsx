@@ -83,6 +83,7 @@ export function CreditsClient() {
   const [ledger, setLedger] = useState<LedgerData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -128,6 +129,18 @@ export function CreditsClient() {
 
     return () => {
       cancelled = true;
+    };
+  }, [refreshKey]);
+
+  useEffect(() => {
+    function handleCreditsUpdated() {
+      setRefreshKey((value) => value + 1);
+    }
+
+    window.addEventListener("lightquant:credits-updated", handleCreditsUpdated);
+
+    return () => {
+      window.removeEventListener("lightquant:credits-updated", handleCreditsUpdated);
     };
   }, []);
 
@@ -261,4 +274,3 @@ export function CreditsClient() {
     </section>
   );
 }
-

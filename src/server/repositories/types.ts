@@ -1,4 +1,20 @@
-import type { CreditAccount, CreditLedger, CreditLedgerDirection, CreditLedgerType, Pagination, SmsCodeRecord, SmsScene, User } from "@/server/domain";
+import type {
+  CreditAccount,
+  CreditLedger,
+  CreditLedgerDirection,
+  CreditLedgerType,
+  OrderStatus,
+  Pagination,
+  PayChannel,
+  PaymentProvider,
+  PaymentTransaction,
+  PaymentTransactionStatus,
+  RechargeOrder,
+  RechargePlan,
+  SmsCodeRecord,
+  SmsScene,
+  User
+} from "@/server/domain";
 
 export type CreateSmsCodeInput = {
   phone: string;
@@ -33,6 +49,35 @@ export type ApplyCreditLedgerInput = {
   createdAt: string;
 };
 
+export type CreateRechargeOrderInput = {
+  orderNo: string;
+  userId: string;
+  planId: string;
+  amountCents: number;
+  points: number;
+  bonusPoints: number;
+  totalPoints: number;
+  payChannel: PayChannel;
+  status: OrderStatus;
+  clientRequestId: string;
+  paidAt: string | null;
+  closedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreatePaymentTransactionInput = {
+  orderId: string;
+  provider: PaymentProvider;
+  providerTradeNo: string;
+  notifyId: string;
+  amountCents: number;
+  status: PaymentTransactionStatus;
+  rawPayload: Record<string, unknown>;
+  idempotencyKey: string;
+  createdAt: string;
+};
+
 export type LedgerPage = {
   items: CreditLedger[];
   total: number;
@@ -57,5 +102,13 @@ export interface LightQuantRepository {
   ensureCreditAccount(userId: string, now: string): Promise<CreditAccount>;
   applyCreditLedger(input: ApplyCreditLedgerInput): Promise<AppliedCreditLedger>;
   listCreditLedger(userId: string, pagination: Pagination): Promise<LedgerPage>;
+  listEnabledRechargePlans(): Promise<RechargePlan[]>;
+  findRechargePlanById(id: string): Promise<RechargePlan | null>;
+  findOrderById(id: string): Promise<RechargeOrder | null>;
+  findOrderByOrderNo(orderNo: string): Promise<RechargeOrder | null>;
+  findRechargeOrderByClientRequestId(userId: string, clientRequestId: string): Promise<RechargeOrder | null>;
+  createRechargeOrder(input: CreateRechargeOrderInput): Promise<RechargeOrder>;
+  markOrderPaid(orderId: string, paidAt: string): Promise<RechargeOrder>;
+  findPaymentTransactionByIdempotencyKey(idempotencyKey: string): Promise<PaymentTransaction | null>;
+  createPaymentTransaction(input: CreatePaymentTransactionInput): Promise<PaymentTransaction>;
 }
-

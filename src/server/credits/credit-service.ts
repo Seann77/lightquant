@@ -1,4 +1,4 @@
-import type { CreditAccount, CreditLedger, Pagination } from "@/server/domain";
+import type { CreditAccount, CreditLedger, Pagination, RechargeOrder, RechargePlan } from "@/server/domain";
 import { ApiError } from "@/server/http/api-response";
 import { getRepository } from "@/server/repositories";
 
@@ -37,6 +37,25 @@ export async function ensureSignupBonus(userId: string, requestId: string) {
     sourceId: userId,
     idempotencyKey: `signup_bonus:${userId}`,
     remark: "新用户注册赠送 500 基础积分",
+    createdAt: now
+  });
+}
+
+export async function applyRechargeCredit(order: RechargeOrder, plan: RechargePlan, requestId: string) {
+  const now = new Date().toISOString();
+  const repository = getRepository();
+
+  return repository.applyCreditLedger({
+    userId: order.userId,
+    requestId,
+    scene: "recharge",
+    type: "recharge",
+    direction: "in",
+    amount: order.totalPoints,
+    sourceType: "recharge",
+    sourceId: order.id,
+    idempotencyKey: `recharge:${order.id}`,
+    remark: `充值到账：${plan.name}，获得 ${order.totalPoints.toLocaleString("zh-CN")} 积分`,
     createdAt: now
   });
 }
@@ -124,6 +143,10 @@ function titleForLedger(ledger: CreditLedger) {
     return "新用户注册赠送";
   }
 
+  if (ledger.scene === "recharge") {
+    return "充值到账";
+  }
+
   return ledger.remark || "积分变动";
 }
 
@@ -143,4 +166,3 @@ function formatDateTime(value: string) {
     .format(new Date(value))
     .replace(/\//g, "-");
 }
-
