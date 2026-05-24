@@ -112,6 +112,7 @@ export type PaymentTransaction = {
 
 export type AiTaskType = "strategy_generation" | "code_conversion" | "code_analysis";
 export type AiTaskStatus = "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+export type AiTaskScopeStatus = "in_scope" | "out_of_scope";
 export type CreditReservationStatus = "RESERVED" | "CONFIRMED" | "RELEASED";
 
 export type AiTask = {
@@ -119,6 +120,7 @@ export type AiTask = {
   userId: string;
   type: AiTaskType;
   status: AiTaskStatus;
+  scopeStatus: AiTaskScopeStatus;
   sourcePlatform: string | null;
   targetPlatform: string | null;
   prompt: string | null;
@@ -137,6 +139,7 @@ export type AiTask = {
 export type AiTaskResult = {
   taskId: string;
   resultType: AiTaskType;
+  scopeStatus: AiTaskScopeStatus;
   generatedCode: string | null;
   explanation: string | null;
   migrationNotes: string | null;

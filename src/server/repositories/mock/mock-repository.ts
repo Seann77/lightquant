@@ -356,6 +356,7 @@ export class MockLightQuantRepository implements LightQuantRepository {
     const updated: AiTask = {
       ...task,
       status: input.status,
+      scopeStatus: input.scopeStatus === undefined ? task.scopeStatus : input.scopeStatus,
       errorCode: input.errorCode === undefined ? task.errorCode : input.errorCode,
       errorMessage: input.errorMessage === undefined ? task.errorMessage : input.errorMessage,
       startedAt: input.startedAt === undefined ? task.startedAt : input.startedAt,

@@ -3,7 +3,7 @@ import { applyRechargeCredit } from "@/server/credits/credit-service";
 import type { PayChannel, PaymentTransaction, RechargeOrder, RechargePlan } from "@/server/domain";
 import { ApiError } from "@/server/http/api-response";
 import { assertMockPaymentAvailable, createPaymentInfo } from "@/server/payments/payment-provider";
-import { getRepository } from "@/server/repositories";
+import { getRepository, withRepositoryTransaction } from "@/server/repositories";
 
 type CreateRechargeOrderInput = {
   planId: string;
@@ -97,6 +97,8 @@ export async function getPaymentStatusForUser(userId: string, orderId: string) {
 export async function handleMockPaymentNotify(input: MockNotifyInput, requestId: string) {
   assertMockPaymentAvailable();
 
+  return withRepositoryTransaction(async () => {
+
   if (!input.orderId && !input.orderNo) {
     throw new ApiError("VALIDATION_ERROR", "orderId 或 orderNo 至少提供一个", 400);
   }
@@ -175,6 +177,7 @@ export async function handleMockPaymentNotify(input: MockNotifyInput, requestId:
       account: creditResult.account
     }
   };
+  });
 }
 
 function toRechargePlanResponse(plan: RechargePlan) {

@@ -1,8 +1,8 @@
 import type { AiTask, AiTaskResult, AiTaskStatus, AiTaskType, Pagination } from "@/server/domain";
 import { getCreditAccountForUser, confirmReservation, refundConfirmedAiTaskCost, releaseReservation, reserveCredits } from "@/server/credits/credit-service";
 import { ApiError } from "@/server/http/api-response";
-import { getRepository } from "@/server/repositories";
-import { getAiTaskCost } from "@/server/ai/ai-pricing";
+import { getRepository, withRepositoryTransaction } from "@/server/repositories";
+import { getAiTaskConfig, getTotalInputChars, parseAiTaskType } from "@/server/ai/ai-task-config";
 import { runAiProvider } from "@/server/ai/ai-provider";
 
 type CreateAiTaskRequest = {
@@ -18,6 +18,8 @@ export async function createAndRunAiTask(userId: string, input: CreateAiTaskRequ
   const type = normalizeTaskType(input.type);
   const clientRequestId = normalizeNonEmpty(input.clientRequestId, "clientRequestId");
   const normalized = normalizeTaskInput(type, input);
+  const config = getAiTaskConfig(type);
+  assertInputWithinLimit(config, normalized);
   const repository = getRepository();
   const existing = await repository.findAiTaskByClientRequestId(userId, clientRequestId);
 
@@ -32,31 +34,39 @@ export async function createAndRunAiTask(userId: string, input: CreateAiTaskRequ
     };
   }
 
-  const now = new Date().toISOString();
-  let task = await repository.createAiTask({
-    userId,
-    type,
-    status: "PENDING",
-    sourcePlatform: normalized.sourcePlatform,
-    targetPlatform: normalized.targetPlatform,
-    prompt: normalized.prompt,
-    inputCode: normalized.inputCode,
-    costPoints: getAiTaskCost(type),
-    clientRequestId,
-    requestId,
-    errorCode: null,
-    errorMessage: null,
-    startedAt: null,
-    finishedAt: null,
-    createdAt: now,
-    updatedAt: now
-  });
+  let task: AiTask | null = null;
 
   try {
-    await reserveCredits({
-      userId,
-      taskId: task.id,
-      amount: task.costPoints
+    task = await withRepositoryTransaction(async () => {
+      const transactionRepository = getRepository();
+      const now = new Date().toISOString();
+      const createdTask = await transactionRepository.createAiTask({
+        userId,
+        type,
+        status: "PENDING",
+        scopeStatus: "in_scope",
+        sourcePlatform: normalized.sourcePlatform,
+        targetPlatform: normalized.targetPlatform,
+        prompt: normalized.prompt,
+        inputCode: normalized.inputCode,
+        costPoints: config.costPoints,
+        clientRequestId,
+        requestId,
+        errorCode: null,
+        errorMessage: null,
+        startedAt: null,
+        finishedAt: null,
+        createdAt: now,
+        updatedAt: now
+      });
+
+      await reserveCredits({
+        userId,
+        taskId: createdTask.id,
+        amount: createdTask.costPoints
+      });
+
+      return createdTask;
     });
 
     task = await repository.updateAiTask(task.id, {
@@ -71,6 +81,7 @@ export async function createAndRunAiTask(userId: string, input: CreateAiTaskRequ
     const result = await repository.createAiTaskResult({
       taskId: task.id,
       resultType: task.type,
+      scopeStatus: providerResult.scopeStatus,
       generatedCode: providerResult.generatedCode,
       explanation: providerResult.explanation,
       migrationNotes: providerResult.migrationNotes,
@@ -82,12 +93,13 @@ export async function createAndRunAiTask(userId: string, input: CreateAiTaskRequ
     });
     task = await repository.updateAiTask(task.id, {
       status: "SUCCEEDED",
+      scopeStatus: providerResult.scopeStatus,
       finishedAt: new Date().toISOString(),
       errorCode: null,
       errorMessage: null,
       updatedAt: new Date().toISOString()
     });
-    const credit = await confirmReservation(task, requestId);
+    const credit = await withRepositoryTransaction(() => confirmReservation(task as AiTask, requestId));
 
     return {
       task: toTaskResponse(task),
@@ -97,14 +109,22 @@ export async function createAndRunAiTask(userId: string, input: CreateAiTaskRequ
     };
   } catch (error) {
     const apiError = normalizeTaskError(error);
-    await releaseReservation(task.id);
 
-    const latestTask = await repository.updateAiTask(task.id, {
-      status: "FAILED",
-      errorCode: apiError.code,
-      errorMessage: apiError.message,
-      finishedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+    if (!task) {
+      throw apiError;
+    }
+
+    const taskToFail = task;
+    const latestTask = await withRepositoryTransaction(async () => {
+      await releaseReservation(taskToFail.id);
+
+      return getRepository().updateAiTask(taskToFail.id, {
+        status: "FAILED",
+        errorCode: apiError.code,
+        errorMessage: apiError.message,
+        finishedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
     });
 
     await refundConfirmedAiTaskCost(latestTask, requestId);
@@ -166,6 +186,7 @@ export function toTaskResponse(task: AiTask) {
     id: task.id,
     type: task.type,
     status: task.status,
+    scopeStatus: task.scopeStatus,
     sourcePlatform: task.sourcePlatform,
     targetPlatform: task.targetPlatform,
     prompt: task.prompt,
@@ -185,6 +206,7 @@ export function toResultResponse(result: AiTaskResult) {
   return {
     taskId: result.taskId,
     resultType: result.resultType,
+    scopeStatus: result.scopeStatus,
     generatedCode: result.generatedCode,
     explanation: result.explanation,
     migrationNotes: result.migrationNotes,
@@ -211,11 +233,7 @@ async function getOwnedTask(userId: string, taskId: string) {
 }
 
 function normalizeTaskType(value: string): AiTaskType {
-  if (value === "strategy_generation" || value === "code_conversion" || value === "code_analysis") {
-    return value;
-  }
-
-  throw new ApiError("VALIDATION_ERROR", "type 参数不正确", 400);
+  return parseAiTaskType(value);
 }
 
 function normalizeTaskStatus(value: string): AiTaskStatus {
@@ -255,7 +273,27 @@ function normalizeTaskInput(type: AiTaskType, input: CreateAiTaskRequest) {
 function normalizeOptionalText(value: string | undefined) {
   const normalized = value?.trim();
 
-  return normalized ? normalized.slice(0, 20000) : null;
+  return normalized || null;
+}
+
+function assertInputWithinLimit(
+  config: ReturnType<typeof getAiTaskConfig>,
+  input: {
+    sourcePlatform: string | null;
+    targetPlatform: string | null;
+    prompt: string | null;
+    inputCode: string | null;
+  }
+) {
+  const totalInputChars = getTotalInputChars(input);
+
+  if (totalInputChars > config.maxTotalInputChars) {
+    throw new ApiError(
+      "INPUT_TOO_LARGE",
+      `${config.displayName}内容过长，请拆分后提交。当前 ${totalInputChars.toLocaleString("zh-CN")} 字符，上限 ${config.maxTotalInputChars.toLocaleString("zh-CN")} 字符。`,
+      413
+    );
+  }
 }
 
 function normalizeNonEmpty(value: string, field: string) {
@@ -287,4 +325,3 @@ function normalizeTaskError(error: unknown) {
 
   return new ApiError("AI_TASK_FAILED", "AI 任务执行失败，请稍后再试", 500);
 }
-

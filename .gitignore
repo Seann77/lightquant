@@ -10,3 +10,5 @@ yarn-error.log*
 pnpm-debug.log*
 next-dev*.log
 qa-screenshots
+
+/src/generated/prisma

@@ -3,7 +3,7 @@ import type { SmsScene, User } from "@/server/domain";
 import { shouldExposeMockSmsCode } from "@/server/env";
 import { ensureSignupBonus, toCreditAccountResponse } from "@/server/credits/credit-service";
 import { ApiError } from "@/server/http/api-response";
-import { getRepository } from "@/server/repositories";
+import { getRepository, withRepositoryTransaction } from "@/server/repositories";
 
 const MOCK_SMS_CODE = "123456";
 const SMS_CODE_TTL_MINUTES = 10;
@@ -41,31 +41,33 @@ export async function loginWithSmsCode(input: {
 }) {
   const phone = normalizePhone(input.phone);
   const code = normalizeSmsCode(input.code);
-  const repository = getRepository();
-  const now = new Date().toISOString();
-  const smsCode = await repository.findSmsCodeForVerification(phone, "login", code, now);
+  return withRepositoryTransaction(async () => {
+    const repository = getRepository();
+    const now = new Date().toISOString();
+    const smsCode = await repository.findSmsCodeForVerification(phone, "login", code, now);
 
-  if (!smsCode) {
-    throw new ApiError("VALIDATION_ERROR", "验证码不正确或已过期", 400);
-  }
+    if (!smsCode) {
+      throw new ApiError("VALIDATION_ERROR", "验证码不正确或已过期", 400);
+    }
 
-  await repository.markSmsCodeUsed(smsCode.id, now);
+    await repository.markSmsCodeUsed(smsCode.id, now);
 
-  const existingUser = await repository.findUserByPhone(phone);
-  const user = existingUser ? await repository.updateUserLastLogin(existingUser.id, now) : await createUser(phone, input.inviteCode, now);
+    const existingUser = await repository.findUserByPhone(phone);
+    const user = existingUser ? await repository.updateUserLastLogin(existingUser.id, now) : await createUser(phone, input.inviteCode, now);
 
-  if (user.status !== "active") {
-    throw new ApiError("FORBIDDEN", "当前账号不可用", 403);
-  }
+    if (user.status !== "active") {
+      throw new ApiError("FORBIDDEN", "当前账号不可用", 403);
+    }
 
-  const appliedBonus = await ensureSignupBonus(user.id, input.requestId);
+    const appliedBonus = await ensureSignupBonus(user.id, input.requestId);
 
-  return {
-    user: toUserResponse(user),
-    creditAccount: toCreditAccountResponse(appliedBonus.account),
-    isNewUser: !existingUser,
-    signupBonusGranted: !appliedBonus.duplicated
-  };
+    return {
+      user: toUserResponse(user),
+      creditAccount: toCreditAccountResponse(appliedBonus.account),
+      isNewUser: !existingUser,
+      signupBonusGranted: !appliedBonus.duplicated
+    };
+  });
 }
 
 export async function getCurrentUserProfile(userId: string) {
@@ -153,4 +155,3 @@ function createInviteCode() {
 function maskPhone(phone: string) {
   return `${phone.slice(0, 3)}****${phone.slice(-4)}`;
 }
-

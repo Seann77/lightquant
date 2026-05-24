@@ -116,6 +116,18 @@ export function AppShell({ children }: AppShellProps) {
     void refreshCurrentUser();
   }, [refreshCurrentUser]);
 
+  useEffect(() => {
+    function handleCreditsUpdated() {
+      void refreshCurrentUser();
+    }
+
+    window.addEventListener("lightquant:credits-updated", handleCreditsUpdated);
+
+    return () => {
+      window.removeEventListener("lightquant:credits-updated", handleCreditsUpdated);
+    };
+  }, [refreshCurrentUser]);
+
   function handleCreditStatusClick() {
     if (isLoggedIn) {
       setCreditActionsOpen((open) => !open);

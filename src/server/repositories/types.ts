@@ -3,6 +3,7 @@ import type {
   AiTaskResult,
   AiTaskStatus,
   AiTaskType,
+  AiTaskScopeStatus,
   CreditAccount,
   CreditLedger,
   CreditLedgerDirection,
@@ -88,6 +89,7 @@ export type CreateAiTaskInput = {
   userId: string;
   type: AiTaskType;
   status: AiTaskStatus;
+  scopeStatus: AiTaskScopeStatus;
   sourcePlatform: string | null;
   targetPlatform: string | null;
   prompt: string | null;
@@ -105,6 +107,7 @@ export type CreateAiTaskInput = {
 
 export type UpdateAiTaskInput = {
   status: AiTaskStatus;
+  scopeStatus?: AiTaskScopeStatus;
   errorCode?: string | null;
   errorMessage?: string | null;
   startedAt?: string | null;

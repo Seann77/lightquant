@@ -1,0 +1,282 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserStatus {
+  active
+  disabled
+}
+
+enum SmsScene {
+  login
+}
+
+enum CreditLedgerDirection {
+  in
+  out
+}
+
+enum CreditLedgerStatus {
+  posted
+  voided
+}
+
+enum CreditLedgerType {
+  bonus
+  recharge
+  consume
+  refund
+}
+
+enum PayChannel {
+  wechat
+  alipay
+  mock
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CLOSED
+  FAILED
+}
+
+enum PaymentProvider {
+  wechat
+  alipay
+  mock
+}
+
+enum PaymentTransactionStatus {
+  NOTIFIED
+  VERIFIED
+  DUPLICATE
+  FAILED
+}
+
+enum AiTaskType {
+  strategy_generation
+  code_conversion
+  code_analysis
+}
+
+enum AiTaskStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum AiTaskScopeStatus {
+  in_scope
+  out_of_scope
+}
+
+enum CreditReservationStatus {
+  RESERVED
+  CONFIRMED
+  RELEASED
+}
+
+model User {
+  id          String          @id @default(uuid()) @db.Uuid
+  phone       String          @unique @db.VarChar(20)
+  displayName String          @map("display_name") @db.VarChar(80)
+  inviteCode  String          @unique @map("invite_code") @db.VarChar(32)
+  referredBy  String?         @map("referred_by") @db.Uuid
+  status      UserStatus      @default(active)
+  createdAt   DateTime        @map("created_at") @db.Timestamptz(3)
+  lastLoginAt DateTime        @map("last_login_at") @db.Timestamptz(3)
+
+  creditAccount       CreditAccount?
+  creditLedger        CreditLedger[]
+  creditReservations  CreditReservation[]
+  rechargeOrders      RechargeOrder[]
+  aiTasks             AiTask[]
+
+  @@map("users")
+}
+
+model SmsCode {
+  id        String    @id @default(uuid()) @db.Uuid
+  phone     String    @db.VarChar(20)
+  scene     SmsScene
+  codeHash  String?   @map("code_hash") @db.VarChar(255)
+  mockCode  String?   @map("mock_code") @db.VarChar(32)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(3)
+  requestIp String?   @map("request_ip") @db.VarChar(80)
+  createdAt DateTime  @map("created_at") @db.Timestamptz(3)
+
+  @@index([phone, scene, expiresAt])
+  @@map("sms_codes")
+}
+
+model CreditAccount {
+  userId      String   @id @map("user_id") @db.Uuid
+  balance     Int
+  totalEarned Int      @map("total_earned")
+  totalSpent  Int      @map("total_spent")
+  version     Int
+  updatedAt   DateTime @map("updated_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("credit_accounts")
+}
+
+model CreditLedger {
+  id             String                @id @default(uuid()) @db.Uuid
+  userId         String                @map("user_id") @db.Uuid
+  requestId      String                @map("request_id") @db.VarChar(80)
+  scene          String                @db.VarChar(80)
+  type           CreditLedgerType
+  direction      CreditLedgerDirection
+  amount         Int
+  balanceAfter   Int                   @map("balance_after")
+  status         CreditLedgerStatus
+  sourceType     String                @map("source_type") @db.VarChar(80)
+  sourceId       String                @map("source_id") @db.VarChar(120)
+  idempotencyKey String                @unique @map("idempotency_key") @db.VarChar(160)
+  remark         String                @db.Text
+  createdAt      DateTime              @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("credit_ledger")
+}
+
+model CreditReservation {
+  id             String                  @id @default(uuid()) @db.Uuid
+  userId         String                  @map("user_id") @db.Uuid
+  taskId         String                  @unique @map("task_id") @db.Uuid
+  amount         Int
+  status         CreditReservationStatus
+  idempotencyKey String                  @unique @map("idempotency_key") @db.VarChar(160)
+  expiresAt      DateTime                @map("expires_at") @db.Timestamptz(3)
+  createdAt      DateTime                @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime                @map("updated_at") @db.Timestamptz(3)
+
+  user User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task AiTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@map("credit_reservations")
+}
+
+model RechargePlan {
+  id          String   @id @db.VarChar(40)
+  name        String   @db.VarChar(80)
+  description String   @db.Text
+  priceCents  Int      @map("price_cents")
+  points      Int
+  bonusPoints Int      @map("bonus_points")
+  totalPoints Int      @map("total_points")
+  enabled     Boolean
+  sort        Int
+  createdAt   DateTime @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @map("updated_at") @db.Timestamptz(3)
+
+  orders RechargeOrder[]
+
+  @@map("recharge_plans")
+}
+
+model RechargeOrder {
+  id              String      @id @default(uuid()) @db.Uuid
+  orderNo         String      @unique @map("order_no") @db.VarChar(80)
+  userId          String      @map("user_id") @db.Uuid
+  planId          String      @map("plan_id") @db.VarChar(40)
+  amountCents     Int         @map("amount_cents")
+  points          Int
+  bonusPoints     Int         @map("bonus_points")
+  totalPoints     Int         @map("total_points")
+  payChannel      PayChannel  @map("pay_channel")
+  status          OrderStatus
+  clientRequestId String      @map("client_request_id") @db.VarChar(120)
+  paidAt          DateTime?   @map("paid_at") @db.Timestamptz(3)
+  closedAt        DateTime?   @map("closed_at") @db.Timestamptz(3)
+  createdAt       DateTime    @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime    @map("updated_at") @db.Timestamptz(3)
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan RechargePlan @relation(fields: [planId], references: [id])
+  transactions PaymentTransaction[]
+
+  @@unique([userId, clientRequestId])
+  @@index([userId, createdAt])
+  @@map("orders")
+}
+
+model PaymentTransaction {
+  id              String                   @id @default(uuid()) @db.Uuid
+  orderId         String                   @map("order_id") @db.Uuid
+  provider        PaymentProvider
+  providerTradeNo String                   @map("provider_trade_no") @db.VarChar(120)
+  notifyId        String                   @map("notify_id") @db.VarChar(160)
+  amountCents     Int                      @map("amount_cents")
+  status          PaymentTransactionStatus
+  rawPayload      Json                     @map("raw_payload")
+  idempotencyKey  String                   @unique @map("idempotency_key") @db.VarChar(160)
+  createdAt       DateTime                 @map("created_at") @db.Timestamptz(3)
+
+  order RechargeOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, notifyId])
+  @@index([orderId])
+  @@map("payment_transactions")
+}
+
+model AiTask {
+  id              String            @id @default(uuid()) @db.Uuid
+  userId          String            @map("user_id") @db.Uuid
+  type            AiTaskType
+  status          AiTaskStatus
+  scopeStatus     AiTaskScopeStatus @default(in_scope) @map("scope_status")
+  sourcePlatform  String?           @map("source_platform") @db.VarChar(80)
+  targetPlatform  String?           @map("target_platform") @db.VarChar(80)
+  prompt          String?           @db.Text
+  inputCode       String?           @map("input_code") @db.Text
+  costPoints      Int               @map("cost_points")
+  clientRequestId String            @map("client_request_id") @db.VarChar(120)
+  requestId       String            @map("request_id") @db.VarChar(80)
+  errorCode       String?           @map("error_code") @db.VarChar(80)
+  errorMessage    String?           @map("error_message") @db.Text
+  startedAt       DateTime?         @map("started_at") @db.Timestamptz(3)
+  finishedAt      DateTime?         @map("finished_at") @db.Timestamptz(3)
+  createdAt       DateTime          @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime          @map("updated_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  result AiTaskResult?
+  reservation CreditReservation?
+
+  @@unique([userId, clientRequestId])
+  @@index([userId, createdAt])
+  @@map("ai_tasks")
+}
+
+model AiTaskResult {
+  taskId         String            @id @map("task_id") @db.Uuid
+  resultType     AiTaskType        @map("result_type")
+  scopeStatus    AiTaskScopeStatus @map("scope_status")
+  generatedCode  String?           @map("generated_code") @db.Text
+  explanation    String?           @db.Text
+  migrationNotes String?           @map("migration_notes") @db.Text
+  riskWarnings   Json              @map("risk_warnings")
+  reportJson     Json?             @map("report_json")
+  model          String            @db.VarChar(120)
+  tokenUsage     Json              @map("token_usage")
+  createdAt      DateTime          @map("created_at") @db.Timestamptz(3)
+
+  task AiTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("ai_task_results")
+}
