@@ -1,9 +1,21 @@
 "use client";
 
-import { useState } from "react";
-import { Button } from "@/components/ui/Button";
-import { MaterialIcon } from "@/components/ui/MaterialIcon";
+import { useRef, useState, type ChangeEvent } from "react";
+import {
+  AlertTriangle,
+  Ban,
+  BarChart3,
+  CheckCircle2,
+  DollarSign,
+  FileUp,
+  LoaderCircle,
+  Sparkles,
+  Trash2,
+  type LucideIcon
+} from "lucide-react";
+import { getFileUploadFriendlyError, getScanStatusText, uploadCodeFile, type UploadedCodeFile } from "@/lib/file-upload";
 import { codeAnalysisPlatforms, codeAnalysisTabs } from "@/lib/mock-data";
+import { PlatformDropdown } from "@/components/ui/PlatformDropdown";
 
 type ApiResponse<T> =
   | { success: true; data: T; requestId: string }
@@ -30,6 +42,31 @@ export function CodeAnalysisClient() {
   const [activeTab, setActiveTab] = useState(codeAnalysisTabs[0]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [uploadedFile, setUploadedFile] = useState<UploadedCodeFile | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    setUploading(true);
+    setUploadError("");
+
+    try {
+      setUploadedFile(await uploadCodeFile(file));
+    } catch (uploadErrorValue) {
+      setUploadedFile(null);
+      setUploadError(getFileUploadFriendlyError(uploadErrorValue));
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function handleSubmit() {
     setLoading(true);
@@ -45,6 +82,7 @@ export function CodeAnalysisClient() {
           type: "code_analysis",
           sourcePlatform: platform,
           inputCode,
+          inputFileId: uploadedFile?.fileId,
           clientRequestId: createClientRequestId()
         })
       });
@@ -66,96 +104,77 @@ export function CodeAnalysisClient() {
   const report = data?.result?.reportJson;
 
   return (
-    <section className="mx-auto mt-xl flex w-full max-w-[1280px] flex-col items-center px-md pb-xxl md:px-xxl">
-      <header className="mb-lg w-full max-w-3xl text-center">
-        <h1 className="mb-sm text-display-lg font-bold tracking-tight text-ink">代码翻译解析</h1>
-        <p className="mb-xs text-body-lg text-secondary">将策略代码翻译成清晰的自然语言说明，并识别逻辑结构与潜在风险</p>
-        <p className="inline-block rounded-full bg-primary-soft/50 px-sm py-xxs text-caption-md text-primary-bright">
-          支持 PTrade、聚宽、QMT 策略代码
-        </p>
-        <p className="mt-xs text-caption-md text-secondary">每次代码解析消耗 100 积分</p>
-      </header>
+    <section className="lq-analysis-page min-h-full">
+      <section className="lq-title-block">
+        <h1>代码翻译解析</h1>
+        <p>将策略代码翻译成清晰的自然语言说明，并识别逻辑结构与潜在风险</p>
+      </section>
 
-      <section className="mb-xl w-full max-w-4xl rounded-xl border border-surface-container bg-paper p-lg shadow-[0_4px_16px_rgba(0,0,0,0.04)]">
-        <div className="mb-sm flex flex-wrap items-center gap-md">
-          <label className="flex items-center gap-xs text-caption-bold text-ink">
-            代码平台:
-            <select
-              className="rounded-md border border-steel bg-surface-container-low px-2 py-1 text-body-md text-ink outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-              onChange={(event) => setPlatform(event.target.value)}
-              value={platform}
-            >
-              {codeAnalysisPlatforms.map((item) => (
-                <option key={item}>{item}</option>
-              ))}
-            </select>
-          </label>
-
-          <button
-            className="ml-auto flex items-center gap-xs rounded-md px-sm py-1 text-button-md text-primary transition-colors hover:bg-primary-soft/50"
-            type="button"
-          >
-            <MaterialIcon size={18}>upload_file</MaterialIcon>
+      <section className="lq-analysis-card">
+        <div className="lq-analysis-toolbar">
+          <PlatformDropdown className="lq-analysis-platform-select" label="代码平台" onChange={setPlatform} options={codeAnalysisPlatforms} value={platform} />
+          <button className="lq-upload-chip" disabled={uploading} onClick={() => fileInputRef.current?.click()} type="button">
+            <FileUp aria-hidden="true" size={17} />
             上传 .py / .txt
           </button>
+          <input accept=".py,.txt" className="hidden" onChange={handleFileChange} ref={fileInputRef} type="file" />
         </div>
 
-        <div className="relative mb-sm h-52 w-full overflow-hidden rounded-lg border border-outline-variant bg-[#fafafa] transition-all focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
-          <div className="absolute bottom-0 left-0 top-0 flex w-10 select-none flex-col items-center border-r border-outline-variant bg-surface-container-lowest pt-sm font-mono text-caption-sm text-outline">
-            {[1, 2, 3, 4, 5].map((line) => (
-              <span key={line}>{line}</span>
+        <FileUploadStatus file={uploadedFile} message={uploadError} />
+
+        <div className="lq-analysis-editor">
+          <div className="lq-line-numbers">
+            {Array.from({ length: 5 }, (_, index) => (
+              <div key={index}>{index + 1}</div>
             ))}
           </div>
           <textarea
-            className="h-full w-full resize-none border-none bg-transparent py-sm pl-12 pr-md font-mono text-body-md text-ink outline-none placeholder:text-outline focus:ring-0"
+            className="lq-textarea lq-analysis-textarea"
             onChange={(event) => setInputCode(event.target.value)}
             placeholder="请粘贴需要解析的策略代码..."
             value={inputCode}
           />
         </div>
 
-        <div className="flex items-center justify-between gap-md">
-          <span className="flex items-center gap-xxs text-caption-md text-secondary">
-            <MaterialIcon className="text-primary-bright" size={16}>verified_user</MaterialIcon>
-            解析结果仅供学习参考，请自行复核代码逻辑
-          </span>
-          <div className="flex gap-sm">
+        <div className="lq-analysis-footer">
+          <div className="lq-analysis-actions">
             <button
-              className="rounded-md border border-steel px-md py-2 text-button-md text-secondary transition-colors hover:bg-surface-container-low hover:text-ink"
+              className="lq-secondary-btn"
               onClick={() => {
                 setInputCode("");
                 setData(null);
                 setError("");
+                setUploadedFile(null);
+                setUploadError("");
               }}
               type="button"
             >
+              <Trash2 aria-hidden="true" size={17} />
               清空内容
             </button>
-            <Button className="px-xl py-2 shadow-sm" disabled={loading || !inputCode.trim()} onClick={handleSubmit} type="button">
-              <MaterialIcon size={18}>play_arrow</MaterialIcon>
+            <button
+              className="lq-primary-btn"
+              disabled={loading || (!inputCode.trim() && !uploadedFile) || uploadedFile?.scanStatus === "BLOCKED"}
+              onClick={handleSubmit}
+              type="button"
+            >
+              {loading ? <LoaderCircle aria-hidden="true" className="animate-spin" size={18} /> : <Sparkles aria-hidden="true" size={18} />}
               {loading ? "解析中..." : "开始解析"}
-            </Button>
+            </button>
+            <div className="lq-cost-pill">
+              <DollarSign aria-hidden="true" />
+              <span>每次代码解析消耗 100 积分</span>
+            </div>
           </div>
         </div>
 
-        {error ? (
-          <div className="mt-md rounded-lg border border-error-container bg-error-container/20 px-sm py-sm text-caption-md text-bloom-deep">
-            {error}
-          </div>
-        ) : null}
+        {error ? <div className="mx-[18px] mb-4"><ErrorPanel message={error} /></div> : null}
       </section>
 
-      <section className="w-full max-w-4xl">
-        <div className="mb-md flex overflow-x-auto border-b border-steel app-scrollbar">
+      <section className="lq-analysis-results">
+        <div className="lq-result-tabs">
           {codeAnalysisTabs.map((tab) => (
-            <button
-              className={`whitespace-nowrap border-b-2 px-md py-sm text-button-md transition-colors ${
-                tab === activeTab ? "border-primary text-primary" : "border-transparent text-secondary hover:text-ink"
-              }`}
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              type="button"
-            >
+            <button className={`lq-result-tab ${tab === activeTab ? "is-active" : ""}`} key={tab} onClick={() => setActiveTab(tab)} type="button">
               {tab}
             </button>
           ))}
@@ -164,16 +183,44 @@ export function CodeAnalysisClient() {
         {data?.result ? (
           <AnalysisResult activeTab={activeTab} costPoints={data.task.costPoints} report={report} result={data.result} />
         ) : (
-          <div className="flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-dashed border-steel bg-paper p-xxl text-center">
-            <div className="mb-md flex h-16 w-16 items-center justify-center rounded-full bg-surface-container-low">
-              <MaterialIcon className="text-outline" size={32}>analytics</MaterialIcon>
+          <div className="lq-empty-result">
+            <div className="lq-empty-icon">
+              <BarChart3 aria-hidden="true" size={25} />
             </div>
-            <h2 className="mb-xs text-body-emphasis text-ink">解析结果将在这里显示</h2>
-            <p className="max-w-sm text-caption-md text-secondary">粘贴您的策略代码并点击“开始解析”，系统将自动生成详细的说明报告。</p>
+            <h2>{loading ? "正在生成解析报告" : "解析结果将在这里显示"}</h2>
+            <p>粘贴您的策略代码并点击“开始解析”，系统将自动生成详细的说明报告。</p>
           </div>
         )}
       </section>
     </section>
+  );
+}
+
+function FileUploadStatus({ file, message }: { file: UploadedCodeFile | null; message: string }) {
+  if (!file && !message) {
+    return null;
+  }
+
+  if (message) {
+    return <div className="lq-file-status is-error mx-[18px]">{message}</div>;
+  }
+
+  if (!file) {
+    return null;
+  }
+
+  const blocked = file.scanStatus === "BLOCKED";
+  const StatusIcon: LucideIcon = blocked ? Ban : file.scanStatus === "WARNING" ? AlertTriangle : CheckCircle2;
+
+  return (
+    <div className={`lq-file-status mx-[18px] ${blocked ? "is-blocked" : ""}`}>
+      <div className="flex flex-wrap items-center gap-2">
+        <StatusIcon aria-hidden="true" size={16} />
+        <span>{file.originalName}</span>
+        <span>{getScanStatusText(file)}</span>
+      </div>
+      {file.riskFlags.length > 0 ? <div className="mt-1 break-words">风险标记：{file.riskFlags.join("、")}</div> : null}
+    </div>
   );
 }
 
@@ -191,18 +238,22 @@ function AnalysisResult({
   const content = getTabContent(activeTab, report, result);
 
   return (
-    <div className="rounded-xl border border-surface-container bg-paper p-xl shadow-[0_4px_16px_rgba(0,0,0,0.04)]">
-      <div className="mb-md flex items-center justify-between gap-sm">
-        <h2 className="text-body-emphasis text-ink">{activeTab}</h2>
-        <span className="rounded-full bg-primary-soft px-sm py-xxs text-caption-sm text-primary-bright">已扣除 {costPoints} 积分</span>
+    <div className="lq-analysis-output">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="m-0 text-lg font-extrabold text-[#111827]">{activeTab}</h2>
+        <span className="lq-cost-tag">已扣除 {costPoints} 积分</span>
       </div>
-      <div className="space-y-sm text-body-md text-on-surface-variant">
+      <div className="grid gap-3">
         {content.map((item) => (
-          <p key={item}>{item}</p>
+          <p className="m-0" key={item}>{item}</p>
         ))}
       </div>
     </div>
   );
+}
+
+function ErrorPanel({ message }: { message: string }) {
+  return <div className="lq-error-panel">{message}</div>;
 }
 
 function getTabContent(activeTab: string, report: Record<string, unknown> | null | undefined, result: NonNullable<AiTaskData["result"]>) {

@@ -1,48 +1,49 @@
+import Image from "next/image";
 import Link from "next/link";
-import { MaterialIcon } from "@/components/ui/MaterialIcon";
-import { Panel } from "@/components/ui/Panel";
+import { ArrowUpRight, Code2, Repeat2, Sparkles, type LucideIcon } from "lucide-react";
 import { homeFeatures, homeHero } from "@/lib/mock-data";
+
+const featureIcons: Record<string, LucideIcon> = {
+  auto_awesome: Sparkles,
+  code: Code2,
+  translate: Repeat2
+};
 
 export default function HomePage() {
   return (
-    <section className="relative flex min-h-full w-full min-w-0 flex-col items-center justify-start p-md py-12 md:justify-center md:p-xxl">
-      <section className="mx-auto mb-section w-full max-w-[calc(100vw-32px)] min-w-0 text-center md:max-w-3xl">
-        <h1 className="mb-sm text-[44px] font-medium leading-none tracking-tight text-ink-deep sm:text-[56px] md:text-display-xxl">
-          {homeHero.title} <span className="block text-primary-bright sm:inline">{homeHero.product}</span>
+    <section className="lq-home-page">
+      <section className="lq-home-hero">
+        <div className="lq-ai-badge">
+          <Image alt="" height={24} src="/lightquant/lightquant-app-icon.png" width={24} />
+          <span>LightQuant AI Platform</span>
+        </div>
+        <h1>
+          {homeHero.title} <span>{homeHero.product}</span>
         </h1>
-        <p className="mx-auto w-full max-w-xl px-2 text-[18px] font-medium leading-[1.22] text-secondary sm:text-display-xs">
-          {homeHero.subtitle}
-        </p>
+        <p>{homeHero.subtitle.replace("——", "与").replace(" 相互转化", "相互转化")}</p>
+        <div className="lq-home-support-pill">
+          <Sparkles aria-hidden="true" size={16} strokeWidth={1.8} />
+          <span>支持 PTrade、聚宽、QMT 策略代码</span>
+        </div>
       </section>
 
-      <section className="mx-auto grid w-full max-w-[calc(100vw-32px)] min-w-0 grid-cols-1 justify-items-center gap-xl md:max-w-5xl md:grid-cols-3">
-        {homeFeatures.map((feature) => (
-          <Panel
-            className="group relative h-[200px] w-[calc(100vw-32px)] max-w-full min-w-0 overflow-hidden transition-all hover:border-primary-bright/30 md:w-auto"
-            key={feature.title}
-          >
-            <Link className="flex h-full flex-col p-xl text-left" href={feature.href}>
-              <span
-                className={`mb-auto flex h-12 w-12 items-center justify-center rounded-lg transition-colors ${
-                  feature.active
-                    ? "bg-primary-soft text-primary-bright"
-                    : "bg-surface-container text-ink-soft group-hover:bg-primary-soft group-hover:text-primary-bright"
-                }`}
-              >
-                <MaterialIcon fill={feature.active} size={28}>
-                  {feature.icon}
-                </MaterialIcon>
-              </span>
+      <section aria-label="功能入口" className="lq-home-cards">
+        {homeFeatures.map((feature) => {
+          const Icon = featureIcons[feature.icon] ?? Sparkles;
 
-              <span className="w-full min-w-0">
-                <span className="mb-xxs block text-display-xs text-ink transition-colors group-hover:text-primary-bright">
-                  {feature.title}
-                </span>
-                <span className="block text-caption-md text-secondary">{feature.description}</span>
+          return (
+            <Link className="lq-feature-card" href={feature.href} key={feature.title}>
+              <span className="lq-icon-button lq-feature-card-arrow">
+                <ArrowUpRight aria-hidden="true" size={18} />
               </span>
+              <span className="lq-feature-card-icon">
+                <Icon aria-hidden="true" size={25} strokeWidth={1.8} />
+              </span>
+              <h2>{feature.title}</h2>
+              <p>{feature.description}</p>
             </Link>
-          </Panel>
-        ))}
+          );
+        })}
       </section>
     </section>
   );

@@ -1,4 +1,4 @@
-import type { AiTask, CreditAccount, CreditLedger, CreditReservation, Pagination, RechargeOrder, RechargePlan } from "@/server/domain";
+import type { AiTask, CreditAccount, CreditLedger, CreditReservation, Pagination, RechargeOrder } from "@/server/domain";
 import { ApiError } from "@/server/http/api-response";
 import { getRepository } from "@/server/repositories";
 
@@ -41,7 +41,7 @@ export async function ensureSignupBonus(userId: string, requestId: string) {
   });
 }
 
-export async function applyRechargeCredit(order: RechargeOrder, plan: RechargePlan, requestId: string) {
+export async function applyRechargeCredit(order: RechargeOrder, requestId: string) {
   const now = new Date().toISOString();
   const repository = getRepository();
 
@@ -55,7 +55,7 @@ export async function applyRechargeCredit(order: RechargeOrder, plan: RechargePl
     sourceType: "recharge",
     sourceId: order.id,
     idempotencyKey: `recharge:${order.id}`,
-    remark: `充值到账：${plan.name}，获得 ${order.totalPoints.toLocaleString("zh-CN")} 积分`,
+    remark: `充值到账：订单 ${order.orderNo}，获得 ${order.totalPoints.toLocaleString("zh-CN")} 积分`,
     createdAt: now
   });
 }

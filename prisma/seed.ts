@@ -1,6 +1,9 @@
-import "dotenv/config";
+import { config as loadEnv } from "dotenv";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
+
+loadEnv({ path: ".env.local" });
+loadEnv({ path: ".env" });
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({
@@ -72,7 +75,6 @@ async function main() {
   }
 }
 
-main()
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+main().finally(async () => {
+  await prisma.$disconnect();
+});

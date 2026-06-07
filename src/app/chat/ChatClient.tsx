@@ -1,9 +1,26 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Button } from "@/components/ui/Button";
-import { MaterialIcon } from "@/components/ui/MaterialIcon";
+import { useRef, useState, type ChangeEvent } from "react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Ban,
+  Bot,
+  CheckCircle2,
+  Code2,
+  DollarSign,
+  FileUp,
+  LoaderCircle,
+  MessageCircle,
+  Paperclip,
+  Send,
+  Sparkles,
+  Trash2,
+  type LucideIcon
+} from "lucide-react";
+import { getFileUploadFriendlyError, getScanStatusText, uploadCodeFile, type UploadedCodeFile } from "@/lib/file-upload";
 import { chatPlatformOptions, convertPlatforms } from "@/lib/mock-data";
+import { PlatformDropdown } from "@/components/ui/PlatformDropdown";
 
 type ApiResponse<T> =
   | { success: true; data: T; requestId: string }
@@ -34,6 +51,8 @@ type ChatClientProps = {
   mode: "strategy" | "convert";
 };
 
+const conversionTabs = ["目标平台代码", "迁移说明", "风险提醒"] as const;
+
 export function ChatClient({ mode }: ChatClientProps) {
   if (mode === "convert") {
     return <ConvertModeContent />;
@@ -45,19 +64,47 @@ export function ChatClient({ mode }: ChatClientProps) {
 function StrategyModeContent() {
   const [targetPlatform, setTargetPlatform] = useState(chatPlatformOptions[0]);
   const [prompt, setPrompt] = useState("");
+  const [submittedPrompt, setSubmittedPrompt] = useState("");
   const [taskData, setTaskData] = useState<AiTaskData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [uploadedFile, setUploadedFile] = useState<UploadedCodeFile | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    setUploading(true);
+    setUploadError("");
+
+    try {
+      setUploadedFile(await uploadCodeFile(file));
+    } catch (uploadErrorValue) {
+      setUploadedFile(null);
+      setUploadError(getFileUploadFriendlyError(uploadErrorValue));
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function handleSubmit() {
     setLoading(true);
     setError("");
+    setSubmittedPrompt(prompt.trim() || (uploadedFile ? `已上传文件：${uploadedFile.originalName}` : ""));
 
     try {
       const data = await createAiTask({
         type: "strategy_generation",
         targetPlatform,
         prompt,
+        inputFileId: uploadedFile?.fileId,
         clientRequestId: createClientRequestId("strategy")
       });
 
@@ -71,66 +118,79 @@ function StrategyModeContent() {
   }
 
   return (
-    <section className="relative flex h-full min-h-full flex-col overflow-hidden bg-paper">
-      <div className="flex flex-shrink-0 items-center gap-md overflow-x-auto border-b border-surface-container-highest bg-surface-bright px-xl py-sm">
-        <div className="mx-auto flex w-full max-w-4xl items-center gap-md">
-          <span className="whitespace-nowrap text-caption-bold text-secondary">目标平台:</span>
-          {chatPlatformOptions.map((platform) => {
-            const active = platform === targetPlatform;
-
-            return (
-              <button
-                className={`flex whitespace-nowrap rounded-full border px-sm py-xs text-button-sm transition-colors ${
-                  active
-                    ? "items-center gap-xxs border-primary bg-primary-container text-on-primary-container"
-                    : "border-steel bg-paper text-secondary hover:bg-fog"
-                }`}
-                key={platform}
-                onClick={() => setTargetPlatform(platform)}
-                type="button"
-              >
-                {active ? <MaterialIcon size={14}>check_circle</MaterialIcon> : null}
-                {platform}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto bg-background p-xl pb-[180px] app-scrollbar">
-        <div className="mx-auto flex w-full max-w-4xl flex-col gap-xl">
-          <ChatBubble role="assistant" text="请输入策略需求，我会在服务端创建 AI 任务，成功后再扣除 50 积分。" />
-          {prompt && taskData ? <ChatBubble role="user" text={prompt} /> : null}
-          {loading ? <ChatBubble role="assistant" text="正在生成策略..." loading /> : null}
-          {taskData?.result ? <StrategyResult data={taskData} /> : null}
-          {error ? <ErrorPanel message={error} /> : null}
-        </div>
-      </div>
-
-      <div className="absolute bottom-0 left-0 right-0 z-30 flex flex-col items-center bg-gradient-to-t from-paper via-paper to-transparent px-xl pb-xl pt-xl">
-        <div className="relative flex w-full max-w-4xl flex-col rounded-xl border border-steel bg-paper shadow-[0_-4px_24px_rgba(0,0,0,0.06)] transition-colors focus-within:border-primary">
-          <textarea
-            className="max-h-[200px] min-h-20 w-full resize-none border-none bg-transparent p-md text-body-md text-ink outline-none placeholder:text-secondary-fixed-dim focus:ring-0"
-            onChange={(event) => setPrompt(event.target.value)}
-            placeholder="输入策略需求，或粘贴代码片段..."
-            value={prompt}
-          />
-          <div className="flex items-center justify-between rounded-b-xl border-t border-surface-container-highest bg-surface-bright p-sm">
+    <section className="lq-strategy-page">
+      <section className="lq-platform-strip is-subtle">
+        <div className="lq-platform-inner">
+          <span className="lq-platform-label">目标平台：</span>
+          {chatPlatformOptions.map((platform) => (
             <button
-              className="flex items-center gap-xs rounded px-sm py-xs text-button-sm text-secondary transition-colors hover:bg-surface-container hover:text-ink"
+              className={`lq-pill ${platform === targetPlatform ? "is-active" : ""}`}
+              key={platform}
+              onClick={() => setTargetPlatform(platform)}
               type="button"
             >
-              <MaterialIcon size={18}>attach_file</MaterialIcon>
-              上传策略/日志 (.py, .txt)
+              {platform}
             </button>
-            <Button className="h-10 px-xl py-xs shadow-sm" disabled={loading || !prompt.trim()} onClick={handleSubmit} size="sm" type="button">
-              <MaterialIcon size={18}>send</MaterialIcon>
-              {loading ? "生成中" : "发送"}
-            </Button>
+          ))}
+        </div>
+      </section>
+
+      <section className="lq-workspace">
+        <SignalRibbon />
+
+        <div className="lq-strategy-thread">
+          <div className="lq-message-stack">
+            <ChatBubble role="assistant" text="请输入策略需求，我会在服务端创建 AI 任务，成功后再扣除 50 积分。" />
+            {submittedPrompt ? <ChatBubble role="user" text={submittedPrompt} /> : null}
+            {loading ? <ChatBubble loading role="assistant" text="正在生成策略..." /> : null}
+            {taskData?.result ? (
+              <div className="lq-assistant-row">
+                <StrategyResult data={taskData} />
+              </div>
+            ) : null}
+            {error ? (
+              <div className="lq-assistant-row">
+                <ErrorPanel message={error} />
+              </div>
+            ) : null}
           </div>
         </div>
-        <div className="mt-xs text-center text-caption-sm text-secondary-fixed-dim">AI 生成的策略代码需自行回测验证，投资有风险。</div>
-      </div>
+
+        <div className="lq-composer-wrap">
+          <div className="lq-composer">
+            <textarea
+              className="lq-composer-textarea"
+              onChange={(event) => setPrompt(event.target.value)}
+              placeholder="输入策略需求，或粘贴代码片段..."
+              value={prompt}
+            />
+            <div className="lq-composer-bottom">
+              <button className="lq-upload-chip" disabled={uploading} onClick={() => fileInputRef.current?.click()} type="button">
+                <Paperclip aria-hidden="true" size={18} />
+                上传策略/日志 (.py, .txt)
+              </button>
+              <input accept=".py,.txt" className="hidden" onChange={handleFileChange} ref={fileInputRef} type="file" />
+              <div className="lq-composer-actions">
+                <div className="lq-cost-pill">
+                  <DollarSign aria-hidden="true" />
+                  <span>每次策略生成消耗 50 积分</span>
+                </div>
+                <button
+                  className="lq-primary-btn"
+                  disabled={loading || (!prompt.trim() && !uploadedFile) || uploadedFile?.scanStatus === "BLOCKED"}
+                  onClick={handleSubmit}
+                  type="button"
+                >
+                  {loading ? <LoaderCircle aria-hidden="true" className="animate-spin" size={18} /> : <Send aria-hidden="true" size={18} />}
+                  {loading ? "生成中" : "发送"}
+                </button>
+              </div>
+            </div>
+            <FileUploadStatus file={uploadedFile} message={uploadError} />
+          </div>
+          <p className="lq-risk">AI 生成策略需自行回测验证，投资有风险，请谨慎使用。</p>
+        </div>
+      </section>
     </section>
   );
 }
@@ -141,8 +201,34 @@ function ConvertModeContent() {
   const [inputCode, setInputCode] = useState("");
   const [prompt, setPrompt] = useState("");
   const [taskData, setTaskData] = useState<AiTaskData | null>(null);
+  const [activeTab, setActiveTab] = useState<(typeof conversionTabs)[number]>(conversionTabs[0]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [uploadedFile, setUploadedFile] = useState<UploadedCodeFile | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    setUploading(true);
+    setUploadError("");
+
+    try {
+      setUploadedFile(await uploadCodeFile(file));
+    } catch (uploadErrorValue) {
+      setUploadedFile(null);
+      setUploadError(getFileUploadFriendlyError(uploadErrorValue));
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function handleSubmit() {
     setLoading(true);
@@ -155,10 +241,12 @@ function ConvertModeContent() {
         targetPlatform,
         inputCode,
         prompt,
+        inputFileId: uploadedFile?.fileId,
         clientRequestId: createClientRequestId("convert")
       });
 
       setTaskData(data);
+      setActiveTab(conversionTabs[0]);
       window.dispatchEvent(new Event("lightquant:credits-updated"));
     } catch (submitError) {
       setError(getFriendlyError(submitError));
@@ -168,51 +256,57 @@ function ConvertModeContent() {
   }
 
   const result = taskData?.result;
+  const panelContent = getConversionTabContent(activeTab, result);
 
   return (
-    <section className="flex min-h-full flex-col p-md md:p-xxl">
-      <section className="mx-auto mb-lg max-w-3xl space-y-sm text-center">
-        <h1 className="text-display-lg font-bold tracking-tight text-ink">平台代码转换</h1>
-        <p className="text-body-lg leading-relaxed text-secondary">将不同量化平台的策略代码转换为目标平台可读、可改、可验证的版本</p>
+    <section className="min-h-full">
+      <section className="lq-title-block">
+        <h1>平台代码转换</h1>
+        <p>将不同量化平台的策略代码转换为目标平台可读、可改、可验证的版本</p>
       </section>
 
-      <section className="mx-auto mb-xl flex w-full max-w-5xl flex-col gap-lg rounded-16 border border-surface-container-high bg-paper p-lg shadow-soft-lift">
-        <div className="flex flex-wrap items-center justify-between gap-md rounded-lg border border-surface-container-highest bg-surface-container-low p-md sm:flex-nowrap">
-          <PlatformSelect label="源平台" onChange={setSourcePlatform} options={convertPlatforms.source} tone="muted" value={sourcePlatform} />
-          <div className="flex items-center justify-center px-md text-outline">
-            <MaterialIcon size={24}>arrow_forward</MaterialIcon>
+      <section className="lq-workbench is-compact">
+        <div className="lq-platform-select-row">
+          <div className="lq-platform-select-group">
+            <PlatformSelectCard label="源平台" onChange={setSourcePlatform} options={convertPlatforms.source} value={sourcePlatform} />
+            <button aria-label="转换方向" className="lq-platform-swap" type="button">
+              <ArrowRight aria-hidden="true" size={17} />
+            </button>
+            <PlatformSelectCard isTarget label="目标平台" onChange={setTargetPlatform} options={convertPlatforms.target} value={targetPlatform} />
           </div>
-          <PlatformSelect label="目标平台" onChange={setTargetPlatform} options={convertPlatforms.target} tone="primary" value={targetPlatform} />
         </div>
 
-        <div className="grid min-h-[430px] grid-cols-1 gap-lg lg:grid-cols-2">
-          <div className="flex min-h-0 flex-col gap-sm">
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-steel/50 bg-surface">
-              <div className="flex items-center justify-between border-b border-steel/30 bg-surface-bright px-md py-sm">
-                <div className="flex items-center gap-sm">
-                  <MaterialIcon className="text-outline" size={18}>code</MaterialIcon>
-                  <span className="text-caption-bold text-ink">源代码输入</span>
+        <div className="lq-workspace-grid">
+          <div className="lq-column">
+            <div className="lq-editor-card">
+              <div className="lq-card-head">
+                <div className="lq-head-title">
+                  <Code2 aria-hidden="true" />
+                  <span>源代码输入</span>
                 </div>
-                <button className="flex items-center gap-xxs rounded border border-steel/40 bg-canvas px-sm py-xxs text-caption-sm text-secondary transition-colors hover:text-primary-bright" type="button">
-                  <MaterialIcon size={16}>upload_file</MaterialIcon>
-                  上传 .py / .txt
+                <button className="lq-upload-chip" disabled={uploading} onClick={() => fileInputRef.current?.click()} type="button">
+                  <FileUp aria-hidden="true" size={16} />
+                  上传 .py/.txt
                 </button>
+                <input accept=".py,.txt" className="hidden" onChange={handleFileChange} ref={fileInputRef} type="file" />
               </div>
+              <FileUploadStatus file={uploadedFile} message={uploadError} />
               <textarea
-                className="min-h-[260px] flex-1 resize-none border-none bg-transparent p-md font-mono text-[14px] leading-relaxed text-charcoal outline-none placeholder:text-secondary-fixed-dim focus:ring-0"
+                className="lq-textarea lq-code-input"
                 onChange={(event) => setInputCode(event.target.value)}
                 placeholder="请粘贴需要转换的策略代码..."
                 value={inputCode}
               />
             </div>
 
-            <div className="space-y-sm rounded-xl border border-steel/50 bg-surface p-md">
-              <label className="flex items-center gap-xs text-caption-bold text-ink">
-                <MaterialIcon className="text-primary-bright" size={18}>chat_bubble_outline</MaterialIcon>
-                转换要求 (可选)
+            <div className="lq-requirement-card">
+              <label className="lq-requirement-label" htmlFor="conversion-requirement">
+                <MessageCircle aria-hidden="true" />
+                <span>转换要求（可选）</span>
               </label>
               <textarea
-                className="h-16 w-full resize-none rounded-lg border border-steel/40 bg-canvas p-sm text-body-md text-ink outline-none placeholder:text-secondary-fixed-dim focus:border-primary-bright focus:ring-1 focus:ring-primary-bright"
+                className="lq-textarea"
+                id="conversion-requirement"
                 onChange={(event) => setPrompt(event.target.value)}
                 placeholder="例如：保留原策略的止损逻辑，优先使用目标平台的内置数据获取函数..."
                 value={prompt}
@@ -220,25 +314,27 @@ function ConvertModeContent() {
             </div>
           </div>
 
-          <div className="flex min-h-0 flex-col gap-sm">
-            <div className="flex min-h-[420px] flex-col overflow-hidden rounded-xl border border-charcoal bg-ink shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
-              <div className="flex border-b border-charcoal/50 bg-ink-deep">
-                {["目标平台代码", "迁移说明", "风险提醒"].map((tab, index) => (
-                  <button
-                    className={`flex-1 border-b-2 px-md py-sm text-center text-caption-bold transition-colors ${
-                      index === 0 ? "border-primary-bright bg-ink-soft/50 text-canvas" : "border-transparent text-outline"
-                    }`}
-                    key={tab}
-                    type="button"
-                  >
+          <div className="lq-column">
+            <div className="lq-result-panel">
+              <div className="lq-tabs">
+                {conversionTabs.map((tab) => (
+                  <button className={`lq-tab ${tab === activeTab ? "is-active" : ""}`} key={tab} onClick={() => setActiveTab(tab)} type="button">
                     {tab}
                   </button>
                 ))}
               </div>
-              <div className="flex-1 overflow-auto bg-[#1e1e1e] p-md app-scrollbar">
-                <pre className="whitespace-pre-wrap font-mono text-[13px] leading-relaxed text-steel">
-                  <code>{result?.generatedCode ?? result?.explanation ?? "转换结果将在这里显示"}</code>
-                </pre>
+              <div className="lq-code-preview app-scrollbar">
+                <div className="lq-code-lines">{Array.from({ length: 10 }, (_, index) => <div key={index}>{index + 1}</div>)}</div>
+                {panelContent ? (
+                  <pre className="m-0 whitespace-pre-wrap text-[#c8d5ea]">
+                    <code>{panelContent}</code>
+                  </pre>
+                ) : (
+                  <div className="lq-result-placeholder">
+                    <BotIcon />
+                    <span>{loading ? "正在转换策略代码..." : "转换结果将在这里显示"}</span>
+                  </div>
+                )}
               </div>
             </div>
             {result ? <ResultNotes migrationNotes={result.migrationNotes} riskWarnings={result.riskWarnings} /> : null}
@@ -246,28 +342,37 @@ function ConvertModeContent() {
           </div>
         </div>
 
-        <div className="mt-auto flex items-center justify-between border-t border-surface-container-highest pt-md">
-          <div className="flex items-center gap-md">
-            <Button className="h-10 rounded-lg bg-primary-container px-xl py-sm shadow-[0_4px_12px_rgba(2,74,216,0.2)]" disabled={loading || !inputCode.trim()} onClick={handleSubmit} type="button">
-              <MaterialIcon size={20}>auto_awesome</MaterialIcon>
-              {loading ? "转换中..." : "开始转换"}
-            </Button>
+        <div className="lq-actions">
+          <div className="lq-actions-left">
             <button
-              className="rounded-lg border border-transparent px-md py-sm text-button-md text-secondary transition-colors hover:border-steel/40 hover:text-ink"
+              className="lq-primary-btn"
+              disabled={loading || (!inputCode.trim() && !uploadedFile) || uploadedFile?.scanStatus === "BLOCKED"}
+              onClick={handleSubmit}
+              type="button"
+            >
+              {loading ? <LoaderCircle aria-hidden="true" className="animate-spin" size={18} /> : <Sparkles aria-hidden="true" size={18} />}
+              {loading ? "转换中..." : "开始转换"}
+            </button>
+            <button
+              className="lq-secondary-btn"
               onClick={() => {
                 setInputCode("");
                 setPrompt("");
                 setTaskData(null);
                 setError("");
+                setUploadedFile(null);
+                setUploadError("");
+                setActiveTab(conversionTabs[0]);
               }}
               type="button"
             >
+              <Trash2 aria-hidden="true" size={17} />
               清空内容
             </button>
           </div>
-          <div className="flex items-center gap-xs rounded-full border border-steel/20 bg-surface-container px-sm py-xxs text-outline">
-            <MaterialIcon className="text-bloom-coral" size={16}>generating_tokens</MaterialIcon>
-            <span className="text-caption-sm">每次平台转换消耗 200 积分</span>
+          <div className="lq-cost-pill">
+            <DollarSign aria-hidden="true" />
+            <span>每次平台转换消耗 200 积分</span>
           </div>
         </div>
       </section>
@@ -275,29 +380,37 @@ function ConvertModeContent() {
   );
 }
 
+function SignalRibbon() {
+  return (
+    <svg className="lq-signal-ribbon" fill="none" viewBox="0 0 820 220">
+      <path d="M26 168C120 132 185 148 268 168C354 189 438 180 514 122C598 58 682 54 790 84" stroke="rgba(11,99,255,0.18)" strokeWidth="1.5" />
+      <path d="M34 184C152 116 227 220 345 151C445 92 509 112 604 68C684 31 733 44 796 34" stroke="rgba(23,195,178,0.2)" strokeWidth="1.5" />
+      <path d="M72 74H176M112 34V114M594 144h96M642 104v84" stroke="rgba(11,99,255,0.08)" strokeWidth="1" />
+      <circle cx="268" cy="168" fill="rgba(11,99,255,0.2)" r="4" />
+      <circle cx="514" cy="122" fill="rgba(23,195,178,0.24)" r="4" />
+      <circle cx="684" cy="31" fill="rgba(11,99,255,0.18)" r="4" />
+    </svg>
+  );
+}
+
 function ChatBubble({ loading = false, role, text }: { loading?: boolean; role: "user" | "assistant"; text: string }) {
   if (role === "user") {
     return (
-      <div className="flex w-full justify-end">
-        <div className="rounded-[16px] rounded-br-none bg-primary p-md text-on-primary shadow-sm">
-          <p className="whitespace-pre-wrap text-body-md">{text}</p>
+      <div className="lq-user-row">
+        <div className="lq-user-bubble">
+          <p>{text}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex w-full justify-start">
-      <div className="flex max-w-[85%] items-end gap-sm">
-        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-primary-fixed bg-primary-container text-on-primary-container">
-          <MaterialIcon size={18}>smart_toy</MaterialIcon>
-        </div>
-        <div className="rounded-[16px] rounded-bl-none border border-surface-container-highest bg-paper p-md text-on-surface shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-          <div className={`flex items-center gap-xs text-secondary ${loading ? "animate-pulse" : ""}`}>
-            {loading ? <MaterialIcon className="animate-spin" size={18}>hourglass_empty</MaterialIcon> : null}
-            <span className="text-body-md">{text}</span>
-          </div>
-        </div>
+    <div className="lq-assistant-row">
+      <div className="lq-chat-bubble">
+        <span className="lq-ai-mark">
+          {loading ? <LoaderCircle aria-hidden="true" className="animate-spin" size={18} /> : <Bot aria-hidden="true" />}
+        </span>
+        <p>{text}</p>
       </div>
     </div>
   );
@@ -313,14 +426,14 @@ function StrategyResult({ data }: { data: AiTaskData }) {
   const outOfScope = result.scopeStatus === "out_of_scope";
 
   return (
-    <div className="rounded-xl border border-surface-container-highest bg-paper p-md shadow-sm">
-      <div className="mb-sm flex items-center justify-between gap-sm">
-        <h2 className="text-body-emphasis text-ink">{outOfScope ? "模块范围提示" : "策略生成结果"}</h2>
-        <span className="rounded-full bg-primary-soft px-sm py-xxs text-caption-sm text-primary-bright">已扣除 {data.task.costPoints} 积分</span>
+    <div className="lq-result-card">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2>{outOfScope ? "模块范围提示" : "策略生成结果"}</h2>
+        <span className="lq-cost-tag">已扣除 {data.task.costPoints} 积分</span>
       </div>
-      <p className="mb-md text-body-md text-secondary">{result.explanation}</p>
+      {result.explanation ? <p className="m-0 text-sm leading-7 text-[#5b6472]">{result.explanation}</p> : null}
       {result.generatedCode ? (
-        <pre className="max-h-[360px] overflow-auto rounded-lg bg-[#1e1e1e] p-md font-mono text-[13px] leading-relaxed text-steel app-scrollbar">
+        <pre className="lq-code-block app-scrollbar">
           <code>{result.generatedCode}</code>
         </pre>
       ) : null}
@@ -330,14 +443,18 @@ function StrategyResult({ data }: { data: AiTaskData }) {
 }
 
 function ResultNotes({ migrationNotes, riskWarnings }: { migrationNotes?: string | null; riskWarnings: string[] }) {
+  if (!migrationNotes && riskWarnings.length === 0) {
+    return null;
+  }
+
   return (
-    <div className="rounded-xl border border-steel/40 bg-surface p-md text-caption-md text-secondary">
-      {migrationNotes ? <p className="mb-xs text-ink">{migrationNotes}</p> : null}
+    <div className="lq-notes-card">
+      {migrationNotes ? <p className="mb-2 mt-0 text-[#111827]">{migrationNotes}</p> : null}
       {riskWarnings.length > 0 ? (
-        <ul className="space-y-xxs">
+        <ul className="m-0 grid gap-2 p-0">
           {riskWarnings.map((warning) => (
-            <li className="flex gap-xs" key={warning}>
-              <MaterialIcon className="text-bloom-coral" size={16}>warning</MaterialIcon>
+            <li className="flex gap-2" key={warning}>
+              <AlertTriangle aria-hidden="true" className="mt-[2px] flex-shrink-0 text-[#d92d20]" size={16} />
               <span>{warning}</span>
             </li>
           ))}
@@ -347,31 +464,66 @@ function ResultNotes({ migrationNotes, riskWarnings }: { migrationNotes?: string
   );
 }
 
-function ErrorPanel({ message }: { message: string }) {
+function FileUploadStatus({ file, message }: { file: UploadedCodeFile | null; message: string }) {
+  if (!file && !message) {
+    return null;
+  }
+
+  if (message) {
+    return <div className="lq-file-status is-error">{message}</div>;
+  }
+
+  if (!file) {
+    return null;
+  }
+
+  const blocked = file.scanStatus === "BLOCKED";
+  const StatusIcon: LucideIcon = blocked ? Ban : file.scanStatus === "WARNING" ? AlertTriangle : CheckCircle2;
+
   return (
-    <div className="rounded-lg border border-error-container bg-error-container/20 px-sm py-sm text-caption-md text-bloom-deep">
-      {message}
+    <div className={`lq-file-status ${blocked ? "is-blocked" : ""}`}>
+      <div className="flex flex-wrap items-center gap-2">
+        <StatusIcon aria-hidden="true" size={16} />
+        <span>{file.originalName}</span>
+        <span>{getScanStatusText(file)}</span>
+      </div>
+      {file.riskFlags.length > 0 ? <div className="mt-1 break-words">风险标记：{file.riskFlags.join("、")}</div> : null}
     </div>
   );
 }
 
-function PlatformSelect({ label, onChange, options, tone, value }: { label: string; onChange: (value: string) => void; options: string[]; tone: "muted" | "primary"; value: string }) {
+function ErrorPanel({ message }: { message: string }) {
+  return <div className="lq-error-panel">{message}</div>;
+}
+
+function PlatformSelectCard({ isTarget = false, label, onChange, options, value }: { isTarget?: boolean; label: string; onChange: (value: string) => void; options: string[]; value: string }) {
+  return <PlatformDropdown label={label} onChange={onChange} options={options} tone={isTarget ? "target" : "default"} value={value} />;
+}
+
+function BotIcon() {
   return (
-    <div className="flex flex-1 flex-col gap-xxs">
-      <label className={`text-caption-bold ${tone === "primary" ? "text-primary-bright" : "text-outline"}`}>{label}</label>
-      <select
-        className={`w-full cursor-pointer rounded-lg border-none bg-transparent px-0 py-xs text-body-md outline-none focus:ring-0 ${
-          tone === "primary" ? "font-semibold text-primary-deep" : "text-ink"
-        }`}
-        onChange={(event) => onChange(event.target.value)}
-        value={value}
-      >
-        {options.map((option) => (
-          <option key={option}>{option}</option>
-        ))}
-      </select>
-    </div>
+    <svg fill="none" height="18" viewBox="0 0 24 24" width="18">
+      <path d="M12 3v3" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+      <rect height="10" rx="3" stroke="currentColor" strokeWidth="1.8" width="14" x="5" y="8" />
+      <path d="M9 13h.01M15 13h.01M10 18v3h4v-3" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+    </svg>
   );
+}
+
+function getConversionTabContent(tab: (typeof conversionTabs)[number], result: AiTaskData["result"] | undefined) {
+  if (!result) {
+    return "";
+  }
+
+  if (tab === "迁移说明") {
+    return result.migrationNotes ?? result.explanation ?? "";
+  }
+
+  if (tab === "风险提醒") {
+    return result.riskWarnings.length > 0 ? result.riskWarnings.map((warning) => `- ${warning}`).join("\n") : "暂未识别到明显风险。";
+  }
+
+  return result.generatedCode ?? result.explanation ?? "";
 }
 
 async function createAiTask(input: {
@@ -380,6 +532,7 @@ async function createAiTask(input: {
   targetPlatform?: string;
   prompt?: string;
   inputCode?: string;
+  inputFileId?: string;
   clientRequestId: string;
 }) {
   const response = await fetch("/api/v1/ai/tasks", {

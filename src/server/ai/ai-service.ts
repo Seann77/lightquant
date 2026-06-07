@@ -11,6 +11,7 @@ type CreateAiTaskRequest = {
   targetPlatform?: string;
   prompt?: string;
   inputCode?: string;
+  inputFileId?: string;
   clientRequestId: string;
 };
 
@@ -19,7 +20,6 @@ export async function createAndRunAiTask(userId: string, input: CreateAiTaskRequ
   const clientRequestId = normalizeNonEmpty(input.clientRequestId, "clientRequestId");
   const normalized = normalizeTaskInput(type, input);
   const config = getAiTaskConfig(type);
-  assertInputWithinLimit(config, normalized);
   const repository = getRepository();
   const existing = await repository.findAiTaskByClientRequestId(userId, clientRequestId);
 
@@ -34,6 +34,9 @@ export async function createAndRunAiTask(userId: string, input: CreateAiTaskRequ
     };
   }
 
+  const resolvedInput = await resolveInputFile(userId, normalized);
+  assertInputWithinLimit(config, resolvedInput);
+
   let task: AiTask | null = null;
 
   try {
@@ -45,10 +48,11 @@ export async function createAndRunAiTask(userId: string, input: CreateAiTaskRequ
         type,
         status: "PENDING",
         scopeStatus: "in_scope",
-        sourcePlatform: normalized.sourcePlatform,
-        targetPlatform: normalized.targetPlatform,
-        prompt: normalized.prompt,
-        inputCode: normalized.inputCode,
+        sourcePlatform: resolvedInput.sourcePlatform,
+        targetPlatform: resolvedInput.targetPlatform,
+        prompt: resolvedInput.prompt,
+        inputCode: resolvedInput.inputCode,
+        inputFileId: resolvedInput.inputFileId,
         costPoints: config.costPoints,
         clientRequestId,
         requestId,
@@ -191,6 +195,7 @@ export function toTaskResponse(task: AiTask) {
     targetPlatform: task.targetPlatform,
     prompt: task.prompt,
     inputCode: task.inputCode,
+    inputFileId: task.inputFileId,
     costPoints: task.costPoints,
     clientRequestId: task.clientRequestId,
     errorCode: task.errorCode,
@@ -247,24 +252,26 @@ function normalizeTaskStatus(value: string): AiTaskStatus {
 function normalizeTaskInput(type: AiTaskType, input: CreateAiTaskRequest) {
   const prompt = normalizeOptionalText(input.prompt);
   const inputCode = normalizeOptionalText(input.inputCode);
+  const inputFileId = normalizeOptionalText(input.inputFileId);
   const sourcePlatform = normalizeOptionalText(input.sourcePlatform);
   const targetPlatform = normalizeOptionalText(input.targetPlatform);
 
-  if (type === "strategy_generation" && !prompt && !inputCode) {
+  if (type === "strategy_generation" && !prompt && !inputCode && !inputFileId) {
     throw new ApiError("VALIDATION_ERROR", "请输入策略需求", 400);
   }
 
-  if (type === "code_conversion" && !inputCode) {
+  if (type === "code_conversion" && !inputCode && !inputFileId) {
     throw new ApiError("VALIDATION_ERROR", "请输入需要转换的代码", 400);
   }
 
-  if (type === "code_analysis" && !inputCode) {
+  if (type === "code_analysis" && !inputCode && !inputFileId) {
     throw new ApiError("VALIDATION_ERROR", "请输入需要解析的代码", 400);
   }
 
   return {
     prompt,
     inputCode,
+    inputFileId,
     sourcePlatform,
     targetPlatform
   };
@@ -276,6 +283,44 @@ function normalizeOptionalText(value: string | undefined) {
   return normalized || null;
 }
 
+async function resolveInputFile(
+  userId: string,
+  input: {
+    sourcePlatform: string | null;
+    targetPlatform: string | null;
+    prompt: string | null;
+    inputCode: string | null;
+    inputFileId: string | null;
+  }
+) {
+  if (!input.inputFileId) {
+    return input;
+  }
+
+  const uploadedFile = await getRepository().findUploadedFileById(input.inputFileId);
+
+  if (!uploadedFile) {
+    throw new ApiError("NOT_FOUND", "上传文件不存在", 404);
+  }
+
+  if (uploadedFile.userId !== userId) {
+    throw new ApiError("FORBIDDEN", "无权使用该上传文件", 403);
+  }
+
+  if (uploadedFile.parseStatus !== "SUCCEEDED") {
+    throw new ApiError("FILE_PARSE_FAILED", "上传文件解析失败，请重新上传", 400);
+  }
+
+  if (uploadedFile.scanStatus === "BLOCKED") {
+    throw new ApiError("FILE_BLOCKED", "文件包含疑似密钥或私钥，请脱敏后重新上传", 400);
+  }
+
+  return {
+    ...input,
+    inputCode: mergeInputCode(input.inputCode, uploadedFile.contentText, uploadedFile.originalName)
+  };
+}
+
 function assertInputWithinLimit(
   config: ReturnType<typeof getAiTaskConfig>,
   input: {
@@ -283,6 +328,7 @@ function assertInputWithinLimit(
     targetPlatform: string | null;
     prompt: string | null;
     inputCode: string | null;
+    inputFileId?: string | null;
   }
 ) {
   const totalInputChars = getTotalInputChars(input);
@@ -294,6 +340,12 @@ function assertInputWithinLimit(
       413
     );
   }
+}
+
+function mergeInputCode(inputCode: string | null, fileText: string, originalName: string) {
+  const fileBlock = `# Uploaded file: ${originalName}\n${fileText}`;
+
+  return inputCode ? `${inputCode}\n\n${fileBlock}` : fileBlock;
 }
 
 function normalizeNonEmpty(value: string, field: string) {

@@ -4,11 +4,26 @@ out
 dist
 .env*
 !.env.example
+*.log
+*.tsbuildinfo
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 next-dev*.log
+next-dev-database-logs/
 qa-screenshots
+test-results/
+.codex-artifacts/
+tmp/
+output/
+outputs/
+exports/
+hyperframes-smoke/
+hyperframes-video-assets/
+quant-explainer-video/
+tools/
+stra/
+tts-test-zh.txt
 
 /src/generated/prisma

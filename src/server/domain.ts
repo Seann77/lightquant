@@ -107,6 +107,10 @@ export type PaymentTransaction = {
   status: PaymentTransactionStatus;
   rawPayload: Record<string, unknown>;
   idempotencyKey: string;
+  verifiedAt: string | null;
+  failedReason: string | null;
+  orderStatusBefore: OrderStatus | null;
+  orderStatusAfter: OrderStatus | null;
   createdAt: string;
 };
 
@@ -114,6 +118,23 @@ export type AiTaskType = "strategy_generation" | "code_conversion" | "code_analy
 export type AiTaskStatus = "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
 export type AiTaskScopeStatus = "in_scope" | "out_of_scope";
 export type CreditReservationStatus = "RESERVED" | "CONFIRMED" | "RELEASED";
+export type UploadedFileParseStatus = "PENDING" | "SUCCEEDED" | "FAILED";
+export type UploadedFileScanStatus = "PASSED" | "BLOCKED" | "WARNING";
+
+export type UploadedFile = {
+  id: string;
+  userId: string;
+  originalName: string;
+  ext: string;
+  mimeType: string;
+  sizeBytes: number;
+  sha256: string;
+  contentText: string;
+  parseStatus: UploadedFileParseStatus;
+  scanStatus: UploadedFileScanStatus;
+  riskFlags: string[];
+  createdAt: string;
+};
 
 export type AiTask = {
   id: string;
@@ -125,6 +146,7 @@ export type AiTask = {
   targetPlatform: string | null;
   prompt: string | null;
   inputCode: string | null;
+  inputFileId: string | null;
   costPoints: number;
   clientRequestId: string;
   requestId: string;

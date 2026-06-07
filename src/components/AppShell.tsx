@@ -3,15 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { Clock3, FileText, Menu, MessageCircle, UserRoundPlus } from "lucide-react";
 import { CreditActionPopover } from "@/components/shell/CreditActionPopover";
 import { Logo } from "@/components/shell/Logo";
 import { LoginModal } from "@/components/shell/LoginModal";
 import { RechargeModal } from "@/components/shell/RechargeModal";
 import { ShellNavItem } from "@/components/shell/ShellNavItem";
 import { WechatQrModal } from "@/components/shell/WechatQrModal";
-import { Button } from "@/components/ui/Button";
-import { CreditStatus } from "@/components/ui/CreditStatus";
-import { MaterialIcon } from "@/components/ui/MaterialIcon";
 import { recentConversations } from "@/lib/mock-data";
 
 type AppShellProps = {
@@ -96,6 +94,7 @@ export function AppShell({ children }: AppShellProps) {
   const [rechargeOpen, setRechargeOpen] = useState(false);
   const [wechatOpen, setWechatOpen] = useState(false);
   const mode = searchParams.get("mode");
+  const isAdminPath = pathname.startsWith("/admin");
   const isLoggedIn = Boolean(currentUser);
   const userPoints = currentUser?.creditAccount.balance ?? 0;
 
@@ -121,12 +120,29 @@ export function AppShell({ children }: AppShellProps) {
       void refreshCurrentUser();
     }
 
+    function handleOpenWechat() {
+      setWechatOpen(true);
+    }
+
+    function handleOpenRecharge() {
+      if (isLoggedIn) {
+        setRechargeOpen(true);
+        return;
+      }
+
+      setLoginOpen(true);
+    }
+
     window.addEventListener("lightquant:credits-updated", handleCreditsUpdated);
+    window.addEventListener("lightquant:open-wechat", handleOpenWechat);
+    window.addEventListener("lightquant:open-recharge", handleOpenRecharge);
 
     return () => {
       window.removeEventListener("lightquant:credits-updated", handleCreditsUpdated);
+      window.removeEventListener("lightquant:open-wechat", handleOpenWechat);
+      window.removeEventListener("lightquant:open-recharge", handleOpenRecharge);
     };
-  }, [refreshCurrentUser]);
+  }, [isLoggedIn, refreshCurrentUser]);
 
   function handleCreditStatusClick() {
     if (isLoggedIn) {
@@ -146,7 +162,7 @@ export function AppShell({ children }: AppShellProps) {
     setRechargeOpen(false);
   }
 
-  function handleOpenRecharge() {
+  function handleOpenRechargeFromMenu() {
     setCreditActionsOpen(false);
     setRechargeOpen(true);
   }
@@ -165,14 +181,16 @@ export function AppShell({ children }: AppShellProps) {
     setRechargeOpen(false);
   }
 
-  return (
-    <div className="flex h-screen w-screen overflow-hidden bg-background text-on-background">
-      <aside className="hidden h-screen w-[var(--app-sidebar-width)] flex-shrink-0 flex-col border-r border-steel bg-cloud p-md md:flex">
-        <div className="mb-xxl px-xs pt-sm">
-          <Logo />
-        </div>
+  if (isAdminPath) {
+    return <>{children}</>;
+  }
 
-        <nav aria-label="主导航" className="mt-md flex flex-col gap-xxs text-body-emphasis">
+  return (
+    <div className="lq-frame">
+      <aside className="lq-sidebar">
+        <Logo />
+
+        <nav aria-label="主导航" className="lq-nav">
           {navItems.map((item) => (
             <ShellNavItem
               active={item.match(pathname, mode)}
@@ -184,67 +202,57 @@ export function AppShell({ children }: AppShellProps) {
           ))}
         </nav>
 
-        <div className="mt-xl flex-1 overflow-y-auto app-scrollbar">
-          <div className="mb-sm px-xs">
-            <h3 className="text-caption-bold text-ink">最近</h3>
-          </div>
-          <div className="flex flex-col gap-xs text-caption-md text-secondary">
-            {recentConversations.map((item) => (
-              <Link className="truncate rounded-md px-sm py-xs transition-colors hover:bg-fog" href="/chat?mode=strategy" key={item}>
-                {item}
-              </Link>
-            ))}
-          </div>
+        <div className="lq-recent">
+          <p className="lq-recent-title">最近</p>
+          {recentConversations.map((item, index) => (
+            <Link className="lq-recent-link" href="/chat?mode=strategy" key={item}>
+              {index === 0 ? <Clock3 aria-hidden="true" /> : <FileText aria-hidden="true" />}
+              <span>{item}</span>
+            </Link>
+          ))}
         </div>
 
-        <div className="relative mt-auto border-t border-steel pt-sm">
+        <div className="lq-login-area">
           <CreditActionPopover
             onClose={() => setCreditActionsOpen(false)}
             onLogout={handleLogout}
-            onOpenRecharge={handleOpenRecharge}
+            onOpenRecharge={handleOpenRechargeFromMenu}
             onOpenStatement={handleOpenStatement}
             open={creditActionsOpen}
           />
           <button
             aria-label={isLoggedIn ? "打开积分操作菜单" : "打开登录注册弹窗"}
-            className="mb-xs w-full border-b border-steel/30 pb-sm text-left"
+            className="lq-login-card"
             onClick={handleCreditStatusClick}
             type="button"
           >
-            <CreditStatus label={currentUser?.user.displayName} loggedIn={isLoggedIn} points={userPoints} />
+            <span className="lq-login-icon">
+              <UserRoundPlus aria-hidden="true" size={21} strokeWidth={1.8} />
+            </span>
+            <span>
+              <p className="lq-login-title">{currentUser?.user.displayName ?? "未登录"}</p>
+              <p className="lq-login-subtitle">{isLoggedIn ? `积分余额 ${userPoints.toLocaleString("zh-CN")}` : "登录后查看积分"}</p>
+            </span>
           </button>
         </div>
       </aside>
 
-      <div className="relative flex min-w-0 max-w-full flex-1 flex-col overflow-hidden bg-background">
-        <header className="relative z-50 flex h-[var(--app-topbar-height)] w-full flex-shrink-0 items-center gap-md overflow-hidden border-b border-steel bg-paper px-md md:px-xl">
-          <div className="absolute left-0 right-0 top-0 h-[var(--app-shell-blue-line)] bg-primary-bright" />
-          <div className="flex min-w-0 items-center gap-sm">
-            <button className="p-xs text-ink transition-colors hover:text-primary md:hidden" type="button" aria-label="打开菜单">
-              <MaterialIcon size={24}>menu</MaterialIcon>
+      <div className="lq-content">
+        <header className="lq-topbar">
+          <div className="lq-mobile-menu">
+            <button aria-label="打开菜单" className="lq-icon-button h-10 w-10" type="button">
+              <Menu aria-hidden="true" size={20} />
             </button>
-            <div className="min-w-0 md:hidden">
-              <Logo />
-            </div>
-            <button
-              aria-label="打开登录注册弹窗"
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-outline-variant bg-surface-container text-secondary transition-colors hover:bg-surface-variant hover:text-primary md:hidden"
-              onClick={() => setLoginOpen(true)}
-              type="button"
-            >
-              <MaterialIcon size={20}>person</MaterialIcon>
-            </button>
+            <Logo />
           </div>
 
-          <div className="ml-auto hidden shrink-0 items-center gap-md md:flex">
-            <Button className="hidden md:inline-flex" onClick={() => setWechatOpen(true)} size="sm" type="button" variant="ghost">
-              <MaterialIcon size={20}>group</MaterialIcon>
-              加入微信群
-            </Button>
-          </div>
+          <button className="lq-wechat" onClick={() => setWechatOpen(true)} type="button">
+            <MessageCircle aria-hidden="true" />
+            <span>加入微信群</span>
+          </button>
         </header>
 
-        <main className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto bg-background bg-diagonal-texture app-scrollbar">{children}</main>
+        <main className="lq-main app-scrollbar">{children}</main>
       </div>
 
       <LoginModal onClose={() => setLoginOpen(false)} onLoginSuccess={handleLoginSuccess} open={loginOpen} />

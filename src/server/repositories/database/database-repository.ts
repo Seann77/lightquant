@@ -10,12 +10,19 @@ import type {
   RechargeOrder,
   RechargePlan,
   SmsCodeRecord,
+  UploadedFile,
   User
 } from "@/server/domain";
 import { ApiError } from "@/server/http/api-response";
+import { getOrderExpiresAt, isOrderExpired } from "@/server/payments/payment-config";
 import { getPrismaClient } from "@/server/repositories/database/prisma-client";
 import type {
   AiTaskPage,
+  AdminAiTaskPage,
+  AdminOrderPage,
+  AdminOverview,
+  AdminUploadedFilePage,
+  AdminUserPage,
   AppliedCreditLedger,
   ApplyCreditLedgerInput,
   CreateAiTaskInput,
@@ -24,6 +31,7 @@ import type {
   CreatePaymentTransactionInput,
   CreateRechargeOrderInput,
   CreateSmsCodeInput,
+  CreateUploadedFileInput,
   CreateUserInput,
   LedgerPage,
   LightQuantRepository,
@@ -403,9 +411,10 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
   }
 
   async markOrderPaid(orderId: string, paidAt: string) {
-    const order = await this.db.rechargeOrder.update({
+    const result = await this.db.rechargeOrder.updateMany({
       where: {
-        id: orderId
+        id: orderId,
+        status: "PENDING"
       },
       data: {
         status: "PAID",
@@ -414,13 +423,66 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
       }
     });
 
+    if (result.count === 0) {
+      const existing = await this.findOrderById(orderId);
+
+      if (existing?.status === "PAID") {
+        throw new ApiError("ORDER_ALREADY_PAID", "订单已支付", 409);
+      }
+
+      if (existing?.status === "CLOSED") {
+        throw new ApiError("ORDER_CLOSED", "订单已关闭", 409);
+      }
+
+      throw new ApiError("FORBIDDEN", "当前订单状态不允许支付确认", 403);
+    }
+
+    const order = await this.db.rechargeOrder.findUniqueOrThrow({
+      where: {
+        id: orderId
+      }
+    });
+
     return toRechargeOrder(order);
+  }
+
+  async closeExpiredRechargeOrders(cutoff: string, closedAt: string) {
+    const result = await this.db.rechargeOrder.updateMany({
+      where: {
+        status: "PENDING",
+        createdAt: {
+          lt: toDate(cutoff)
+        }
+      },
+      data: {
+        status: "CLOSED",
+        closedAt: toDate(closedAt),
+        updatedAt: toDate(closedAt)
+      }
+    });
+
+    return {
+      count: result.count
+    };
   }
 
   async findPaymentTransactionByIdempotencyKey(idempotencyKey: string) {
     const transaction = await this.db.paymentTransaction.findUnique({
       where: {
         idempotencyKey
+      }
+    });
+
+    return transaction ? toPaymentTransaction(transaction) : null;
+  }
+
+  async findLatestPaymentTransactionByOrderId(orderId: string) {
+    const transaction = await this.db.paymentTransaction.findFirst({
+      where: {
+        orderId
+      },
+      orderBy: {
+        createdAt: "desc"
       }
     });
 
@@ -445,6 +507,10 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
           status: input.status,
           rawPayload: toJsonObject(input.rawPayload),
           idempotencyKey: input.idempotencyKey,
+          verifiedAt: input.verifiedAt ? toDate(input.verifiedAt) : null,
+          failedReason: input.failedReason,
+          orderStatusBefore: input.orderStatusBefore,
+          orderStatusAfter: input.orderStatusAfter,
           createdAt: toDate(input.createdAt)
         }
       });
@@ -498,6 +564,7 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
           targetPlatform: input.targetPlatform,
           prompt: input.prompt,
           inputCode: input.inputCode,
+          inputFileId: input.inputFileId,
           costPoints: input.costPoints,
           clientRequestId: input.clientRequestId,
           requestId: input.requestId,
@@ -599,6 +666,264 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
 
     return {
       items: items.map(toAiTask),
+      total
+    };
+  }
+
+  async createUploadedFile(input: CreateUploadedFileInput) {
+    const uploadedFile = await this.db.uploadedFile.create({
+      data: {
+        userId: input.userId,
+        originalName: input.originalName,
+        ext: input.ext,
+        mimeType: input.mimeType,
+        sizeBytes: input.sizeBytes,
+        sha256: input.sha256,
+        contentText: input.contentText,
+        parseStatus: input.parseStatus,
+        scanStatus: input.scanStatus,
+        riskFlags: input.riskFlags,
+        createdAt: toDate(input.createdAt)
+      }
+    });
+
+    return toUploadedFile(uploadedFile);
+  }
+
+  async findUploadedFileById(id: string) {
+    const uploadedFile = await this.db.uploadedFile.findUnique({
+      where: {
+        id
+      }
+    });
+
+    return uploadedFile ? toUploadedFile(uploadedFile) : null;
+  }
+
+  async getAdminOverview(todayStart: string): Promise<AdminOverview> {
+    const todayStartDate = toDate(todayStart);
+    const [
+      users,
+      creditTotals,
+      todayAiTasks,
+      todayOrders,
+      todayRiskFiles,
+      todayResults,
+      recentFailedTasks,
+      recentRiskFiles
+    ] = await Promise.all([
+      this.db.user.count(),
+      this.db.creditAccount.aggregate({
+        _sum: {
+          balance: true,
+          totalEarned: true,
+          totalSpent: true
+        }
+      }),
+      this.db.aiTask.count({
+        where: {
+          createdAt: {
+            gte: todayStartDate
+          }
+        }
+      }),
+      this.db.rechargeOrder.count({
+        where: {
+          createdAt: {
+            gte: todayStartDate
+          }
+        }
+      }),
+      this.db.uploadedFile.count({
+        where: {
+          createdAt: {
+            gte: todayStartDate
+          },
+          scanStatus: {
+            in: ["WARNING", "BLOCKED"]
+          }
+        }
+      }),
+      this.db.aiTaskResult.findMany({
+        where: {
+          task: {
+            createdAt: {
+              gte: todayStartDate
+            }
+          }
+        },
+        select: {
+          tokenUsage: true
+        }
+      }),
+      this.db.aiTask.findMany({
+        where: {
+          status: "FAILED"
+        },
+        include: {
+          user: true,
+          result: true
+        },
+        orderBy: {
+          updatedAt: "desc"
+        },
+        take: 5
+      }),
+      this.db.uploadedFile.findMany({
+        where: {
+          scanStatus: {
+            in: ["WARNING", "BLOCKED"]
+          }
+        },
+        include: {
+          user: true
+        },
+        orderBy: {
+          createdAt: "desc"
+        },
+        take: 5
+      })
+    ]);
+
+    return {
+      totals: {
+        users,
+        creditBalance: creditTotals._sum.balance ?? 0,
+        creditEarned: creditTotals._sum.totalEarned ?? 0,
+        creditSpent: creditTotals._sum.totalSpent ?? 0,
+        todayAiTasks,
+        todayAiTokens: todayResults.reduce((total, item) => total + toTokenUsage(item.tokenUsage).totalTokens, 0),
+        todayOrders,
+        todayRiskFiles
+      },
+      recentFailedAiTasks: recentFailedTasks.map(toAdminAiTaskItem),
+      recentRiskFiles: recentRiskFiles.map(toAdminUploadedFileItem)
+    };
+  }
+
+  async listAdminUsers(pagination: { page: number; pageSize: number }, filters: { phone?: string }): Promise<AdminUserPage> {
+    const where = {
+      phone: filters.phone
+        ? {
+            contains: filters.phone
+          }
+        : undefined
+    };
+    const [items, total] = await Promise.all([
+      this.db.user.findMany({
+        where,
+        include: {
+          creditAccount: true,
+          creditLedger: {
+            orderBy: {
+              createdAt: "desc"
+            },
+            take: 1
+          }
+        },
+        orderBy: {
+          createdAt: "desc"
+        },
+        skip: (pagination.page - 1) * pagination.pageSize,
+        take: pagination.pageSize
+      }),
+      this.db.user.count({
+        where
+      })
+    ]);
+
+    return {
+      items: items.map(toAdminUserItem),
+      total
+    };
+  }
+
+  async listAdminOrders(pagination: { page: number; pageSize: number }, filters: { status?: RechargeOrder["status"] }): Promise<AdminOrderPage> {
+    const where = {
+      status: filters.status
+    };
+    const [items, total] = await Promise.all([
+      this.db.rechargeOrder.findMany({
+        where,
+        include: {
+          user: true,
+          plan: true,
+          transactions: {
+            orderBy: {
+              createdAt: "desc"
+            },
+            take: 1
+          }
+        },
+        orderBy: {
+          createdAt: "desc"
+        },
+        skip: (pagination.page - 1) * pagination.pageSize,
+        take: pagination.pageSize
+      }),
+      this.db.rechargeOrder.count({
+        where
+      })
+    ]);
+
+    return {
+      items: items.map(toAdminOrderItem),
+      total
+    };
+  }
+
+  async listAdminAiTasks(pagination: { page: number; pageSize: number }, filters: { type?: AiTask["type"]; status?: AiTask["status"] }): Promise<AdminAiTaskPage> {
+    const where = {
+      type: filters.type,
+      status: filters.status
+    };
+    const [items, total] = await Promise.all([
+      this.db.aiTask.findMany({
+        where,
+        include: {
+          user: true,
+          result: true
+        },
+        orderBy: {
+          createdAt: "desc"
+        },
+        skip: (pagination.page - 1) * pagination.pageSize,
+        take: pagination.pageSize
+      }),
+      this.db.aiTask.count({
+        where
+      })
+    ]);
+
+    return {
+      items: items.map(toAdminAiTaskItem),
+      total
+    };
+  }
+
+  async listAdminUploadedFiles(pagination: { page: number; pageSize: number }, filters: { scanStatus?: UploadedFile["scanStatus"] }): Promise<AdminUploadedFilePage> {
+    const where = {
+      scanStatus: filters.scanStatus
+    };
+    const [items, total] = await Promise.all([
+      this.db.uploadedFile.findMany({
+        where,
+        include: {
+          user: true
+        },
+        orderBy: {
+          createdAt: "desc"
+        },
+        skip: (pagination.page - 1) * pagination.pageSize,
+        take: pagination.pageSize
+      }),
+      this.db.uploadedFile.count({
+        where
+      })
+    ]);
+
+    return {
+      items: items.map(toAdminUploadedFileItem),
       total
     };
   }
@@ -893,6 +1218,10 @@ function toPaymentTransaction(transaction: {
   status: PaymentTransaction["status"];
   rawPayload: Prisma.JsonValue;
   idempotencyKey: string;
+  verifiedAt: Date | null;
+  failedReason: string | null;
+  orderStatusBefore: PaymentTransaction["orderStatusBefore"];
+  orderStatusAfter: PaymentTransaction["orderStatusAfter"];
   createdAt: Date;
 }): PaymentTransaction {
   return {
@@ -905,7 +1234,194 @@ function toPaymentTransaction(transaction: {
     status: transaction.status,
     rawPayload: toRecord(transaction.rawPayload),
     idempotencyKey: transaction.idempotencyKey,
+    verifiedAt: transaction.verifiedAt ? toIso(transaction.verifiedAt) : null,
+    failedReason: transaction.failedReason,
+    orderStatusBefore: transaction.orderStatusBefore,
+    orderStatusAfter: transaction.orderStatusAfter,
     createdAt: toIso(transaction.createdAt)
+  };
+}
+
+function toUploadedFile(uploadedFile: {
+  id: string;
+  userId: string;
+  originalName: string;
+  ext: string;
+  mimeType: string;
+  sizeBytes: number;
+  sha256: string;
+  contentText: string;
+  parseStatus: UploadedFile["parseStatus"];
+  scanStatus: UploadedFile["scanStatus"];
+  riskFlags: Prisma.JsonValue;
+  createdAt: Date;
+}): UploadedFile {
+  return {
+    id: uploadedFile.id,
+    userId: uploadedFile.userId,
+    originalName: uploadedFile.originalName,
+    ext: uploadedFile.ext,
+    mimeType: uploadedFile.mimeType,
+    sizeBytes: uploadedFile.sizeBytes,
+    sha256: uploadedFile.sha256,
+    contentText: uploadedFile.contentText,
+    parseStatus: uploadedFile.parseStatus,
+    scanStatus: uploadedFile.scanStatus,
+    riskFlags: toStringArray(uploadedFile.riskFlags),
+    createdAt: toIso(uploadedFile.createdAt)
+  };
+}
+
+function toAdminUserItem(user: {
+  id: string;
+  phone: string;
+  displayName: string;
+  status: User["status"];
+  createdAt: Date;
+  lastLoginAt: Date;
+  creditAccount: {
+    balance: number;
+    totalEarned: number;
+    totalSpent: number;
+  } | null;
+  creditLedger: Array<{
+    direction: CreditLedger["direction"];
+    amount: number;
+    remark: string;
+    createdAt: Date;
+  }>;
+}): AdminUserPage["items"][number] {
+  const latestLedger = user.creditLedger[0] ?? null;
+
+  return {
+    id: user.id,
+    phone: user.phone,
+    displayName: user.displayName,
+    status: user.status,
+    createdAt: toIso(user.createdAt),
+    lastLoginAt: toIso(user.lastLoginAt),
+    creditBalance: user.creditAccount?.balance ?? 0,
+    totalEarned: user.creditAccount?.totalEarned ?? 0,
+    totalSpent: user.creditAccount?.totalSpent ?? 0,
+    latestLedger: latestLedger
+      ? {
+          amount: latestLedger.amount,
+          direction: latestLedger.direction,
+          remark: latestLedger.remark,
+          createdAt: toIso(latestLedger.createdAt)
+        }
+      : null
+  };
+}
+
+function toAdminOrderItem(order: {
+  id: string;
+  orderNo: string;
+  amountCents: number;
+  points: number;
+  bonusPoints: number;
+  totalPoints: number;
+  payChannel: RechargeOrder["payChannel"];
+  status: RechargeOrder["status"];
+  clientRequestId: string;
+  createdAt: Date;
+  paidAt: Date | null;
+  closedAt: Date | null;
+  user: {
+    phone: string;
+  };
+  plan: {
+    name: string;
+  };
+  transactions: Array<{
+    status: PaymentTransaction["status"];
+    providerTradeNo: string;
+    failedReason: string | null;
+  }>;
+}): AdminOrderPage["items"][number] {
+  const createdAt = toIso(order.createdAt);
+  const latestTransaction = order.transactions[0] ?? null;
+
+  return {
+    id: order.id,
+    orderNo: order.orderNo,
+    userPhone: order.user.phone,
+    planName: order.plan.name,
+    amountCents: order.amountCents,
+    points: order.points,
+    bonusPoints: order.bonusPoints,
+    totalPoints: order.totalPoints,
+    payChannel: order.payChannel,
+    status: order.status,
+    clientRequestId: order.clientRequestId,
+    createdAt,
+    paidAt: order.paidAt ? toIso(order.paidAt) : null,
+    closedAt: order.closedAt ? toIso(order.closedAt) : null,
+    expiresAt: getOrderExpiresAt(createdAt),
+    expired: order.status === "PENDING" && isOrderExpired(createdAt),
+    latestPaymentStatus: latestTransaction?.status ?? null,
+    latestPaymentProviderTradeNo: latestTransaction?.providerTradeNo ?? null,
+    latestPaymentFailedReason: latestTransaction?.failedReason ?? null
+  };
+}
+
+function toAdminAiTaskItem(task: {
+  id: string;
+  type: AiTask["type"];
+  status: AiTask["status"];
+  scopeStatus: AiTask["scopeStatus"];
+  costPoints: number;
+  errorCode: string | null;
+  errorMessage: string | null;
+  createdAt: Date;
+  finishedAt: Date | null;
+  user: {
+    phone: string;
+  };
+  result: {
+    model: string;
+    tokenUsage: Prisma.JsonValue;
+  } | null;
+}): AdminAiTaskPage["items"][number] {
+  return {
+    id: task.id,
+    userPhone: task.user.phone,
+    type: task.type,
+    status: task.status,
+    scopeStatus: task.scopeStatus,
+    costPoints: task.costPoints,
+    model: task.result?.model ?? null,
+    tokenUsage: task.result ? toTokenUsage(task.result.tokenUsage) : null,
+    errorCode: task.errorCode,
+    errorMessage: truncateText(task.errorMessage, 160),
+    createdAt: toIso(task.createdAt),
+    finishedAt: task.finishedAt ? toIso(task.finishedAt) : null
+  };
+}
+
+function toAdminUploadedFileItem(file: {
+  id: string;
+  originalName: string;
+  ext: string;
+  sizeBytes: number;
+  sha256: string;
+  scanStatus: UploadedFile["scanStatus"];
+  riskFlags: Prisma.JsonValue;
+  createdAt: Date;
+  user: {
+    phone: string;
+  };
+}): AdminUploadedFilePage["items"][number] {
+  return {
+    id: file.id,
+    userPhone: file.user.phone,
+    originalName: file.originalName,
+    ext: file.ext,
+    sizeBytes: file.sizeBytes,
+    sha256Prefix: file.sha256.slice(0, 12),
+    scanStatus: file.scanStatus,
+    riskFlags: toStringArray(file.riskFlags),
+    createdAt: toIso(file.createdAt)
   };
 }
 
@@ -919,6 +1435,7 @@ function toAiTask(task: {
   targetPlatform: string | null;
   prompt: string | null;
   inputCode: string | null;
+  inputFileId: string | null;
   costPoints: number;
   clientRequestId: string;
   requestId: string;
@@ -939,6 +1456,7 @@ function toAiTask(task: {
     targetPlatform: task.targetPlatform,
     prompt: task.prompt,
     inputCode: task.inputCode,
+    inputFileId: task.inputFileId,
     costPoints: task.costPoints,
     clientRequestId: task.clientRequestId,
     requestId: task.requestId,
@@ -1023,6 +1541,14 @@ function toTokenUsage(value: Prisma.JsonValue) {
     completionTokens: Number(record.completionTokens ?? 0),
     totalTokens: Number(record.totalTokens ?? 0)
   };
+}
+
+function truncateText(value: string | null, maxLength: number) {
+  if (!value || value.length <= maxLength) {
+    return value;
+  }
+
+  return `${value.slice(0, maxLength)}...`;
 }
 
 function isObject(value: Prisma.JsonValue): value is Prisma.JsonObject {

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MaterialIcon } from "@/components/ui/MaterialIcon";
+import { Code2, Grid2X2, Repeat2, Sparkles, type LucideIcon } from "lucide-react";
 
 type ShellNavItemProps = {
   active?: boolean;
@@ -8,19 +8,22 @@ type ShellNavItemProps = {
   label: string;
 };
 
+const iconMap: Record<string, LucideIcon> = {
+  auto_awesome: Sparkles,
+  code: Code2,
+  grid_view: Grid2X2,
+  translate: Repeat2
+};
+
 export function ShellNavItem({ active = false, href, icon, label }: ShellNavItemProps) {
+  const Icon = iconMap[icon] ?? Sparkles;
+
   return (
     <Link
-      className={`flex items-center gap-sm rounded-lg px-sm py-sm text-body-emphasis transition-all ${
-        active
-          ? "scale-[0.98] bg-paper font-bold text-primary"
-          : "text-secondary hover:bg-fog hover:text-primary-bright"
-      }`}
+      className={`lq-nav-item ${active ? "is-active" : ""}`}
       href={href}
     >
-      <MaterialIcon fill={active} size={24}>
-        {icon}
-      </MaterialIcon>
+      <Icon aria-hidden="true" />
       <span>{label}</span>
     </Link>
   );

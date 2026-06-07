@@ -19,6 +19,7 @@ export async function POST(request: NextRequest) {
         targetPlatform: getStringField(body, "targetPlatform", false),
         prompt: getStringField(body, "prompt", false),
         inputCode: getStringField(body, "inputCode", false),
+        inputFileId: getStringField(body, "inputFileId", false),
         clientRequestId: getStringField(body, "clientRequestId")
       },
       requestId
@@ -41,4 +42,3 @@ export async function GET(request: NextRequest) {
     return ok(data, requestId);
   });
 }
-

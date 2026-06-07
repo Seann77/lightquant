@@ -1,35 +1,21 @@
-import { getPaymentMode, isMockPaymentEnabled, ServerConfigError } from "@/server/env";
 import type { RechargeOrder } from "@/server/domain";
-import { ApiError } from "@/server/http/api-response";
+import { basePaymentAction, type PaymentAction } from "@/server/payments/payment-action";
+import { createAlipayPaymentAction } from "@/server/payments/providers/alipay-provider";
+import { createWechatPaymentAction } from "@/server/payments/providers/wechat-provider";
 
-export function createPaymentInfo(order: RechargeOrder) {
-  assertMockPaymentAvailable();
+export async function createPaymentAction(order: RechargeOrder): Promise<PaymentAction> {
+  if (order.payChannel === "alipay") {
+    return createAlipayPaymentAction(order);
+  }
+
+  if (order.payChannel === "wechat") {
+    return createWechatPaymentAction(order);
+  }
 
   return {
-    provider: "mock",
-    payChannel: order.payChannel,
-    status: order.status,
-    mockPaymentUrl: "/api/v1/payments/mock/notify",
+    ...basePaymentAction(order),
+    type: "mock",
     qrCodeText: `LIGHTQUANT_MOCK_PAY:${order.orderNo}`,
-    pollUrl: `/api/v1/payments/${order.id}/status`
+    mockPaymentUrl: "/api/v1/payments/mock/notify"
   };
 }
-
-export function assertMockPaymentAvailable() {
-  let paymentMode: ReturnType<typeof getPaymentMode>;
-
-  try {
-    paymentMode = getPaymentMode();
-  } catch (error) {
-    if (error instanceof ServerConfigError) {
-      throw new ApiError("PAYMENT_CONFIG_ERROR", "支付配置不可用", 500);
-    }
-
-    throw error;
-  }
-
-  if (paymentMode !== "mock" || process.env.NODE_ENV === "production" || !isMockPaymentEnabled()) {
-    throw new ApiError("PAYMENT_CONFIG_ERROR", "当前环境未启用模拟支付", 500);
-  }
-}
-

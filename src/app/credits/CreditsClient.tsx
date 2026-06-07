@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/Button";
-import { MaterialIcon } from "@/components/ui/MaterialIcon";
-import { Panel } from "@/components/ui/Panel";
+import { ArrowDown, ArrowUp, CalendarDays, DollarSign, FileText, Filter, LineChart } from "lucide-react";
 import { creditFilters } from "@/lib/mock-data";
 
 type ApiResponse<T> =
@@ -49,31 +47,29 @@ type LedgerData = {
 };
 
 function amountClass(amount: number) {
-  return amount > 0 ? "text-primary-bright" : "text-bloom-deep";
+  return amount > 0 ? "text-[#0b63ff]" : "text-[#d92d20]";
 }
 
 function statusClass(status: string) {
   if (status === "已退回") {
-    return "bg-primary-fixed text-primary";
+    return "bg-[#eaf2ff] text-[#0b63ff]";
   }
 
-  return "bg-surface-container-low text-primary";
+  return "bg-[#eff6ff] text-[#0b63ff]";
 }
 
 function formatAmount(amount: number) {
   return `${amount > 0 ? "+" : ""}${amount.toLocaleString("zh-CN")}`;
 }
 
-function EmptyCreditState({ message = "当前暂无积分变动记录。" }: { message?: string }) {
+function EmptyCreditState({ message = "请先登录" }: { message?: string }) {
   return (
-    <div className="flex min-h-[260px] flex-col items-center justify-center rounded-xl border border-dashed border-steel bg-paper p-xxl text-center">
-      <div className="mb-md flex h-16 w-16 items-center justify-center rounded-full bg-surface-container-low">
-        <MaterialIcon className="text-outline" size={32}>
-          receipt_long
-        </MaterialIcon>
+    <div className="lq-empty-ledger">
+      <div className="lq-empty-ledger-icon">
+        <FileText aria-hidden="true" size={27} />
       </div>
-      <h2 className="mb-xs text-body-emphasis text-ink">暂无积分流水</h2>
-      <p className="max-w-sm text-caption-md text-secondary">{message}</p>
+      <h2>暂无积分流水</h2>
+      <p>{message}</p>
     </div>
   );
 }
@@ -148,129 +144,118 @@ export function CreditsClient() {
     const monthlyChange = ledger?.items.reduce((total, item) => total + item.amount, 0) ?? 0;
 
     return [
-      { label: "当前积分余额", value: account?.balance.toLocaleString("zh-CN") ?? "-", tone: "primary" },
-      { label: "累计获得", value: account?.totalEarned.toLocaleString("zh-CN") ?? "-", tone: "ink" },
-      { label: "累计消耗", value: account?.totalSpent.toLocaleString("zh-CN") ?? "-", tone: "ink" },
-      { label: "本页变化", value: `${monthlyChange > 0 ? "+" : ""}${monthlyChange.toLocaleString("zh-CN")}`, tone: "primary" }
+      { icon: DollarSign, label: "当前积分余额", value: account?.balance.toLocaleString("zh-CN") ?? "-", primary: true },
+      { icon: ArrowUp, label: "累计获得", value: account?.totalEarned.toLocaleString("zh-CN") ?? "0", primary: false },
+      { icon: ArrowDown, label: "累计消耗", value: account?.totalSpent.toLocaleString("zh-CN") ?? "0", primary: false },
+      { icon: LineChart, label: "本页变化", value: `${monthlyChange > 0 ? "+" : ""}${monthlyChange.toLocaleString("zh-CN")}`, primary: false }
     ];
   }, [account, ledger]);
   const records = ledger?.items ?? [];
   const hasTransactions = records.length > 0;
 
   return (
-    <section className="mx-auto min-h-full w-full max-w-[1080px] px-md py-lg md:px-xl md:py-xl">
-      <header className="mb-lg">
-        <h1 className="mb-sm text-display-lg font-bold tracking-tight text-ink">积分流水</h1>
-        <p className="text-body-lg text-secondary">查看积分获取、消耗和退回记录。</p>
+    <section className="lq-ledger-page">
+      <header className="lq-ledger-header">
+        <h1>积分流水</h1>
+        <p>查看积分获取、消耗和退回记录。</p>
       </header>
 
-      <section className="mb-lg grid grid-cols-1 gap-md md:grid-cols-4">
-        {summary.map((item) => (
-          <Panel className="min-h-[92px] p-md" key={item.label}>
-            <p className="mb-xs text-caption-md text-secondary">{item.label}</p>
-            <p className={`text-price-md ${item.tone === "primary" ? "text-primary-bright" : "text-ink"}`}>{item.value}</p>
-          </Panel>
-        ))}
+      <section aria-label="积分统计" className="lq-stat-grid">
+        {summary.map((item) => {
+          const Icon = item.icon;
+
+          return (
+            <article className={`lq-stat-card ${item.primary ? "is-primary" : ""}`} key={item.label}>
+              <p className="lq-stat-label">
+                <span className="lq-stat-icon">
+                  <Icon aria-hidden="true" size={16} />
+                </span>
+                {item.label}
+              </p>
+              <p className="lq-stat-value">{item.value}</p>
+            </article>
+          );
+        })}
       </section>
 
-      <Panel className="overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-md border-b border-surface-container-high px-md py-sm">
-          <div className="flex flex-wrap gap-xs">
+      <section className="lq-ledger-panel">
+        <div className="lq-ledger-tools">
+          <div className="lq-filter-tabs">
             {creditFilters.map((filter, index) => (
-              <button
-                className={`h-8 rounded-md border px-sm text-button-sm transition-colors ${
-                  index === 0
-                    ? "border-primary bg-primary text-on-primary"
-                    : "border-steel/60 bg-paper text-secondary hover:bg-surface-container-low hover:text-primary"
-                }`}
-                key={filter}
-                type="button"
-              >
+              <button className={`lq-filter-tab ${index === 0 ? "is-active" : ""}`} key={filter} type="button">
                 {filter}
               </button>
             ))}
           </div>
 
-          <div className="flex items-center gap-sm">
-            <button className="flex h-8 items-center gap-xs rounded-md border border-steel/60 bg-paper px-sm text-caption-md text-secondary" type="button">
-              <MaterialIcon size={16}>calendar_month</MaterialIcon>
+          <div className="lq-filter-buttons">
+            <button className="lq-filter-btn" type="button">
+              <CalendarDays aria-hidden="true" size={16} />
               时间范围
             </button>
-            <button className="flex h-8 items-center gap-xs rounded-md border border-steel/60 bg-paper px-sm text-caption-md text-secondary" type="button">
+            <button className="lq-filter-btn" type="button">
+              <Filter aria-hidden="true" size={16} />
               来源类型
-              <MaterialIcon size={16}>expand_more</MaterialIcon>
             </button>
           </div>
         </div>
 
-        {loading ? (
-          <div className="p-lg">
-            <EmptyCreditState message="正在加载积分流水..." />
-          </div>
-        ) : error ? (
-          <div className="p-lg">
-            <EmptyCreditState message={error} />
-          </div>
-        ) : hasTransactions ? (
-          <>
-            <div className="overflow-x-auto app-scrollbar">
-              <table className="min-w-[880px] w-full border-collapse text-left">
-                <thead className="bg-cloud text-caption-bold text-secondary">
+        {hasTransactions ? (
+          <div className="lq-ledger-scroll app-scrollbar">
+            <div className="lq-ledger-table-body">
+              <table className="lq-ledger-table">
+                <thead>
                   <tr>
-                    <th className="px-md py-sm font-bold">时间</th>
-                    <th className="px-sm py-sm font-bold">类型</th>
-                    <th className="px-sm py-sm font-bold">事项 / 描述</th>
-                    <th className="px-sm py-sm text-right font-bold">积分变化</th>
-                    <th className="px-sm py-sm text-right font-bold">余额</th>
-                    <th className="px-md py-sm text-right font-bold">状态</th>
+                    <th>时间</th>
+                    <th>类型</th>
+                    <th>事项 / 描述</th>
+                    <th className="text-right">积分变化</th>
+                    <th className="text-right">余额</th>
+                    <th className="text-right">状态</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-surface-container-high text-caption-md text-on-surface-variant">
+                <tbody>
                   {records.map((record) => (
-                    <tr className="bg-paper transition-colors hover:bg-surface-container-low" key={record.id}>
-                      <td className="whitespace-nowrap px-md py-xs text-secondary">{record.time}</td>
-                      <td className="px-sm py-xs">
-                        <span className="rounded bg-surface-container px-xs py-xxs text-caption-sm text-primary">{record.category}</span>
+                    <tr key={record.id}>
+                      <td className="whitespace-nowrap">{record.time}</td>
+                      <td>
+                        <span className="rounded bg-[#eaf2ff] px-2 py-1 text-xs font-bold text-[#0b63ff]">{record.category}</span>
                       </td>
-                      <td className="px-sm py-xs">
-                        <p className="text-caption-bold leading-tight text-ink">{record.title}</p>
-                        <p className="text-caption-sm leading-tight text-secondary">{record.description}</p>
+                      <td>
+                        <p className="m-0 font-extrabold text-[#111827]">{record.title}</p>
+                        <p className="m-0 text-xs text-[#5b6472]">{record.description}</p>
                       </td>
-                      <td className={`whitespace-nowrap px-sm py-xs text-right text-caption-bold ${amountClass(record.amount)}`}>
-                        {formatAmount(record.amount)}
-                      </td>
-                      <td className="whitespace-nowrap px-sm py-xs text-right text-secondary">
-                        {record.balanceAfter.toLocaleString("zh-CN")}
-                      </td>
-                      <td className="whitespace-nowrap px-md py-xs text-right">
-                        <span className={`rounded-full px-xs py-xxs text-caption-sm ${statusClass(record.status)}`}>{record.status}</span>
+                      <td className={`whitespace-nowrap text-right font-extrabold ${amountClass(record.amount)}`}>{formatAmount(record.amount)}</td>
+                      <td className="whitespace-nowrap text-right">{record.balanceAfter.toLocaleString("zh-CN")}</td>
+                      <td className="whitespace-nowrap text-right">
+                        <span className={`rounded-full px-2 py-1 text-xs font-bold ${statusClass(record.status)}`}>{record.status}</span>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-
-            <div className="flex items-center justify-between border-t border-surface-container-high px-md py-sm text-caption-md text-secondary">
+            <div className="lq-ledger-footer">
               <span>
                 第 {ledger?.page ?? 1} 页 / 共 {ledger?.totalPages ?? 1} 页
               </span>
-              <div className="flex gap-xs">
-                <Button disabled size="sm" type="button" variant="ghost">
-                  上一页
-                </Button>
-                <Button disabled size="sm" type="button" variant="outline">
-                  下一页
-                </Button>
-              </div>
+              <span>共 {ledger?.total ?? records.length} 条</span>
             </div>
-          </>
-        ) : (
-          <div className="p-lg">
-            <EmptyCreditState />
           </div>
+        ) : (
+          <>
+            <div className="lq-table-head">
+              <span>时间</span>
+              <span>类型</span>
+              <span>事项 / 描述</span>
+              <span className="text-right">积分变化</span>
+              <span className="text-right">余额</span>
+              <span className="text-right">状态</span>
+            </div>
+            <EmptyCreditState message={loading ? "正在加载积分流水..." : error || "请先登录"} />
+          </>
         )}
-      </Panel>
+      </section>
     </section>
   );
 }

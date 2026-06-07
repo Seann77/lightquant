@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 type LogoProps = {
   className?: string;
@@ -6,11 +7,18 @@ type LogoProps = {
 
 export function Logo({ className = "" }: LogoProps) {
   return (
-    <Link className={`flex min-w-0 items-center gap-xs ${className}`} href="/">
-      <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-on-primary shadow-soft-lift">
-        <span className="text-caption-bold leading-none">A</span>
+    <Link className={`lq-brand ${className}`} href="/">
+      <span className="lq-logo-shell">
+        <Image
+          alt="LightQuant LQ logo"
+          className="lq-logo-img"
+          height={44}
+          priority
+          src="/lightquant/lightquant-app-icon.png"
+          width={44}
+        />
       </span>
-      <span className="truncate text-display-xs font-bold text-ink">LightQuant</span>
+      <span className="lq-brand-name">LightQuant</span>
     </Link>
   );
 }

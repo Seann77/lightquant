@@ -1,9 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import { useState, type FormEvent } from "react";
-import { Button } from "@/components/ui/Button";
-import { MaterialIcon } from "@/components/ui/MaterialIcon";
-import { TextField } from "@/components/ui/TextField";
+import { ArrowRight, CircleDollarSign, Gift, LockKeyhole, Phone, Ticket, X } from "lucide-react";
 
 type CurrentUserData = {
   user: {
@@ -123,74 +122,101 @@ export function LoginModal({ onClose, onLoginSuccess, open }: LoginModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/55 p-md backdrop-blur-[2px]" role="presentation">
-      <div
-        aria-labelledby="login-modal-title"
-        aria-modal="true"
-        className="relative w-full max-w-[360px] rounded-xl bg-paper p-xl shadow-modal"
-        role="dialog"
-      >
-        <button
-          aria-label="关闭登录弹窗"
-          className="absolute right-md top-md text-secondary transition-colors hover:text-primary"
-          onClick={onClose}
-          type="button"
-        >
-          <MaterialIcon size={20}>close</MaterialIcon>
+    <div className="lq-modal-backdrop" role="presentation">
+      <section aria-labelledby="login-modal-title" aria-modal="true" className="lq-modal" role="dialog">
+        <button aria-label="关闭登录弹窗" className="lq-icon-button lq-modal-close" onClick={onClose} type="button">
+          <X aria-hidden="true" size={18} />
         </button>
 
-        <div className="mb-lg">
-          <h2 className="text-display-md font-semibold text-on-background" id="login-modal-title">
+        <div className="lq-modal-head">
+          <Image
+            alt="LightQuant LQ logo"
+            className="lq-modal-logo"
+            height={34}
+            priority
+            src="/lightquant/lightquant-app-icon.png"
+            width={34}
+          />
+          <h2 className="lq-modal-title" id="login-modal-title">
             登录 / 注册
           </h2>
-          <p className="mt-xs text-caption-bold text-primary-bright">注册即送 500 基础积分</p>
+          <p className="lq-modal-subtitle">
+            <CircleDollarSign aria-hidden="true" size={14} />
+            注册即送 500 基础积分
+          </p>
         </div>
 
-        <form className="grid gap-md" onSubmit={handleSubmit}>
-          <TextField label="手机号" name="phone" onChange={(event) => setPhone(event.target.value)} placeholder="请输入手机号" type="tel" value={phone} />
-          <div className="grid gap-xs">
-            <span className="text-caption-bold text-on-surface">验证码</span>
-            <div className="grid grid-cols-[minmax(0,1fr)_104px] gap-xs">
+        <form className="lq-form" onSubmit={handleSubmit}>
+          <label className="lq-field-group" htmlFor="login-phone">
+            <span className="lq-field-label">手机号</span>
+            <span className="lq-field">
+              <Phone aria-hidden="true" size={16} />
               <input
-                className="h-11 rounded border border-steel bg-paper px-sm text-body-md outline-none transition-colors placeholder:text-on-surface-variant/50 focus:border-primary focus:ring-1 focus:ring-primary"
-                onChange={(event) => setCode(event.target.value)}
-                placeholder="输入验证码"
-                type="text"
-                value={code}
+                autoComplete="tel"
+                id="login-phone"
+                name="phone"
+                onChange={(event) => setPhone(event.target.value)}
+                placeholder="请输入手机号"
+                type="tel"
+                value={phone}
               />
-              <Button disabled={sendingCode} onClick={handleSendCode} size="sm" type="button" variant="outline">
+            </span>
+          </label>
+
+          <div className="lq-field-group">
+            <label className="lq-field-label" htmlFor="login-code">
+              验证码
+            </label>
+            <div className="lq-code-row">
+              <span className="lq-field">
+                <LockKeyhole aria-hidden="true" size={16} />
+                <input
+                  autoComplete="one-time-code"
+                  id="login-code"
+                  onChange={(event) => setCode(event.target.value)}
+                  placeholder="6 位验证码"
+                  type="text"
+                  value={code}
+                />
+              </span>
+              <button className="lq-code-button" disabled={sendingCode} onClick={handleSendCode} type="button">
                 {sendingCode ? "发送中" : "获取验证码"}
-              </Button>
+              </button>
             </div>
           </div>
-          <TextField
-            label="邀请码（选填）"
-            name="invite"
-            onChange={(event) => setInviteCode(event.target.value)}
-            placeholder="如有邀请码请填写"
-            type="text"
-            value={inviteCode}
-          />
 
-          {message ? (
-            <div className="rounded bg-primary-soft/50 px-sm py-xs text-caption-md text-primary-bright">{message}</div>
-          ) : null}
-          {error ? (
-            <div className="rounded bg-error-container/40 px-sm py-xs text-caption-md text-bloom-deep">{error}</div>
-          ) : null}
+          <label className="lq-field-group" htmlFor="login-invite">
+            <span className="lq-field-label">邀请码（选填）</span>
+            <span className="lq-field">
+              <Gift aria-hidden="true" size={16} />
+              <input
+                autoComplete="off"
+                id="login-invite"
+                name="invite"
+                onChange={(event) => setInviteCode(event.target.value)}
+                placeholder="请输入邀请码"
+                type="text"
+                value={inviteCode}
+              />
+            </span>
+          </label>
 
-          <Button className="mt-xs w-full" disabled={loggingIn} type="submit">
+          {message ? <div className="lq-modal-message">{message}</div> : null}
+          {error ? <div className="lq-modal-error">{error}</div> : null}
+
+          <button className="lq-modal-primary" disabled={loggingIn} type="submit">
+            <ArrowRight aria-hidden="true" size={17} />
             {loggingIn ? "登录中..." : "登录/注册"}
-          </Button>
+          </button>
         </form>
 
-        <div className="mt-lg flex items-center justify-between rounded bg-cloud px-sm py-sm text-caption-sm text-graphite">
+        <div className="lq-bonus-card">
           <span>注册即送 500 基础积分，可用于策略生成与代码转换。</span>
-          <MaterialIcon className="text-primary" size={18}>
-            monetization_on
-          </MaterialIcon>
+          <span className="lq-coin">
+            <Ticket aria-hidden="true" size={18} />
+          </span>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

@@ -9,10 +9,18 @@ import type {
   RechargeOrder,
   RechargePlan,
   SmsCodeRecord,
+  UploadedFile,
   User
 } from "@/server/domain";
+import { ApiError } from "@/server/http/api-response";
+import { getOrderExpiresAt, isOrderExpired } from "@/server/payments/payment-config";
 import type {
   AiTaskPage,
+  AdminAiTaskPage,
+  AdminOrderPage,
+  AdminOverview,
+  AdminUploadedFilePage,
+  AdminUserPage,
   AppliedCreditLedger,
   ApplyCreditLedgerInput,
   CreateAiTaskInput,
@@ -21,6 +29,7 @@ import type {
   CreatePaymentTransactionInput,
   CreateRechargeOrderInput,
   CreateSmsCodeInput,
+  CreateUploadedFileInput,
   CreateUserInput,
   LedgerPage,
   LightQuantRepository,
@@ -88,6 +97,7 @@ export class MockLightQuantRepository implements LightQuantRepository {
   private readonly aiTasks = new Map<string, AiTask>();
   private readonly aiTasksByClientRequestId = new Map<string, string>();
   private readonly aiTaskResults = new Map<string, AiTaskResult>();
+  private readonly uploadedFiles = new Map<string, UploadedFile>();
   private readonly creditReservations = new Map<string, CreditReservation>();
   private readonly creditReservationsByIdempotencyKey = new Map<string, string>();
   private readonly creditReservationsByTaskId = new Map<string, string>();
@@ -291,6 +301,18 @@ export class MockLightQuantRepository implements LightQuantRepository {
       throw new Error("Order not found");
     }
 
+    if (order.status === "PAID") {
+      throw new ApiError("ORDER_ALREADY_PAID", "订单已支付", 409);
+    }
+
+    if (order.status === "CLOSED") {
+      throw new ApiError("ORDER_CLOSED", "订单已关闭", 409);
+    }
+
+    if (order.status !== "PENDING") {
+      throw new ApiError("FORBIDDEN", "当前订单状态不允许支付确认", 403);
+    }
+
     const updated: RechargeOrder = {
       ...order,
       status: "PAID",
@@ -302,9 +324,35 @@ export class MockLightQuantRepository implements LightQuantRepository {
     return updated;
   }
 
+  async closeExpiredRechargeOrders(cutoff: string, closedAt: string) {
+    let count = 0;
+
+    for (const order of this.orders.values()) {
+      if (order.status === "PENDING" && order.createdAt < cutoff) {
+        this.orders.set(order.id, {
+          ...order,
+          status: "CLOSED",
+          closedAt,
+          updatedAt: closedAt
+        });
+        count += 1;
+      }
+    }
+
+    return {
+      count
+    };
+  }
+
   async findPaymentTransactionByIdempotencyKey(idempotencyKey: string) {
     const transactionId = this.paymentTransactionsByIdempotencyKey.get(idempotencyKey);
     return transactionId ? this.paymentTransactions.get(transactionId) ?? null : null;
+  }
+
+  async findLatestPaymentTransactionByOrderId(orderId: string) {
+    return [...this.paymentTransactions.values()]
+      .filter((transaction) => transaction.orderId === orderId)
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0] ?? null;
   }
 
   async createPaymentTransaction(input: CreatePaymentTransactionInput) {
@@ -391,6 +439,103 @@ export class MockLightQuantRepository implements LightQuantRepository {
     };
   }
 
+  async createUploadedFile(input: CreateUploadedFileInput) {
+    const uploadedFile: UploadedFile = {
+      id: randomUUID(),
+      ...input
+    };
+
+    this.uploadedFiles.set(uploadedFile.id, uploadedFile);
+    return uploadedFile;
+  }
+
+  async findUploadedFileById(id: string) {
+    return this.uploadedFiles.get(id) ?? null;
+  }
+
+  async getAdminOverview(todayStart: string): Promise<AdminOverview> {
+    const todayAiTasks = [...this.aiTasks.values()].filter((task) => task.createdAt >= todayStart);
+    const todayOrders = [...this.orders.values()].filter((order) => order.createdAt >= todayStart);
+    const todayRiskFiles = [...this.uploadedFiles.values()].filter((file) => file.createdAt >= todayStart && file.scanStatus !== "PASSED");
+    const todayTokens = todayAiTasks.reduce((total, task) => {
+      const result = this.aiTaskResults.get(task.id);
+      return total + (result?.tokenUsage.totalTokens ?? 0);
+    }, 0);
+    const creditAccounts = [...this.creditAccounts.values()];
+
+    return {
+      totals: {
+        users: this.users.size,
+        creditBalance: creditAccounts.reduce((total, account) => total + account.balance, 0),
+        creditEarned: creditAccounts.reduce((total, account) => total + account.totalEarned, 0),
+        creditSpent: creditAccounts.reduce((total, account) => total + account.totalSpent, 0),
+        todayAiTasks: todayAiTasks.length,
+        todayAiTokens: todayTokens,
+        todayOrders: todayOrders.length,
+        todayRiskFiles: todayRiskFiles.length
+      },
+      recentFailedAiTasks: [...this.aiTasks.values()]
+        .filter((task) => task.status === "FAILED")
+        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+        .slice(0, 5)
+        .map((task) => toAdminAiTaskItem(task, this.users, this.aiTaskResults)),
+      recentRiskFiles: [...this.uploadedFiles.values()]
+        .filter((file) => file.scanStatus !== "PASSED")
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+        .slice(0, 5)
+        .map((file) => toAdminUploadedFileItem(file, this.users))
+    };
+  }
+
+  async listAdminUsers(pagination: { page: number; pageSize: number }, filters: { phone?: string }): Promise<AdminUserPage> {
+    const items = [...this.users.values()]
+      .filter((user) => (filters.phone ? user.phone.includes(filters.phone) : true))
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+    const start = (pagination.page - 1) * pagination.pageSize;
+
+    return {
+      items: items.slice(start, start + pagination.pageSize).map((user) => toAdminUserItem(user, this.creditAccounts, this.creditLedger)),
+      total: items.length
+    };
+  }
+
+  async listAdminOrders(pagination: { page: number; pageSize: number }, filters: { status?: RechargeOrder["status"] }): Promise<AdminOrderPage> {
+    const items = [...this.orders.values()]
+      .filter((order) => (filters.status ? order.status === filters.status : true))
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+    const start = (pagination.page - 1) * pagination.pageSize;
+
+    return {
+      items: items.slice(start, start + pagination.pageSize).map((order) => toAdminOrderItem(order, this.users, this.rechargePlans, this.paymentTransactions)),
+      total: items.length
+    };
+  }
+
+  async listAdminAiTasks(pagination: { page: number; pageSize: number }, filters: { type?: AiTask["type"]; status?: AiTask["status"] }): Promise<AdminAiTaskPage> {
+    const items = [...this.aiTasks.values()]
+      .filter((task) => (filters.type ? task.type === filters.type : true))
+      .filter((task) => (filters.status ? task.status === filters.status : true))
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+    const start = (pagination.page - 1) * pagination.pageSize;
+
+    return {
+      items: items.slice(start, start + pagination.pageSize).map((task) => toAdminAiTaskItem(task, this.users, this.aiTaskResults)),
+      total: items.length
+    };
+  }
+
+  async listAdminUploadedFiles(pagination: { page: number; pageSize: number }, filters: { scanStatus?: UploadedFile["scanStatus"] }): Promise<AdminUploadedFilePage> {
+    const items = [...this.uploadedFiles.values()]
+      .filter((file) => (filters.scanStatus ? file.scanStatus === filters.scanStatus : true))
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+    const start = (pagination.page - 1) * pagination.pageSize;
+
+    return {
+      items: items.slice(start, start + pagination.pageSize).map((file) => toAdminUploadedFileItem(file, this.users)),
+      total: items.length
+    };
+  }
+
   async findCreditReservationByIdempotencyKey(idempotencyKey: string) {
     const reservationId = this.creditReservationsByIdempotencyKey.get(idempotencyKey);
     return reservationId ? this.creditReservations.get(reservationId) ?? null : null;
@@ -446,4 +591,100 @@ export class MockLightQuantRepository implements LightQuantRepository {
 
 function clientRequestKey(userId: string, clientRequestId: string) {
   return `${userId}:${clientRequestId}`;
+}
+
+function toAdminUserItem(user: User, creditAccounts: Map<string, CreditAccount>, creditLedger: Map<string, CreditLedger>): AdminUserPage["items"][number] {
+  const account = creditAccounts.get(user.id);
+  const latestLedger = [...creditLedger.values()]
+    .filter((item) => item.userId === user.id)
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
+
+  return {
+    id: user.id,
+    phone: user.phone,
+    displayName: user.displayName,
+    status: user.status,
+    createdAt: user.createdAt,
+    lastLoginAt: user.lastLoginAt,
+    creditBalance: account?.balance ?? 0,
+    totalEarned: account?.totalEarned ?? 0,
+    totalSpent: account?.totalSpent ?? 0,
+    latestLedger: latestLedger
+      ? {
+          amount: latestLedger.amount,
+          direction: latestLedger.direction,
+          remark: latestLedger.remark,
+          createdAt: latestLedger.createdAt
+        }
+      : null
+  };
+}
+
+function toAdminOrderItem(order: RechargeOrder, users: Map<string, User>, plans: Map<string, RechargePlan>, transactions: Map<string, PaymentTransaction>): AdminOrderPage["items"][number] {
+  const latestTransaction = [...transactions.values()]
+    .filter((transaction) => transaction.orderId === order.id)
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0] ?? null;
+
+  return {
+    id: order.id,
+    orderNo: order.orderNo,
+    userPhone: users.get(order.userId)?.phone ?? "",
+    planName: plans.get(order.planId)?.name ?? order.planId,
+    amountCents: order.amountCents,
+    points: order.points,
+    bonusPoints: order.bonusPoints,
+    totalPoints: order.totalPoints,
+    payChannel: order.payChannel,
+    status: order.status,
+    clientRequestId: order.clientRequestId,
+    createdAt: order.createdAt,
+    paidAt: order.paidAt,
+    closedAt: order.closedAt,
+    expiresAt: getOrderExpiresAt(order.createdAt),
+    expired: order.status === "PENDING" && isOrderExpired(order.createdAt),
+    latestPaymentStatus: latestTransaction?.status ?? null,
+    latestPaymentProviderTradeNo: latestTransaction?.providerTradeNo ?? null,
+    latestPaymentFailedReason: latestTransaction?.failedReason ?? null
+  };
+}
+
+function toAdminAiTaskItem(task: AiTask, users: Map<string, User>, results: Map<string, AiTaskResult>): AdminAiTaskPage["items"][number] {
+  const result = results.get(task.id);
+
+  return {
+    id: task.id,
+    userPhone: users.get(task.userId)?.phone ?? "",
+    type: task.type,
+    status: task.status,
+    scopeStatus: task.scopeStatus,
+    costPoints: task.costPoints,
+    model: result?.model ?? null,
+    tokenUsage: result?.tokenUsage ?? null,
+    errorCode: task.errorCode,
+    errorMessage: truncateText(task.errorMessage, 160),
+    createdAt: task.createdAt,
+    finishedAt: task.finishedAt
+  };
+}
+
+function toAdminUploadedFileItem(file: UploadedFile, users: Map<string, User>): AdminUploadedFilePage["items"][number] {
+  return {
+    id: file.id,
+    userPhone: users.get(file.userId)?.phone ?? "",
+    originalName: file.originalName,
+    ext: file.ext,
+    sizeBytes: file.sizeBytes,
+    sha256Prefix: file.sha256.slice(0, 12),
+    scanStatus: file.scanStatus,
+    riskFlags: file.riskFlags,
+    createdAt: file.createdAt
+  };
+}
+
+function truncateText(value: string | null, maxLength: number) {
+  if (!value || value.length <= maxLength) {
+    return value;
+  }
+
+  return `${value.slice(0, maxLength)}...`;
 }

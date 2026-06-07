@@ -84,21 +84,34 @@ enum CreditReservationStatus {
   RELEASED
 }
 
-model User {
-  id          String          @id @default(uuid()) @db.Uuid
-  phone       String          @unique @db.VarChar(20)
-  displayName String          @map("display_name") @db.VarChar(80)
-  inviteCode  String          @unique @map("invite_code") @db.VarChar(32)
-  referredBy  String?         @map("referred_by") @db.Uuid
-  status      UserStatus      @default(active)
-  createdAt   DateTime        @map("created_at") @db.Timestamptz(3)
-  lastLoginAt DateTime        @map("last_login_at") @db.Timestamptz(3)
+enum UploadedFileParseStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
 
-  creditAccount       CreditAccount?
-  creditLedger        CreditLedger[]
-  creditReservations  CreditReservation[]
-  rechargeOrders      RechargeOrder[]
-  aiTasks             AiTask[]
+enum UploadedFileScanStatus {
+  PASSED
+  BLOCKED
+  WARNING
+}
+
+model User {
+  id          String     @id @default(uuid()) @db.Uuid
+  phone       String     @unique @db.VarChar(20)
+  displayName String     @map("display_name") @db.VarChar(80)
+  inviteCode  String     @unique @map("invite_code") @db.VarChar(32)
+  referredBy  String?    @map("referred_by") @db.Uuid
+  status      UserStatus @default(active)
+  createdAt   DateTime   @map("created_at") @db.Timestamptz(3)
+  lastLoginAt DateTime   @map("last_login_at") @db.Timestamptz(3)
+
+  creditAccount      CreditAccount?
+  creditLedger       CreditLedger[]
+  creditReservations CreditReservation[]
+  rechargeOrders     RechargeOrder[]
+  aiTasks            AiTask[]
+  uploadedFiles      UploadedFile[]
 
   @@map("users")
 }
@@ -206,32 +219,59 @@ model RechargeOrder {
   createdAt       DateTime    @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime    @map("updated_at") @db.Timestamptz(3)
 
-  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  plan RechargePlan @relation(fields: [planId], references: [id])
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan         RechargePlan         @relation(fields: [planId], references: [id])
   transactions PaymentTransaction[]
 
   @@unique([userId, clientRequestId])
   @@index([userId, createdAt])
+  @@index([status, createdAt])
   @@map("orders")
 }
 
 model PaymentTransaction {
-  id              String                   @id @default(uuid()) @db.Uuid
-  orderId         String                   @map("order_id") @db.Uuid
-  provider        PaymentProvider
-  providerTradeNo String                   @map("provider_trade_no") @db.VarChar(120)
-  notifyId        String                   @map("notify_id") @db.VarChar(160)
-  amountCents     Int                      @map("amount_cents")
-  status          PaymentTransactionStatus
-  rawPayload      Json                     @map("raw_payload")
-  idempotencyKey  String                   @unique @map("idempotency_key") @db.VarChar(160)
-  createdAt       DateTime                 @map("created_at") @db.Timestamptz(3)
+  id                String                   @id @default(uuid()) @db.Uuid
+  orderId           String                   @map("order_id") @db.Uuid
+  provider          PaymentProvider
+  providerTradeNo   String                   @map("provider_trade_no") @db.VarChar(120)
+  notifyId          String                   @map("notify_id") @db.VarChar(160)
+  amountCents       Int                      @map("amount_cents")
+  status            PaymentTransactionStatus
+  rawPayload        Json                     @map("raw_payload")
+  idempotencyKey    String                   @unique @map("idempotency_key") @db.VarChar(160)
+  verifiedAt        DateTime?                @map("verified_at") @db.Timestamptz(3)
+  failedReason      String?                  @map("failed_reason") @db.Text
+  orderStatusBefore OrderStatus?             @map("order_status_before")
+  orderStatusAfter  OrderStatus?             @map("order_status_after")
+  createdAt         DateTime                 @map("created_at") @db.Timestamptz(3)
 
   order RechargeOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@unique([provider, notifyId])
   @@index([orderId])
   @@map("payment_transactions")
+}
+
+model UploadedFile {
+  id           String                  @id @default(uuid()) @db.Uuid
+  userId       String                  @map("user_id") @db.Uuid
+  originalName String                  @map("original_name") @db.VarChar(255)
+  ext          String                  @db.VarChar(16)
+  mimeType     String                  @map("mime_type") @db.VarChar(120)
+  sizeBytes    Int                     @map("size_bytes")
+  sha256       String                  @db.VarChar(64)
+  contentText  String                  @map("content_text") @db.Text
+  parseStatus  UploadedFileParseStatus @map("parse_status")
+  scanStatus   UploadedFileScanStatus  @map("scan_status")
+  riskFlags    Json                    @map("risk_flags")
+  createdAt    DateTime                @map("created_at") @db.Timestamptz(3)
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  aiTasks AiTask[]
+
+  @@index([userId, createdAt])
+  @@index([sha256])
+  @@map("uploaded_files")
 }
 
 model AiTask {
@@ -244,6 +284,7 @@ model AiTask {
   targetPlatform  String?           @map("target_platform") @db.VarChar(80)
   prompt          String?           @db.Text
   inputCode       String?           @map("input_code") @db.Text
+  inputFileId     String?           @map("input_file_id") @db.Uuid
   costPoints      Int               @map("cost_points")
   clientRequestId String            @map("client_request_id") @db.VarChar(120)
   requestId       String            @map("request_id") @db.VarChar(80)
@@ -254,12 +295,14 @@ model AiTask {
   createdAt       DateTime          @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime          @map("updated_at") @db.Timestamptz(3)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  result AiTaskResult?
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inputFile   UploadedFile?      @relation(fields: [inputFileId], references: [id], onDelete: SetNull)
+  result      AiTaskResult?
   reservation CreditReservation?
 
   @@unique([userId, clientRequestId])
   @@index([userId, createdAt])
+  @@index([inputFileId])
   @@map("ai_tasks")
 }
 

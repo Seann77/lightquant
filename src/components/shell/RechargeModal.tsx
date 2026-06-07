@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import QRCode from "qrcode";
 import { Button } from "@/components/ui/Button";
 import { MaterialIcon } from "@/components/ui/MaterialIcon";
 
@@ -12,6 +13,8 @@ type RechargeModalProps = {
 };
 
 type PayChannel = "mock" | "wechat" | "alipay";
+type OrderStatus = "PENDING" | "PAID" | "CLOSED" | "FAILED";
+type PaymentActionType = "mock" | "redirect" | "qr_code";
 
 type RechargePlan = {
   id: string;
@@ -33,19 +36,45 @@ type RechargeOrder = {
   price: string;
   totalPoints: number;
   payChannel: PayChannel;
-  status: "PENDING" | "PAID" | "CLOSED" | "FAILED";
+  status: OrderStatus;
+  expiresAt?: string;
+  expired?: boolean;
+};
+
+type PaymentAction = {
+  type: PaymentActionType;
+  provider: PayChannel;
+  payChannel: PayChannel;
+  status: OrderStatus;
+  orderId: string;
+  orderNo: string;
+  expiresAt: string;
+  pollUrl: string;
+  redirectUrl?: string;
+  formHtml?: string;
+  qrCodeText?: string;
+  mockPaymentUrl?: string;
 };
 
 type CreateOrderData = {
   order: RechargeOrder;
-  payment: {
-    provider: string;
-    payChannel: PayChannel;
-    status: RechargeOrder["status"];
-    qrCodeText: string;
-    pollUrl: string;
-  };
+  paymentAction?: PaymentAction;
+  payment?: PaymentAction;
   duplicated: boolean;
+};
+
+type PaymentStatusData = {
+  order: RechargeOrder;
+  payment: {
+    paid: boolean;
+    channel: PayChannel;
+    amountCents: number;
+    creditGranted: boolean;
+    expired: boolean;
+    expiresAt: string;
+    latestTransactionStatus?: string | null;
+    failedReason?: string | null;
+  };
 };
 
 type ApiResponse<T> =
@@ -80,11 +109,14 @@ export function RechargeModal({ onClose, onRechargeSuccess, open, points }: Rech
   const [selectedPlanId, setSelectedPlanId] = useState("standard");
   const [paymentMethod, setPaymentMethod] = useState<PayChannel>("mock");
   const [orderData, setOrderData] = useState<CreateOrderData | null>(null);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
   const [loadingPlans, setLoadingPlans] = useState(false);
   const [creatingOrder, setCreatingOrder] = useState(false);
   const [confirmingPayment, setConfirmingPayment] = useState(false);
+  const [checkingStatus, setCheckingStatus] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const settledOrderRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -129,11 +161,29 @@ export function RechargeModal({ onClose, onRechargeSuccess, open, points }: Rech
     };
   }, [open]);
 
+  useEffect(() => {
+    const paymentAction = getPaymentAction(orderData);
+
+    if (!open || !orderData || !paymentAction || paymentAction.type === "mock" || orderData.order.status !== "PENDING") {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      void refreshPaymentStatus(false);
+    }, 3000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [open, orderData?.order.id, orderData?.order.status, orderData?.paymentAction?.type, orderData?.payment?.type]);
+
   const activePlan = useMemo(
     () => plans.find((plan) => plan.id === selectedPlanId) ?? plans[0],
     [plans, selectedPlanId]
   );
   const activePayment = paymentMethods.find((method) => method.id === paymentMethod) ?? paymentMethods[0];
+  const paid = orderData?.order.status === "PAID";
+  const paymentAction = getPaymentAction(orderData);
 
   if (!open) {
     return null;
@@ -145,9 +195,12 @@ export function RechargeModal({ onClose, onRechargeSuccess, open, points }: Rech
       return;
     }
 
+    const pendingPaymentWindow = paymentMethod === "alipay" ? window.open("about:blank", "_blank", "noopener,noreferrer") : null;
     setCreatingOrder(true);
+    setQrCodeDataUrl("");
     setError("");
     setMessage("");
+    settledOrderRef.current = null;
 
     try {
       const response = await fetch("/api/v1/orders/recharge", {
@@ -164,12 +217,25 @@ export function RechargeModal({ onClose, onRechargeSuccess, open, points }: Rech
       const payload = (await response.json()) as ApiResponse<CreateOrderData>;
 
       if (!payload.success) {
+        pendingPaymentWindow?.close();
         throw new Error(payload.error.message);
       }
 
+      const action = getPaymentAction(payload.data);
       setOrderData(payload.data);
-      setMessage("订单已创建，当前为模拟支付环境，请点击模拟支付确认。");
+
+      if (action?.type === "redirect") {
+        openRedirectPayment(action, pendingPaymentWindow);
+        setMessage("请在新打开的支付宝页面完成支付。");
+      } else if (action?.type === "qr_code" && action.qrCodeText) {
+        setQrCodeDataUrl(await QRCode.toDataURL(action.qrCodeText, { margin: 1, width: 192 }));
+        setMessage("请使用微信扫码支付。");
+      } else {
+        pendingPaymentWindow?.close();
+        setMessage("订单已创建，当前为模拟支付环境，请点击模拟支付确认。");
+      }
     } catch (createError) {
+      pendingPaymentWindow?.close();
       setError(createError instanceof Error ? createError.message : "订单创建失败");
     } finally {
       setCreatingOrder(false);
@@ -209,14 +275,22 @@ export function RechargeModal({ onClose, onRechargeSuccess, open, points }: Rech
           ? {
               ...current,
               order: payload.data.order,
-              payment: {
-                ...current.payment,
-                status: payload.data.order.status
-              }
+              paymentAction: current.paymentAction
+                ? {
+                    ...current.paymentAction,
+                    status: payload.data.order.status
+                  }
+                : current.paymentAction,
+              payment: current.payment
+                ? {
+                    ...current.payment,
+                    status: payload.data.order.status
+                  }
+                : current.payment
             }
           : current
       );
-      setMessage("模拟支付成功，积分已由服务端入账。");
+      setMessage("支付成功，积分已到账。");
       await onRechargeSuccess();
       window.dispatchEvent(new Event("lightquant:credits-updated"));
     } catch (notifyError) {
@@ -226,9 +300,55 @@ export function RechargeModal({ onClose, onRechargeSuccess, open, points }: Rech
     }
   }
 
+  async function refreshPaymentStatus(manual: boolean) {
+    if (!orderData) {
+      return;
+    }
+
+    setCheckingStatus(true);
+    setError("");
+
+    try {
+      const response = await fetch(`/api/v1/payments/${orderData.order.id}/status`, {
+        cache: "no-store"
+      });
+      const payload = (await response.json()) as ApiResponse<PaymentStatusData>;
+
+      if (!payload.success) {
+        throw new Error(payload.error.message);
+      }
+
+      setOrderData((current) => current ? { ...current, order: payload.data.order } : current);
+
+      if (payload.data.payment.paid && payload.data.payment.creditGranted) {
+        if (settledOrderRef.current !== payload.data.order.id) {
+          settledOrderRef.current = payload.data.order.id;
+          setMessage("支付成功，积分已到账。");
+          await onRechargeSuccess();
+          window.dispatchEvent(new Event("lightquant:credits-updated"));
+        }
+        return;
+      }
+
+      if (payload.data.order.status === "CLOSED" || payload.data.payment.expired) {
+        setMessage("订单已过期，请重新下单。");
+        return;
+      }
+
+      if (manual) {
+        setMessage("正在确认支付，请稍后刷新。");
+      }
+    } catch (statusError) {
+      setError(statusError instanceof Error ? statusError.message : "支付状态刷新失败");
+    } finally {
+      setCheckingStatus(false);
+    }
+  }
+
   function handlePlanChange(planId: string) {
     setSelectedPlanId(planId);
     setOrderData(null);
+    setQrCodeDataUrl("");
     setMessage("");
     setError("");
   }
@@ -236,11 +356,10 @@ export function RechargeModal({ onClose, onRechargeSuccess, open, points }: Rech
   function handlePaymentChange(method: PayChannel) {
     setPaymentMethod(method);
     setOrderData(null);
+    setQrCodeDataUrl("");
     setMessage("");
     setError("");
   }
-
-  const paid = orderData?.order.status === "PAID";
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/55 p-md backdrop-blur-[2px]" role="presentation">
@@ -339,7 +458,18 @@ export function RechargeModal({ onClose, onRechargeSuccess, open, points }: Rech
             <p>
               状态 <span className="font-semibold text-primary-bright">{orderData.order.status}</span>
             </p>
-            <p className="truncate">模拟码 {orderData.payment.qrCodeText}</p>
+            {orderData.order.expiresAt ? (
+              <p>
+                过期时间 <span className="text-ink">{formatShortDate(orderData.order.expiresAt)}</span>
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {paymentAction?.type === "qr_code" ? (
+          <div className="mb-md flex flex-col items-center rounded-lg border border-steel/50 bg-paper p-md">
+            {qrCodeDataUrl ? <img alt="微信支付二维码" className="h-48 w-48" src={qrCodeDataUrl} /> : <div className="h-48 w-48 animate-pulse rounded-md bg-surface-container" />}
+            <p className="mt-sm text-caption-md text-secondary">请使用微信扫码支付</p>
           </div>
         ) : null}
 
@@ -361,10 +491,15 @@ export function RechargeModal({ onClose, onRechargeSuccess, open, points }: Rech
           </div>
         ) : null}
 
-        {orderData && !paid ? (
+        {orderData && paymentAction?.type === "mock" && !paid ? (
           <Button className="w-full" disabled={confirmingPayment} onClick={handleMockNotify} type="button">
             <MaterialIcon size={18}>verified</MaterialIcon>
             {confirmingPayment ? "确认中..." : "模拟支付确认"}
+          </Button>
+        ) : orderData && paymentAction?.type !== "mock" && !paid ? (
+          <Button className="w-full" disabled={checkingStatus} onClick={() => void refreshPaymentStatus(true)} type="button">
+            <MaterialIcon size={18}>refresh</MaterialIcon>
+            {checkingStatus ? "刷新中..." : "我已完成支付 / 刷新支付状态"}
           </Button>
         ) : (
           <Button className="w-full" disabled={loadingPlans || creatingOrder || !activePlan || paid} onClick={handleCreateOrder} type="button">
@@ -377,6 +512,28 @@ export function RechargeModal({ onClose, onRechargeSuccess, open, points }: Rech
   );
 }
 
+function getPaymentAction(data: CreateOrderData | null) {
+  return data?.paymentAction ?? data?.payment ?? null;
+}
+
+function openRedirectPayment(action: PaymentAction, paymentWindow: Window | null) {
+  if (action.redirectUrl) {
+    if (paymentWindow) {
+      paymentWindow.location.href = action.redirectUrl;
+      return;
+    }
+
+    window.open(action.redirectUrl, "_blank", "noopener,noreferrer");
+    return;
+  }
+
+  if (action.formHtml && paymentWindow) {
+    paymentWindow.document.open();
+    paymentWindow.document.write(action.formHtml);
+    paymentWindow.document.close();
+  }
+}
+
 function createClientRequestId() {
   return globalThis.crypto?.randomUUID?.() ?? `client-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
@@ -385,3 +542,11 @@ function trimPrice(price: string) {
   return price.endsWith(".00") ? price.slice(0, -3) : price.replace(/0$/, "");
 }
 
+function formatShortDate(value: string) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(value));
+}

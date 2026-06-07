@@ -16,22 +16,19 @@ export const homeFeatures = [
     title: "策略生成 / 修改",
     description: "用自然语言描述您的交易理念，AI为您编写底层策略代码。",
     href: "/chat?mode=strategy",
-    icon: "auto_awesome",
-    active: true
+    icon: "auto_awesome"
   },
   {
     title: "平台代码转换",
     description: "在聚宽、PTrade、QMT等不同量化平台间快速迁移您的策略代码。",
     href: "/chat?mode=convert",
-    icon: "translate",
-    active: false
+    icon: "translate"
   },
   {
     title: "代码翻译解析",
     description: "将晦涩的金融工程代码逐行解析为易懂的人类语言。",
     href: "/code-analysis",
-    icon: "code",
-    active: false
+    icon: "code"
   }
 ];
 
