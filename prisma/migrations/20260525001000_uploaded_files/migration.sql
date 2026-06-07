@@ -42,5 +42,15 @@ ALTER TABLE "ai_tasks" ADD CONSTRAINT "ai_tasks_input_file_id_fkey" FOREIGN KEY 
 
 -- Supabase client roles must not access business tables directly.
 ALTER TABLE "uploaded_files" ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON TABLE "uploaded_files" FROM anon;
-REVOKE ALL ON TABLE "uploaded_files" FROM authenticated;
+
+DO $$
+DECLARE
+  role_name text;
+BEGIN
+  FOREACH role_name IN ARRAY ARRAY['anon', 'authenticated']
+  LOOP
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = role_name) THEN
+      EXECUTE format('REVOKE ALL ON TABLE public.%I FROM %I', 'uploaded_files', role_name);
+    END IF;
+  END LOOP;
+END $$;
