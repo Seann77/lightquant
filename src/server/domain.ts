@@ -11,6 +11,17 @@ export type User = {
   lastLoginAt: string;
 };
 
+export type UserLegalConsent = {
+  id: string;
+  userId: string;
+  agreementVersion: string;
+  privacyVersion: string;
+  agreedAt: string;
+  requestIp: string | null;
+  userAgent: string | null;
+  source: string;
+};
+
 export type SmsScene = "login";
 
 export type SmsCodeRecord = {
@@ -117,28 +128,39 @@ export type PaymentTransaction = {
 export type AiTaskType = "strategy_generation" | "code_conversion" | "code_analysis";
 export type AiTaskStatus = "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
 export type AiTaskScopeStatus = "in_scope" | "out_of_scope";
+export type AiConversationMode = "strategy" | "convert" | "analysis";
+export type AiConversationStatus = "active" | "archived";
+export type AiMessageRole = "user" | "assistant" | "system";
+export type AiMessageAttachmentRole = "input" | "reference" | "generated";
 export type CreditReservationStatus = "RESERVED" | "CONFIRMED" | "RELEASED";
 export type UploadedFileParseStatus = "PENDING" | "SUCCEEDED" | "FAILED";
 export type UploadedFileScanStatus = "PASSED" | "BLOCKED" | "WARNING";
+export type UploadedFileKind = "code" | "text" | "log" | "markdown" | "image";
 
 export type UploadedFile = {
   id: string;
   userId: string;
   originalName: string;
+  kind: UploadedFileKind | null;
   ext: string;
   mimeType: string;
   sizeBytes: number;
   sha256: string;
-  contentText: string;
+  storageKey: string | null;
+  thumbnailKey: string | null;
+  contentText: string | null;
+  contentJson: Record<string, unknown> | null;
   parseStatus: UploadedFileParseStatus;
   scanStatus: UploadedFileScanStatus;
   riskFlags: string[];
   createdAt: string;
+  updatedAt: string | null;
 };
 
 export type AiTask = {
   id: string;
   userId: string;
+  conversationId: string | null;
   type: AiTaskType;
   status: AiTaskStatus;
   scopeStatus: AiTaskScopeStatus;
@@ -156,6 +178,58 @@ export type AiTask = {
   finishedAt: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type AiConversation = {
+  id: string;
+  userId: string;
+  mode: AiConversationMode;
+  title: string;
+  targetPlatform: string | null;
+  sourcePlatform: string | null;
+  status: AiConversationStatus;
+  lastMessageAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AiMessage = {
+  id: string;
+  conversationId: string;
+  userId: string;
+  role: AiMessageRole;
+  taskId: string | null;
+  content: string;
+  contentJson: Record<string, unknown> | null;
+  createdAt: string;
+};
+
+export type AiMessageAttachment = {
+  id: string;
+  messageId: string;
+  conversationId: string;
+  userId: string;
+  fileId: string;
+  role: AiMessageAttachmentRole;
+  displayOrder: number;
+  caption: string | null;
+  createdAt: string;
+};
+
+export type AiMessageAttachmentSummary = AiMessageAttachment & {
+  file: {
+    fileId: string;
+    kind: UploadedFileKind | null;
+    originalName: string;
+    ext: string;
+    mimeType: string;
+    sizeBytes: number;
+    scanStatus: UploadedFileScanStatus;
+    riskFlags: string[];
+    contentPreview: string;
+    hasThumbnail: boolean;
+    createdAt: string;
+  };
 };
 
 export type AiTaskResult = {

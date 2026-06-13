@@ -4,6 +4,7 @@ type ApiResponse<T> =
 
 export type UploadedCodeFile = {
   fileId: string;
+  kind?: "code" | "text" | "log" | "markdown" | "image";
   originalName: string;
   ext: string;
   mimeType: string;
@@ -12,6 +13,9 @@ export type UploadedCodeFile = {
   contentPreview: string;
   scanStatus: "PASSED" | "BLOCKED" | "WARNING";
   riskFlags: string[];
+  hasThumbnail?: boolean;
+  thumbnailUrl?: string | null;
+  previewUrl?: string | null;
   createdAt: string;
 };
 

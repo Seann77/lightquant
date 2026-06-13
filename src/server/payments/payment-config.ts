@@ -12,6 +12,13 @@ type PaymentConfig = {
   orderExpireMinutes: number;
 };
 
+export type PaymentChannelAvailability = {
+  id: PayChannel;
+  label: string;
+  enabled: boolean;
+  current: boolean;
+};
+
 export type AlipayConfig = {
   appId: string;
   privateKey: string;
@@ -28,6 +35,7 @@ export type WechatPayConfig = {
   apiV3Key: string;
   certSerialNo: string;
   privateKey: string;
+  platformCertSerialNo: string | null;
   platformCertificate: string;
   gatewayUrl: string;
   notifyUrl: string;
@@ -36,6 +44,11 @@ export type WechatPayConfig = {
 const DEFAULT_ORDER_EXPIRE_MINUTES = 30;
 const DEFAULT_ALIPAY_GATEWAY = "https://openapi.alipay.com/gateway.do";
 const DEFAULT_WECHAT_GATEWAY = "https://api.mch.weixin.qq.com";
+const PAYMENT_CHANNELS: Array<{ id: PayChannel; label: string }> = [
+  { id: "mock", label: "模拟支付" },
+  { id: "wechat", label: "微信支付" },
+  { id: "alipay", label: "支付宝" }
+];
 
 export function getPaymentConfig(): PaymentConfig {
   let mode: PaymentMode;
@@ -96,6 +109,16 @@ export function assertMockPaymentAvailable() {
   }
 }
 
+export function listPaymentChannelAvailability(): PaymentChannelAvailability[] {
+  const config = getPaymentConfig();
+
+  return PAYMENT_CHANNELS.map((channel) => ({
+    ...channel,
+    enabled: isPaymentChannelConfigured(channel.id, config),
+    current: channel.id === config.mode
+  }));
+}
+
 export function getAlipayConfig(): AlipayConfig {
   const config = getPaymentConfig();
 
@@ -103,15 +126,16 @@ export function getAlipayConfig(): AlipayConfig {
     throw new ApiError("PAYMENT_CONFIG_ERROR", "支付宝支付未启用", 500);
   }
 
-  const notifyBaseUrl = requireConfiguredValue(config.notifyBaseUrl, "PAYMENT_NOTIFY_BASE_URL");
-  const returnBaseUrl = config.returnBaseUrl ?? notifyBaseUrl;
+  const notifyBaseUrl = requireHttpsUrl(requireConfiguredValue(config.notifyBaseUrl, "PAYMENT_NOTIFY_BASE_URL"), "PAYMENT_NOTIFY_BASE_URL");
+  const returnBaseUrl = config.returnBaseUrl ? requireHttpsUrl(config.returnBaseUrl, "PAYMENT_RETURN_BASE_URL") : notifyBaseUrl;
+  const gatewayUrl = requireHttpsUrl(normalizeOptional(process.env.ALIPAY_GATEWAY_URL) ?? DEFAULT_ALIPAY_GATEWAY, "ALIPAY_GATEWAY_URL");
 
   return {
     appId: requireEnv("ALIPAY_APP_ID"),
     privateKey: normalizePem(requireEnv("ALIPAY_PRIVATE_KEY"), "PRIVATE KEY"),
     publicKey: normalizePem(requireEnv("ALIPAY_PUBLIC_KEY"), "PUBLIC KEY"),
     sellerId: normalizeOptional(process.env.ALIPAY_SELLER_ID),
-    gatewayUrl: normalizeOptional(process.env.ALIPAY_GATEWAY_URL) ?? DEFAULT_ALIPAY_GATEWAY,
+    gatewayUrl,
     notifyUrl: joinUrl(notifyBaseUrl, "/api/v1/payments/alipay/notify"),
     returnBaseUrl
   };
@@ -124,16 +148,18 @@ export function getWechatPayConfig(): WechatPayConfig {
     throw new ApiError("PAYMENT_CONFIG_ERROR", "微信支付未启用", 500);
   }
 
-  const notifyBaseUrl = requireConfiguredValue(config.notifyBaseUrl, "PAYMENT_NOTIFY_BASE_URL");
+  const notifyBaseUrl = requireHttpsUrl(requireConfiguredValue(config.notifyBaseUrl, "PAYMENT_NOTIFY_BASE_URL"), "PAYMENT_NOTIFY_BASE_URL");
+  const gatewayUrl = requireHttpsUrl(normalizeOptional(process.env.WECHAT_PAY_GATEWAY_URL) ?? DEFAULT_WECHAT_GATEWAY, "WECHAT_PAY_GATEWAY_URL");
 
   return {
     appId: requireEnv("WECHAT_PAY_APP_ID"),
     mchId: requireEnv("WECHAT_PAY_MCH_ID"),
-    apiV3Key: requireEnv("WECHAT_PAY_API_KEY"),
+    apiV3Key: requireWechatApiV3Key(),
     certSerialNo: requireEnv("WECHAT_PAY_CERT_SERIAL_NO"),
     privateKey: normalizePem(requireEnv("WECHAT_PAY_PRIVATE_KEY"), "PRIVATE KEY"),
+    platformCertSerialNo: normalizeOptional(process.env.WECHAT_PAY_PLATFORM_CERT_SERIAL_NO),
     platformCertificate: normalizePem(requireEnv("WECHAT_PAY_PLATFORM_CERTIFICATE"), "CERTIFICATE"),
-    gatewayUrl: normalizeOptional(process.env.WECHAT_PAY_GATEWAY_URL) ?? DEFAULT_WECHAT_GATEWAY,
+    gatewayUrl,
     notifyUrl: joinUrl(notifyBaseUrl, "/api/v1/payments/wechat/notify")
   };
 }
@@ -166,12 +192,62 @@ function requireEnv(name: string) {
   return requireConfiguredValue(normalizeOptional(process.env[name]), name);
 }
 
+function requireWechatApiV3Key() {
+  const value = requireEnv("WECHAT_PAY_API_KEY");
+
+  if (Buffer.byteLength(value, "utf8") !== 32) {
+    throw new ApiError("PAYMENT_CONFIG_ERROR", "微信支付 API v3 Key 配置不正确", 500);
+  }
+
+  return value;
+}
+
+function isPaymentChannelConfigured(channel: PayChannel, config: PaymentConfig) {
+  if (channel !== config.mode) {
+    return false;
+  }
+
+  if (channel === "mock") {
+    return config.mockEnabled && process.env.NODE_ENV !== "production";
+  }
+
+  if (channel === "alipay") {
+    try {
+      getAlipayConfig();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  try {
+    getWechatPayConfig();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function requireConfiguredValue(value: string | null, _name: string) {
   if (!value) {
     throw new ApiError("PAYMENT_CONFIG_ERROR", "支付渠道配置不完整", 500);
   }
 
   return value;
+}
+
+function requireHttpsUrl(value: string, _name: string) {
+  try {
+    const url = new URL(value);
+
+    if (url.protocol === "https:") {
+      return url.toString();
+    }
+  } catch {
+    // Fall through to stable API error below.
+  }
+
+  throw new ApiError("PAYMENT_CONFIG_ERROR", "真实支付地址必须使用 HTTPS", 500);
 }
 
 function normalizeOptional(value: string | undefined) {

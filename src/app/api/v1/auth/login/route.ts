@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { loginWithSmsCode } from "@/server/auth/auth-service";
 import { setSessionCookie } from "@/server/auth/session";
 import { ok, withApiHandler } from "@/server/http/api-response";
-import { getStringField, readJsonObject } from "@/server/http/request";
+import { getClientIp, getStringField, readJsonObject } from "@/server/http/request";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,7 +14,10 @@ export async function POST(request: NextRequest) {
       phone: getStringField(body, "phone"),
       code: getStringField(body, "code"),
       inviteCode: getStringField(body, "inviteCode", false),
-      requestId
+      requestId,
+      acceptedLegal: body.acceptedLegal === true,
+      requestIp: getClientIp(request),
+      userAgent: request.headers.get("user-agent")
     });
     const response = ok(data, requestId);
 
@@ -23,4 +26,3 @@ export async function POST(request: NextRequest) {
     return response;
   });
 }
-

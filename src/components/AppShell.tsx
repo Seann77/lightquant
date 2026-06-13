@@ -10,7 +10,6 @@ import { LoginModal } from "@/components/shell/LoginModal";
 import { RechargeModal } from "@/components/shell/RechargeModal";
 import { ShellNavItem } from "@/components/shell/ShellNavItem";
 import { WechatQrModal } from "@/components/shell/WechatQrModal";
-import { recentConversations } from "@/lib/mock-data";
 
 type AppShellProps = {
   children: ReactNode;
@@ -57,6 +56,21 @@ type ApiResponse<T> =
       requestId: string;
     };
 
+type RecentConversation = {
+  id: string;
+  mode: "strategy" | "convert" | "analysis";
+  title: string;
+  status: "active" | "archived";
+  targetPlatform?: string | null;
+  sourcePlatform?: string | null;
+  lastMessageAt: string;
+};
+
+type RecentConversationsData = {
+  items: RecentConversation[];
+  nextCursor?: string | null;
+};
+
 const navItems: NavItem[] = [
   {
     href: "/chat?mode=strategy",
@@ -84,6 +98,12 @@ const navItems: NavItem[] = [
   }
 ];
 
+const conversationModeLabels: Record<RecentConversation["mode"], string> = {
+  strategy: "策略",
+  convert: "转换",
+  analysis: "解析"
+};
+
 export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -97,6 +117,8 @@ export function AppShell({ children }: AppShellProps) {
   const isAdminPath = pathname.startsWith("/admin");
   const isLoggedIn = Boolean(currentUser);
   const userPoints = currentUser?.creditAccount.balance ?? 0;
+  const currentUserId = currentUser?.user.id ?? null;
+  const [recentConversations, setRecentConversations] = useState<RecentConversation[]>([]);
 
   const refreshCurrentUser = useCallback(async () => {
     try {
@@ -111,13 +133,47 @@ export function AppShell({ children }: AppShellProps) {
     }
   }, []);
 
+  const refreshRecentConversations = useCallback(async () => {
+    try {
+      const conversationsResponse = await fetch("/api/v1/ai/conversations?limit=5", {
+        cache: "no-store"
+      });
+      const conversationsPayload = (await conversationsResponse.json()) as ApiResponse<RecentConversationsData>;
+
+      if (conversationsPayload.success) {
+        setRecentConversations(conversationsPayload.data.items);
+      }
+    } catch {
+      // Keep the previous lightweight cache to avoid sidebar flicker.
+    }
+  }, []);
+
   useEffect(() => {
     void refreshCurrentUser();
   }, [refreshCurrentUser]);
 
   useEffect(() => {
+    if (!currentUserId) {
+      setRecentConversations([]);
+      return;
+    }
+
+    void refreshRecentConversations();
+  }, [currentUserId, refreshRecentConversations]);
+
+  useEffect(() => {
     function handleCreditsUpdated() {
       void refreshCurrentUser();
+      if (isLoggedIn) {
+        void refreshRecentConversations();
+      }
+    }
+
+    function handleAiTasksUpdated() {
+      if (isLoggedIn) {
+        void refreshRecentConversations();
+        void refreshCurrentUser();
+      }
     }
 
     function handleOpenWechat() {
@@ -134,15 +190,17 @@ export function AppShell({ children }: AppShellProps) {
     }
 
     window.addEventListener("lightquant:credits-updated", handleCreditsUpdated);
+    window.addEventListener("lightquant:ai-tasks-updated", handleAiTasksUpdated);
     window.addEventListener("lightquant:open-wechat", handleOpenWechat);
     window.addEventListener("lightquant:open-recharge", handleOpenRecharge);
 
     return () => {
       window.removeEventListener("lightquant:credits-updated", handleCreditsUpdated);
+      window.removeEventListener("lightquant:ai-tasks-updated", handleAiTasksUpdated);
       window.removeEventListener("lightquant:open-wechat", handleOpenWechat);
       window.removeEventListener("lightquant:open-recharge", handleOpenRecharge);
     };
-  }, [isLoggedIn, refreshCurrentUser]);
+  }, [isLoggedIn, refreshCurrentUser, refreshRecentConversations]);
 
   function handleCreditStatusClick() {
     if (isLoggedIn) {
@@ -204,12 +262,24 @@ export function AppShell({ children }: AppShellProps) {
 
         <div className="lq-recent">
           <p className="lq-recent-title">最近</p>
-          {recentConversations.map((item, index) => (
-            <Link className="lq-recent-link" href="/chat?mode=strategy" key={item}>
+          {recentConversations.map((conversation, index) => (
+            <Link className="lq-recent-link" href={getRecentConversationHref(conversation)} key={conversation.id}>
               {index === 0 ? <Clock3 aria-hidden="true" /> : <FileText aria-hidden="true" />}
-              <span>{item}</span>
+              <span>{getRecentConversationTitle(conversation)}</span>
             </Link>
           ))}
+          {isLoggedIn && recentConversations.length === 0 ? (
+            <div className="lq-recent-link is-muted">
+              <FileText aria-hidden="true" />
+              <span>暂无任务记录</span>
+            </div>
+          ) : null}
+          {!isLoggedIn ? (
+            <div className="lq-recent-link is-muted">
+              <FileText aria-hidden="true" />
+              <span>登录后查看任务</span>
+            </div>
+          ) : null}
         </div>
 
         <div className="lq-login-area">
@@ -260,4 +330,22 @@ export function AppShell({ children }: AppShellProps) {
       <WechatQrModal onClose={() => setWechatOpen(false)} open={wechatOpen} />
     </div>
   );
+}
+
+function getRecentConversationHref(conversation: RecentConversation) {
+  if (conversation.mode === "convert") {
+    return `/chat?mode=convert&conversationId=${encodeURIComponent(conversation.id)}`;
+  }
+
+  if (conversation.mode === "analysis") {
+    return `/code-analysis?conversationId=${encodeURIComponent(conversation.id)}`;
+  }
+
+  return `/chat?mode=strategy&conversationId=${encodeURIComponent(conversation.id)}`;
+}
+
+function getRecentConversationTitle(conversation: RecentConversation) {
+  const baseTitle = conversation.title?.trim() || conversationModeLabels[conversation.mode];
+  const title = baseTitle.length > 12 ? `${baseTitle.slice(0, 12)}...` : baseTitle;
+  return `${title} · ${conversationModeLabels[conversation.mode]}`;
 }

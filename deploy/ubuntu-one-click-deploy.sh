@@ -7,6 +7,7 @@ set -Eeuo pipefail
 #   APP_DOMAIN=admin.example.com \
 #   REPO_URL=https://github.com/your-name/lightquant.git \
 #   ADMIN_PHONE=13800138000 \
+#   LIGHTQUANT_AI_API_KEY=your_mimo_key \
 #   bash deploy/ubuntu-one-click-deploy.sh
 #
 # Update-only run after the first deploy:
@@ -14,11 +15,40 @@ set -Eeuo pipefail
 
 APP_NAME="${APP_NAME:-lightquant}"
 APP_DIR="${APP_DIR:-/var/www/lightquant}"
+DEPLOY_SECRETS_FILE="${DEPLOY_SECRETS_FILE:-${APP_DIR}/.deploy-secrets}"
 APP_PORT="${APP_PORT:-3000}"
 APP_DOMAIN="${APP_DOMAIN:-}"
 REPO_URL="${REPO_URL:-}"
 REPO_BRANCH="${REPO_BRANCH:-master}"
 ADMIN_PHONE="${ADMIN_PHONE:-}"
+LIGHTQUANT_SMS_PROVIDER="${LIGHTQUANT_SMS_PROVIDER:-aliyun}"
+ALIBABA_CLOUD_ACCESS_KEY_ID="${ALIBABA_CLOUD_ACCESS_KEY_ID:-}"
+ALIBABA_CLOUD_ACCESS_KEY_SECRET="${ALIBABA_CLOUD_ACCESS_KEY_SECRET:-}"
+ALIYUN_DYPNS_ENDPOINT="${ALIYUN_DYPNS_ENDPOINT:-dypnsapi.aliyuncs.com}"
+ALIYUN_DYPNS_COUNTRY_CODE="${ALIYUN_DYPNS_COUNTRY_CODE:-86}"
+ALIYUN_DYPNS_SIGN_NAME="${ALIYUN_DYPNS_SIGN_NAME:-}"
+ALIYUN_DYPNS_TEMPLATE_CODE="${ALIYUN_DYPNS_TEMPLATE_CODE:-100001}"
+ALIYUN_DYPNS_VALID_TIME="${ALIYUN_DYPNS_VALID_TIME:-300}"
+ALIYUN_DYPNS_INTERVAL="${ALIYUN_DYPNS_INTERVAL:-60}"
+ALIYUN_DYPNS_CODE_LENGTH="${ALIYUN_DYPNS_CODE_LENGTH:-6}"
+LIGHTQUANT_PAYMENT_MODE="${LIGHTQUANT_PAYMENT_MODE:-wechat}"
+PAYMENT_ORDER_EXPIRE_MINUTES="${PAYMENT_ORDER_EXPIRE_MINUTES:-30}"
+ALIPAY_APP_ID="${ALIPAY_APP_ID:-}"
+ALIPAY_PRIVATE_KEY="${ALIPAY_PRIVATE_KEY:-}"
+ALIPAY_PUBLIC_KEY="${ALIPAY_PUBLIC_KEY:-}"
+ALIPAY_SELLER_ID="${ALIPAY_SELLER_ID:-}"
+ALIPAY_GATEWAY_URL="${ALIPAY_GATEWAY_URL:-}"
+WECHAT_PAY_APP_ID="${WECHAT_PAY_APP_ID:-}"
+WECHAT_PAY_MCH_ID="${WECHAT_PAY_MCH_ID:-}"
+WECHAT_PAY_API_KEY="${WECHAT_PAY_API_KEY:-}"
+WECHAT_PAY_CERT_SERIAL_NO="${WECHAT_PAY_CERT_SERIAL_NO:-}"
+WECHAT_PAY_PRIVATE_KEY="${WECHAT_PAY_PRIVATE_KEY:-}"
+WECHAT_PAY_PLATFORM_CERT_SERIAL_NO="${WECHAT_PAY_PLATFORM_CERT_SERIAL_NO:-}"
+WECHAT_PAY_PLATFORM_CERTIFICATE="${WECHAT_PAY_PLATFORM_CERTIFICATE:-}"
+WECHAT_PAY_GATEWAY_URL="${WECHAT_PAY_GATEWAY_URL:-}"
+LIGHTQUANT_AI_BASE_URL="${LIGHTQUANT_AI_BASE_URL:-https://api.xiaomimimo.com/v1}"
+LIGHTQUANT_AI_MODEL="${LIGHTQUANT_AI_MODEL:-mimo-v2.5-pro}"
+LIGHTQUANT_AI_API_KEY="${LIGHTQUANT_AI_API_KEY:-}"
 NODE_MAJOR="${NODE_MAJOR:-22}"
 DB_NAME="${DB_NAME:-lightquant}"
 DB_USER="${DB_USER:-lightquant}"
@@ -40,6 +70,18 @@ prompt_if_empty() {
 
   if [[ -z "$current_value" ]]; then
     read -r -p "$prompt: " current_value
+    printf -v "$var_name" "%s" "$current_value"
+  fi
+}
+
+prompt_secret_optional() {
+  local var_name="$1"
+  local prompt="$2"
+  local current_value="${!var_name:-}"
+
+  if [[ -z "$current_value" ]]; then
+    read -r -s -p "$prompt: " current_value
+    echo
     printf -v "$var_name" "%s" "$current_value"
   fi
 }
@@ -68,6 +110,121 @@ write_file_sudo() {
   cat >"$tmp_file"
   run_sudo mkdir -p "$(dirname "$target")"
   run_sudo mv "$tmp_file" "$target"
+}
+
+fail_input() {
+  echo "Invalid deployment input: $1" >&2
+  exit 1
+}
+
+validate_required() {
+  local var_name="$1"
+  local value="${!var_name:-}"
+
+  if [[ -z "$value" ]]; then
+    fail_input "$var_name is required."
+  fi
+}
+
+validate_choice() {
+  local var_name="$1"
+  local allowed_values="$2"
+  local value="${!var_name:-}"
+
+  if [[ ",${allowed_values}," != *",${value},"* ]]; then
+    fail_input "$var_name must be one of: ${allowed_values}."
+  fi
+}
+
+validate_integer_range() {
+  local var_name="$1"
+  local min_value="$2"
+  local max_value="$3"
+  local value="${!var_name:-}"
+
+  if [[ ! "$value" =~ ^[0-9]+$ ]]; then
+    fail_input "$var_name must be an integer."
+  fi
+
+  local numeric_value=$((10#$value))
+  if (( numeric_value < min_value || numeric_value > max_value )); then
+    fail_input "$var_name must be between ${min_value} and ${max_value}."
+  fi
+}
+
+validate_identifier() {
+  local var_name="$1"
+  local value="${!var_name:-}"
+
+  if [[ ! "$value" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+    fail_input "$var_name must be a safe PostgreSQL identifier: letters, numbers, and underscores, starting with a letter or underscore."
+  fi
+}
+
+validate_domain() {
+  validate_required APP_DOMAIN
+
+  if [[ ! "$APP_DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]]; then
+    fail_input "APP_DOMAIN may only contain letters, numbers, dots, and hyphens."
+  fi
+
+  if [[ "$APP_DOMAIN" == .* || "$APP_DOMAIN" == *. || "$APP_DOMAIN" == *..* || "$APP_DOMAIN" == *- || "$APP_DOMAIN" == -* ]]; then
+    fail_input "APP_DOMAIN must not start/end with a dot or hyphen, and must not contain consecutive dots."
+  fi
+
+  if (( ${#APP_DOMAIN} > 253 )); then
+    fail_input "APP_DOMAIN must be 253 characters or fewer."
+  fi
+
+  local label
+  IFS="." read -r -a domain_labels <<<"$APP_DOMAIN"
+  for label in "${domain_labels[@]}"; do
+    if (( ${#label} > 63 )); then
+      fail_input "Each APP_DOMAIN label must be 63 characters or fewer."
+    fi
+
+    if [[ "$label" == -* || "$label" == *- ]]; then
+      fail_input "APP_DOMAIN labels must not start or end with a hyphen."
+    fi
+  done
+}
+
+validate_no_newline() {
+  local var_name="$1"
+  local value="${!var_name:-}"
+
+  if [[ "$value" == *$'\n'* || "$value" == *$'\r'* ]]; then
+    fail_input "$var_name must be provided as a single line. Use literal \\n for PEM line breaks."
+  fi
+}
+
+validate_inputs() {
+  validate_domain
+  validate_required ADMIN_PHONE
+  validate_required BASIC_AUTH_USER
+  validate_choice ENABLE_SSL "true,false"
+  validate_choice LIGHTQUANT_PAYMENT_MODE "alipay,wechat"
+  validate_choice LIGHTQUANT_SMS_PROVIDER "aliyun"
+  validate_integer_range APP_PORT 1 65535
+  validate_integer_range NODE_MAJOR 18 30
+  validate_integer_range PAYMENT_ORDER_EXPIRE_MINUTES 1 1440
+  validate_integer_range ALIYUN_DYPNS_VALID_TIME 60 86400
+  validate_integer_range ALIYUN_DYPNS_INTERVAL 1 3600
+  validate_integer_range ALIYUN_DYPNS_CODE_LENGTH 4 8
+  validate_identifier DB_NAME
+  validate_identifier DB_USER
+  validate_required LIGHTQUANT_AI_MODEL
+  validate_no_newline DB_PASSWORD
+  validate_no_newline AUTH_SECRET
+  validate_no_newline BASIC_AUTH_PASSWORD
+  validate_no_newline LIGHTQUANT_AI_API_KEY
+  validate_no_newline ALIBABA_CLOUD_ACCESS_KEY_ID
+  validate_no_newline ALIBABA_CLOUD_ACCESS_KEY_SECRET
+  validate_no_newline ALIPAY_PRIVATE_KEY
+  validate_no_newline ALIPAY_PUBLIC_KEY
+  validate_no_newline WECHAT_PAY_API_KEY
+  validate_no_newline WECHAT_PAY_PRIVATE_KEY
+  validate_no_newline WECHAT_PAY_PLATFORM_CERTIFICATE
 }
 
 install_system_packages() {
@@ -155,15 +312,44 @@ AUTH_SECRET=${AUTH_SECRET}
 DATABASE_URL=${database_url}
 ADMIN_PHONE_WHITELIST=${ADMIN_PHONE}
 
-LIGHTQUANT_PAYMENT_MODE=wechat
+LIGHTQUANT_SMS_PROVIDER=${LIGHTQUANT_SMS_PROVIDER}
+LIGHTQUANT_ALLOW_MOCK_SMS_IN_PRODUCTION=false
+ALIBABA_CLOUD_ACCESS_KEY_ID=${ALIBABA_CLOUD_ACCESS_KEY_ID}
+ALIBABA_CLOUD_ACCESS_KEY_SECRET=${ALIBABA_CLOUD_ACCESS_KEY_SECRET}
+ALIYUN_DYPNS_ENDPOINT=${ALIYUN_DYPNS_ENDPOINT}
+ALIYUN_DYPNS_COUNTRY_CODE=${ALIYUN_DYPNS_COUNTRY_CODE}
+ALIYUN_DYPNS_SIGN_NAME=${ALIYUN_DYPNS_SIGN_NAME}
+ALIYUN_DYPNS_TEMPLATE_CODE=${ALIYUN_DYPNS_TEMPLATE_CODE}
+ALIYUN_DYPNS_VALID_TIME=${ALIYUN_DYPNS_VALID_TIME}
+ALIYUN_DYPNS_INTERVAL=${ALIYUN_DYPNS_INTERVAL}
+ALIYUN_DYPNS_CODE_LENGTH=${ALIYUN_DYPNS_CODE_LENGTH}
+
+LIGHTQUANT_PAYMENT_MODE=${LIGHTQUANT_PAYMENT_MODE}
 PAYMENT_MOCK_ENABLED=false
 PAYMENT_NOTIFY_BASE_URL=https://${APP_DOMAIN}
 PAYMENT_RETURN_BASE_URL=https://${APP_DOMAIN}
-PAYMENT_ORDER_EXPIRE_MINUTES=30
+PAYMENT_ORDER_EXPIRE_MINUTES=${PAYMENT_ORDER_EXPIRE_MINUTES}
 MAINTENANCE_SECRET=$(generate_hex 24)
 
-LIGHTQUANT_AI_PROVIDER=mock
-LIGHTQUANT_ALLOW_MOCK_AI_IN_PRODUCTION=true
+ALIPAY_APP_ID=${ALIPAY_APP_ID}
+ALIPAY_PRIVATE_KEY=${ALIPAY_PRIVATE_KEY}
+ALIPAY_PUBLIC_KEY=${ALIPAY_PUBLIC_KEY}
+ALIPAY_SELLER_ID=${ALIPAY_SELLER_ID}
+ALIPAY_GATEWAY_URL=${ALIPAY_GATEWAY_URL}
+WECHAT_PAY_APP_ID=${WECHAT_PAY_APP_ID}
+WECHAT_PAY_MCH_ID=${WECHAT_PAY_MCH_ID}
+WECHAT_PAY_API_KEY=${WECHAT_PAY_API_KEY}
+WECHAT_PAY_CERT_SERIAL_NO=${WECHAT_PAY_CERT_SERIAL_NO}
+WECHAT_PAY_PRIVATE_KEY=${WECHAT_PAY_PRIVATE_KEY}
+WECHAT_PAY_PLATFORM_CERT_SERIAL_NO=${WECHAT_PAY_PLATFORM_CERT_SERIAL_NO}
+WECHAT_PAY_PLATFORM_CERTIFICATE=${WECHAT_PAY_PLATFORM_CERTIFICATE}
+WECHAT_PAY_GATEWAY_URL=${WECHAT_PAY_GATEWAY_URL}
+
+LIGHTQUANT_AI_PROVIDER=openai_compatible
+LIGHTQUANT_AI_BASE_URL=${LIGHTQUANT_AI_BASE_URL}
+LIGHTQUANT_AI_MODEL=${LIGHTQUANT_AI_MODEL}
+LIGHTQUANT_AI_API_KEY=${LIGHTQUANT_AI_API_KEY}
+LIGHTQUANT_ALLOW_MOCK_AI_IN_PRODUCTION=false
 AI_TASK_TIMEOUT_MS=60000
 AI_MAX_RETRIES=1
 FILE_UPLOAD_MAX_BYTES=262144
@@ -171,12 +357,27 @@ FILE_ALLOWED_EXTENSIONS=.py,.txt
 
 OPENAI_API_KEY=
 DEEPSEEK_API_KEY=
-ZHIPU_API_KEY=
 DASHSCOPE_API_KEY=
 EOF
 
   run_sudo chmod 600 "$APP_DIR/.env"
   run_sudo chown "${USER:-root}:${USER:-root}" "$APP_DIR/.env"
+}
+
+write_deploy_secrets_file() {
+  write_file_sudo "$DEPLOY_SECRETS_FILE" <<EOF
+# LightQuant deployment bootstrap secrets.
+# Keep this file private. Do not commit or paste it into tickets, logs, or chat.
+BASIC_AUTH_USER=${BASIC_AUTH_USER}
+BASIC_AUTH_PASSWORD=${BASIC_AUTH_PASSWORD}
+DB_NAME=${DB_NAME}
+DB_USER=${DB_USER}
+DB_PASSWORD=${DB_PASSWORD}
+APP_ENV_FILE=${APP_DIR}/.env
+EOF
+
+  run_sudo chmod 600 "$DEPLOY_SECRETS_FILE"
+  run_sudo chown "${USER:-root}:${USER:-root}" "$DEPLOY_SECRETS_FILE"
 }
 
 build_app() {
@@ -354,11 +555,14 @@ EOF
 main() {
   prompt_if_empty APP_DOMAIN "Domain, for example admin.example.com"
   prompt_if_empty ADMIN_PHONE "Admin phone number"
+  prompt_secret_optional LIGHTQUANT_AI_API_KEY "MiMo API key (LIGHTQUANT_AI_API_KEY, leave empty to configure later)"
 
+  validate_inputs
   install_system_packages
   prepare_database
   prepare_source
   write_env_file
+  write_deploy_secrets_file
   build_app
   write_nginx_http_config
   enable_https_if_requested
@@ -369,12 +573,11 @@ Deploy finished.
 
 App URL: http://${APP_DOMAIN}
 Basic Auth user: ${BASIC_AUTH_USER}
-Basic Auth password: ${BASIC_AUTH_PASSWORD}
+Bootstrap secrets file: ${DEPLOY_SECRETS_FILE}
 Database: ${DB_NAME}
 Database user: ${DB_USER}
-Database password: ${DB_PASSWORD}
 
-Keep these generated passwords somewhere private.
+Passwords are not printed by default. Keep the bootstrap secrets file private.
 EOF
 }
 

@@ -1,7 +1,7 @@
 import { createDecipheriv, createSign, createVerify, randomUUID } from "crypto";
 import type { RechargeOrder } from "@/server/domain";
 import { ApiError } from "@/server/http/api-response";
-import { getOrderExpiresAt, getWechatPayConfig } from "@/server/payments/payment-config";
+import { getOrderExpiresAt, getWechatPayConfig, joinUrl } from "@/server/payments/payment-config";
 import { basePaymentAction, type PaymentAction } from "@/server/payments/payment-action";
 
 type WechatNotify = {
@@ -21,6 +21,8 @@ type WechatResource = {
   nonce?: string;
 };
 
+const WECHAT_NOTIFY_MAX_SKEW_SECONDS = 5 * 60;
+
 export async function createWechatPaymentAction(order: RechargeOrder): Promise<PaymentAction> {
   const config = getWechatPayConfig();
   const body = JSON.stringify({
@@ -36,7 +38,7 @@ export async function createWechatPaymentAction(order: RechargeOrder): Promise<P
     }
   });
   const path = "/v3/pay/transactions/native";
-  const response = await fetch(`${config.gatewayUrl}${path}`, {
+  const response = await fetch(joinUrl(config.gatewayUrl, path), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -63,9 +65,23 @@ export function parseAndVerifyWechatNotify(headers: Headers, rawBody: string): W
   const timestamp = headers.get("wechatpay-timestamp") ?? "";
   const nonce = headers.get("wechatpay-nonce") ?? "";
   const signature = headers.get("wechatpay-signature") ?? "";
+  const serial = headers.get("wechatpay-serial") ?? "";
+  const signatureType = headers.get("wechatpay-signature-type") ?? "";
 
-  if (!timestamp || !nonce || !signature) {
+  if (!timestamp || !nonce || !signature || !serial || !signatureType) {
     throw new ApiError("PAYMENT_VERIFY_FAILED", "支付通知验签失败", 400);
+  }
+
+  if (signatureType !== "WECHATPAY2-SHA256-RSA2048") {
+    throw new ApiError("PAYMENT_VERIFY_FAILED", "支付通知签名类型不匹配", 400);
+  }
+
+  if (!isFreshWechatTimestamp(timestamp)) {
+    throw new ApiError("PAYMENT_VERIFY_FAILED", "支付通知时间无效", 400);
+  }
+
+  if (config.platformCertSerialNo && serial !== config.platformCertSerialNo) {
+    throw new ApiError("PAYMENT_VERIFY_FAILED", "支付通知平台证书不匹配", 400);
   }
 
   const signText = `${timestamp}\n${nonce}\n${rawBody}\n`;
@@ -78,7 +94,7 @@ export function parseAndVerifyWechatNotify(headers: Headers, rawBody: string): W
   const payload = parseJsonObject(rawBody);
   const resource = payload.resource as WechatResource | undefined;
 
-  if (!resource?.ciphertext || !resource.nonce) {
+  if (resource?.algorithm !== "AEAD_AES_256_GCM" || !resource.ciphertext || !resource.nonce) {
     throw new ApiError("VALIDATION_ERROR", "支付通知参数不完整", 400);
   }
 
@@ -129,6 +145,17 @@ function createWechatAuthorization(method: string, path: string, body: string) {
   return `WECHATPAY2-SHA256-RSA2048 mchid="${config.mchId}",nonce_str="${nonce}",timestamp="${timestamp}",serial_no="${config.certSerialNo}",signature="${signature}"`;
 }
 
+function isFreshWechatTimestamp(value: string) {
+  if (!/^\d{10}$/.test(value)) {
+    return false;
+  }
+
+  const timestampSeconds = Number(value);
+  const nowSeconds = Math.floor(Date.now() / 1000);
+
+  return Math.abs(nowSeconds - timestampSeconds) <= WECHAT_NOTIFY_MAX_SKEW_SECONDS;
+}
+
 function decryptWechatResource(resource: WechatResource, apiV3Key: string) {
   const ciphertext = Buffer.from(resource.ciphertext ?? "", "base64");
   const authTag = ciphertext.subarray(ciphertext.length - 16);
@@ -159,5 +186,9 @@ function parseJsonObject(value: string): Record<string, unknown> {
 }
 
 function getWechatExpireTime(createdAt: string) {
-  return getOrderExpiresAt(createdAt);
+  return formatWechatRfc3339(getOrderExpiresAt(createdAt));
+}
+
+function formatWechatRfc3339(value: string) {
+  return new Date(value).toISOString().replace(/\.\d{3}Z$/, "+00:00");
 }

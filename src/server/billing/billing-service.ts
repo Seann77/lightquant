@@ -4,7 +4,7 @@ import type { OrderStatus, PayChannel, PaymentProvider, PaymentTransaction, Rech
 import { ApiError } from "@/server/http/api-response";
 import { requireAdmin } from "@/server/admin/admin-auth";
 import { createPaymentAction } from "@/server/payments/payment-provider";
-import { assertMockPaymentAvailable, assertPayChannelAvailable, getOrderExpiresAt, getPaymentOrderExpireMinutes, isOrderExpired, isValidMaintenanceSecret } from "@/server/payments/payment-config";
+import { assertMockPaymentAvailable, assertPayChannelAvailable, getOrderExpiresAt, getPaymentOrderExpireMinutes, isOrderExpired, isValidMaintenanceSecret, listPaymentChannelAvailability } from "@/server/payments/payment-config";
 import { getRepository, withRepositoryTransaction } from "@/server/repositories";
 
 type CreateRechargeOrderInput = {
@@ -35,9 +35,13 @@ type MaintenanceInput = {
 
 export async function listRechargePlans() {
   const plans = await getRepository().listEnabledRechargePlans();
+  const paymentChannels = listPaymentChannelAvailability();
+  const defaultPayChannel = paymentChannels.find((channel) => channel.enabled)?.id ?? null;
 
   return {
-    items: plans.map(toRechargePlanResponse)
+    items: plans.map(toRechargePlanResponse),
+    paymentChannels,
+    defaultPayChannel
   };
 }
 
@@ -45,21 +49,42 @@ export async function createRechargeOrder(userId: string, input: CreateRechargeO
   const planId = normalizeNonEmpty(input.planId, "planId");
   const payChannel = normalizePayChannel(input.payChannel);
   const clientRequestId = normalizeClientRequestId(input.clientRequestId);
-  assertPayChannelAvailable(payChannel);
   const repository = getRepository();
-  const plan = await repository.findRechargePlanById(planId);
-
-  if (!plan || !plan.enabled) {
-    throw new ApiError("NOT_FOUND", "充值套餐不存在或已下架", 404);
-  }
-
+  const now = new Date().toISOString();
   const existingOrder = await repository.findRechargeOrderByClientRequestId(userId, clientRequestId);
 
   if (existingOrder) {
-    if (existingOrder.planId !== plan.id || existingOrder.payChannel !== payChannel) {
+    if (existingOrder.planId !== planId || existingOrder.payChannel !== payChannel) {
       throw new ApiError("IDEMPOTENCY_CONFLICT", "重复请求参数与原订单不一致", 409);
     }
 
+    if (existingOrder.status !== "PENDING") {
+      return {
+        order: toOrderResponse(existingOrder),
+        paymentAction: null,
+        payment: null,
+        duplicated: true
+      };
+    }
+
+    if (isOrderExpired(existingOrder.createdAt, new Date(now))) {
+      await repository.closeExpiredRechargeOrders(paymentCutoff(now), now);
+      const closedOrder = await repository.findOrderById(existingOrder.id);
+
+      return {
+        order: toOrderResponse(closedOrder ?? {
+          ...existingOrder,
+          status: "CLOSED",
+          closedAt: now,
+          updatedAt: now
+        }),
+        paymentAction: null,
+        payment: null,
+        duplicated: true
+      };
+    }
+
+    assertPayChannelAvailable(payChannel);
     const paymentAction = await createPaymentAction(existingOrder);
 
     return {
@@ -70,7 +95,13 @@ export async function createRechargeOrder(userId: string, input: CreateRechargeO
     };
   }
 
-  const now = new Date().toISOString();
+  assertPayChannelAvailable(payChannel);
+  const plan = await repository.findRechargePlanById(planId);
+
+  if (!plan || !plan.enabled) {
+    throw new ApiError("NOT_FOUND", "充值套餐不存在或已下架", 404);
+  }
+
   const order = await repository.createRechargeOrder({
     orderNo: createOrderNo(),
     userId,
@@ -88,7 +119,14 @@ export async function createRechargeOrder(userId: string, input: CreateRechargeO
     updatedAt: now
   });
 
-  const paymentAction = await createPaymentAction(order);
+  let paymentAction: Awaited<ReturnType<typeof createPaymentAction>>;
+
+  try {
+    paymentAction = await createPaymentAction(order);
+  } catch (error) {
+    await markOrderPaymentActionFailed(order, error);
+    throw error;
+  }
 
   return {
     order: toOrderResponse(order),
@@ -96,6 +134,31 @@ export async function createRechargeOrder(userId: string, input: CreateRechargeO
     payment: paymentAction,
     duplicated: false
   };
+}
+
+async function markOrderPaymentActionFailed(order: RechargeOrder, error: unknown) {
+  const failedAt = new Date().toISOString();
+
+  await withRepositoryTransaction(async () => {
+    const failedOrder = await getRepository().markOrderFailed(order.id, failedAt);
+
+    await createPaymentTransaction({
+      order,
+      provider: order.payChannel,
+      providerTradeNo: `prepay:${order.orderNo}`,
+      notifyId: `prepay:${order.id}`,
+      amountCents: order.amountCents,
+      rawPayload: {
+        stage: "create_payment_action",
+        code: error instanceof ApiError ? error.code : "PAYMENT_PROVIDER_ERROR"
+      },
+      idempotencyKey: `payment:${order.payChannel}:prepay:${order.id}`,
+      status: "FAILED",
+      failedReason: error instanceof ApiError ? error.code : "PAYMENT_PROVIDER_ERROR",
+      orderStatusAfter: failedOrder.status,
+      createdAt: failedAt
+    });
+  });
 }
 
 export async function getOrderForUser(userId: string, orderId: string) {
@@ -143,6 +206,8 @@ export async function handleMockPaymentNotify(input: MockNotifyInput, requestId:
     const existingTransaction = await repository.findPaymentTransactionByIdempotencyKey(idempotencyKey);
 
     if (existingTransaction) {
+      assertExistingPaymentTransactionCanSucceed(existingTransaction);
+
       return {
         order: toOrderResponse(order),
         payment: toPaymentStatusResponse(order, existingTransaction, true),
@@ -248,6 +313,8 @@ export async function handleVerifiedPaymentNotify(input: VerifiedPaymentNotifyIn
     const existingTransaction = await repository.findPaymentTransactionByIdempotencyKey(idempotencyKey);
 
     if (existingTransaction) {
+      assertExistingPaymentTransactionCanSucceed(existingTransaction);
+
       return {
         order: toOrderResponse(order),
         payment: toPaymentStatusResponse(order, existingTransaction, true),
@@ -446,19 +513,21 @@ function toPaymentStatusResponse(order: RechargeOrder, transaction: PaymentTrans
   const expiresAt = getOrderExpiresAt(order.createdAt);
 
   return {
-    provider: transaction?.provider ?? "mock",
+    provider: transaction?.provider ?? order.payChannel,
+    orderId: order.id,
+    orderNo: order.orderNo,
     status: order.status,
     paid: order.status === "PAID",
     channel: order.payChannel,
     amountCents: order.amountCents,
+    paidAt: order.paidAt,
+    closedAt: order.closedAt,
     creditGranted: order.status === "PAID",
     expired: order.status === "PENDING" && isOrderExpired(order.createdAt),
     expiresAt,
     duplicated,
     transactionStatus: transaction?.status ?? null,
     latestTransactionStatus: transaction?.status ?? null,
-    providerTradeNo: transaction?.providerTradeNo,
-    notifyId: transaction?.notifyId,
     failedReason: transaction?.failedReason ?? null
   };
 }
@@ -524,6 +593,30 @@ async function createPaymentTransaction(input: {
     orderStatusAfter: input.orderStatusAfter,
     createdAt: input.createdAt
   });
+}
+
+function assertExistingPaymentTransactionCanSucceed(transaction: PaymentTransaction) {
+  if (transaction.status !== "FAILED") {
+    return;
+  }
+
+  if (transaction.failedReason === "PAYMENT_AMOUNT_MISMATCH") {
+    throw new ApiError("PAYMENT_AMOUNT_MISMATCH", "支付金额与订单金额不一致", 400);
+  }
+
+  if (transaction.failedReason === "ORDER_EXPIRED") {
+    throw new ApiError("ORDER_EXPIRED", "订单已过期，请重新创建订单", 409);
+  }
+
+  if (transaction.failedReason === "ORDER_CLOSED") {
+    throw new ApiError("ORDER_CLOSED", "订单已关闭，不能继续支付", 409);
+  }
+
+  if (transaction.failedReason === "ORDER_FAILED") {
+    throw new ApiError("FORBIDDEN", "失败订单不允许自动支付入账", 403);
+  }
+
+  throw new ApiError("PAYMENT_PROVIDER_ERROR", "支付通知处理失败", 502);
 }
 
 async function requireMaintenanceAccess(input: MaintenanceInput) {

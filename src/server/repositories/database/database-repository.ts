@@ -2,6 +2,10 @@ import { randomUUID } from "crypto";
 import { Prisma, type PrismaClient } from "@/generated/prisma/client";
 import type {
   AiTask,
+  AiConversation,
+  AiMessage,
+  AiMessageAttachment,
+  AiMessageAttachmentSummary,
   AiTaskResult,
   CreditAccount,
   CreditLedger,
@@ -11,7 +15,8 @@ import type {
   RechargePlan,
   SmsCodeRecord,
   UploadedFile,
-  User
+  User,
+  UserLegalConsent
 } from "@/server/domain";
 import { ApiError } from "@/server/http/api-response";
 import { getOrderExpiresAt, isOrderExpired } from "@/server/payments/payment-config";
@@ -23,18 +28,25 @@ import type {
   AdminOverview,
   AdminUploadedFilePage,
   AdminUserPage,
+  AiConversationPagination,
+  AiMessageListOptions,
   AppliedCreditLedger,
   ApplyCreditLedgerInput,
   CreateAiTaskInput,
+  CreateAiConversationInput,
+  CreateAiMessageAttachmentInput,
+  CreateAiMessageInput,
   CreateAiTaskResultInput,
   CreateCreditReservationInput,
   CreatePaymentTransactionInput,
   CreateRechargeOrderInput,
   CreateSmsCodeInput,
   CreateUploadedFileInput,
+  CreateUserLegalConsentInput,
   CreateUserInput,
   LedgerPage,
   LightQuantRepository,
+  UpdateAiConversationInput,
   UpdateAiTaskInput
 } from "@/server/repositories/types";
 
@@ -51,7 +63,9 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
     return this.db.$transaction(
       async (transaction) => callback(new DatabaseLightQuantRepository(transaction)),
       {
-        isolationLevel: Prisma.TransactionIsolationLevel.Serializable
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        maxWait: 15_000,
+        timeout: 30_000
       }
     );
   }
@@ -89,6 +103,24 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
             codeHash: code
           }
         ]
+      },
+      orderBy: {
+        createdAt: "desc"
+      }
+    });
+
+    return record ? toSmsCode(record) : null;
+  }
+
+  async findLatestSmsCodeForVerification(phone: string, scene: SmsCodeRecord["scene"], now: string) {
+    const record = await this.db.smsCode.findFirst({
+      where: {
+        phone,
+        scene,
+        usedAt: null,
+        expiresAt: {
+          gt: toDate(now)
+        }
       },
       orderBy: {
         createdAt: "desc"
@@ -162,6 +194,30 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
 
       throw error;
     }
+  }
+
+  async createUserLegalConsent(input: CreateUserLegalConsentInput) {
+    const consent = await this.db.userLegalConsent.upsert({
+      where: {
+        userId_agreementVersion_privacyVersion: {
+          userId: input.userId,
+          agreementVersion: input.agreementVersion,
+          privacyVersion: input.privacyVersion
+        }
+      },
+      create: {
+        userId: input.userId,
+        agreementVersion: input.agreementVersion,
+        privacyVersion: input.privacyVersion,
+        agreedAt: toDate(input.agreedAt),
+        requestIp: input.requestIp,
+        userAgent: input.userAgent,
+        source: input.source
+      },
+      update: {}
+    });
+
+    return toUserLegalConsent(consent);
   }
 
   async updateUserLastLogin(userId: string, lastLoginAt: string) {
@@ -446,12 +502,47 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
     return toRechargeOrder(order);
   }
 
+  async markOrderFailed(orderId: string, failedAt: string) {
+    const result = await this.db.rechargeOrder.updateMany({
+      where: {
+        id: orderId,
+        status: "PENDING"
+      },
+      data: {
+        status: "FAILED",
+        updatedAt: toDate(failedAt)
+      }
+    });
+
+    if (result.count === 0) {
+      const existing = await this.findOrderById(orderId);
+
+      if (existing?.status === "PAID") {
+        throw new ApiError("ORDER_ALREADY_PAID", "订单已支付", 409);
+      }
+
+      if (existing?.status === "CLOSED") {
+        throw new ApiError("ORDER_CLOSED", "订单已关闭", 409);
+      }
+
+      throw new ApiError("FORBIDDEN", "当前订单状态不允许标记失败", 403);
+    }
+
+    const order = await this.db.rechargeOrder.findUniqueOrThrow({
+      where: {
+        id: orderId
+      }
+    });
+
+    return toRechargeOrder(order);
+  }
+
   async closeExpiredRechargeOrders(cutoff: string, closedAt: string) {
     const result = await this.db.rechargeOrder.updateMany({
       where: {
         status: "PENDING",
         createdAt: {
-          lt: toDate(cutoff)
+          lte: toDate(cutoff)
         }
       },
       data: {
@@ -557,6 +648,7 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
       const task = await this.db.aiTask.create({
         data: {
           userId: input.userId,
+          conversationId: input.conversationId,
           type: input.type,
           status: input.status,
           scopeStatus: input.scopeStatus,
@@ -670,20 +762,325 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
     };
   }
 
+  async listAiTasksForConversation(conversationId: string, options: { limit?: number; ascending?: boolean } = {}) {
+    const items = await this.db.aiTask.findMany({
+      where: {
+        conversationId
+      },
+      orderBy: {
+        createdAt: options.ascending ? "asc" : "desc"
+      },
+      take: options.limit
+    });
+
+    return items.map(toAiTask);
+  }
+
+  async findAiConversationById(id: string) {
+    const conversation = await this.db.aiConversation.findUnique({
+      where: {
+        id
+      }
+    });
+
+    return conversation ? toAiConversation(conversation) : null;
+  }
+
+  async createAiConversation(input: CreateAiConversationInput) {
+    const conversation = await this.db.aiConversation.create({
+      data: {
+        userId: input.userId,
+        mode: input.mode,
+        title: input.title,
+        targetPlatform: input.targetPlatform,
+        sourcePlatform: input.sourcePlatform,
+        status: input.status,
+        lastMessageAt: toDate(input.lastMessageAt),
+        createdAt: toDate(input.createdAt),
+        updatedAt: toDate(input.updatedAt)
+      }
+    });
+
+    return toAiConversation(conversation);
+  }
+
+  async updateAiConversation(conversationId: string, input: UpdateAiConversationInput) {
+    const conversation = await this.db.aiConversation.update({
+      where: {
+        id: conversationId
+      },
+      data: {
+        title: input.title,
+        targetPlatform: input.targetPlatform,
+        sourcePlatform: input.sourcePlatform,
+        status: input.status,
+        lastMessageAt: input.lastMessageAt ? toDate(input.lastMessageAt) : undefined,
+        updatedAt: toDate(input.updatedAt)
+      }
+    });
+
+    return toAiConversation(conversation);
+  }
+
+  async listAiConversations(
+    userId: string,
+    pagination: AiConversationPagination,
+    filters: { mode?: AiConversation["mode"]; status?: AiConversation["status"] }
+  ) {
+    const baseWhere: Prisma.AiConversationWhereInput = {
+      userId,
+      mode: filters.mode,
+      status: filters.status
+    };
+
+    const orderBy = [
+      { lastMessageAt: "desc" as const },
+      { id: "desc" as const }
+    ];
+    const select = {
+      id: true,
+      userId: true,
+      mode: true,
+      title: true,
+      targetPlatform: true,
+      sourcePlatform: true,
+      status: true,
+      lastMessageAt: true,
+      createdAt: true,
+      updatedAt: true
+    };
+
+    if (pagination.mode === "cursor") {
+      const cursor = pagination.cursor;
+      const cursorDate = cursor ? toDate(cursor.createdAt) : null;
+      const where: Prisma.AiConversationWhereInput = cursorDate
+        ? {
+            ...baseWhere,
+            OR: [
+              {
+                lastMessageAt: {
+                  lt: cursorDate
+                }
+              },
+              {
+                lastMessageAt: cursorDate,
+                id: {
+                  lt: cursor!.id
+                }
+              }
+            ]
+          }
+        : baseWhere;
+      const items = await this.db.aiConversation.findMany({
+        where,
+        orderBy,
+        select,
+        take: pagination.limit
+      });
+
+      return {
+        items: items.map(toAiConversation)
+      };
+    }
+
+    const where = baseWhere;
+    const [items, total] = await Promise.all([
+      this.db.aiConversation.findMany({
+        where,
+        orderBy,
+        select,
+        skip: (pagination.page - 1) * pagination.pageSize,
+        take: pagination.pageSize
+      }),
+      this.db.aiConversation.count({
+        where
+      })
+    ]);
+
+    return {
+      items: items.map(toAiConversation),
+      total
+    };
+  }
+
+  async createAiMessage(input: CreateAiMessageInput) {
+    try {
+      const message = await this.db.aiMessage.create({
+        data: {
+          conversationId: input.conversationId,
+          userId: input.userId,
+          role: input.role,
+          taskId: input.taskId,
+          content: input.content,
+          contentJson: input.contentJson === null ? Prisma.JsonNull : toJsonObject(input.contentJson),
+          createdAt: toDate(input.createdAt)
+        }
+      });
+
+      return toAiMessage(message);
+    } catch (error) {
+      if (input.taskId && isUniqueConstraintError(error)) {
+        const existing = await this.findAiMessageByTaskId(input.taskId);
+
+        if (existing) {
+          return existing;
+        }
+      }
+
+      throw error;
+    }
+  }
+
+  async findAiMessageByTaskId(taskId: string) {
+    const message = await this.db.aiMessage.findUnique({
+      where: {
+        taskId
+      }
+    });
+
+    return message ? toAiMessage(message) : null;
+  }
+
+  async listAiMessages(conversationId: string, options: AiMessageListOptions = {}) {
+    const limit = options.limit && options.limit > 0 ? Math.min(options.limit, 100) : undefined;
+    const direction = options.direction ?? "before";
+    const cursor = options.cursor;
+    const cursorDate = cursor ? toDate(cursor.createdAt) : null;
+    const where: Prisma.AiMessageWhereInput = cursorDate
+      ? {
+          conversationId,
+          OR: direction === "after"
+            ? [
+                {
+                  createdAt: {
+                    gt: cursorDate
+                  }
+                },
+                {
+                  createdAt: cursorDate,
+                  id: {
+                    gt: cursor!.id
+                  }
+                }
+              ]
+            : [
+                {
+                  createdAt: {
+                    lt: cursorDate
+                  }
+                },
+                {
+                  createdAt: cursorDate,
+                  id: {
+                    lt: cursor!.id
+                  }
+                }
+              ]
+        }
+      : {
+          conversationId
+        };
+    const orderDirection = cursorDate && direction === "after"
+      ? "asc"
+      : limit || options.ascending === false
+        ? "desc"
+        : "asc";
+    const records = await this.db.aiMessage.findMany({
+      where,
+      orderBy: [
+        { createdAt: orderDirection },
+        { id: orderDirection }
+      ],
+      take: limit
+    });
+
+    const ordered = orderDirection === "desc" && options.ascending !== false ? [...records].reverse() : records;
+
+    return ordered.map(toAiMessage);
+  }
+
+  async createAiMessageAttachment(input: CreateAiMessageAttachmentInput) {
+    try {
+      const attachment = await this.db.aiMessageAttachment.create({
+        data: {
+          messageId: input.messageId,
+          conversationId: input.conversationId,
+          userId: input.userId,
+          fileId: input.fileId,
+          role: input.role,
+          displayOrder: input.displayOrder,
+          caption: input.caption,
+          createdAt: toDate(input.createdAt)
+        }
+      });
+
+      return toAiMessageAttachment(attachment);
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        const existing = await this.db.aiMessageAttachment.findFirst({
+          where: {
+            messageId: input.messageId,
+            fileId: input.fileId,
+            role: input.role
+          }
+        });
+
+        if (existing) {
+          return toAiMessageAttachment(existing);
+        }
+      }
+
+      throw error;
+    }
+  }
+
+  async listAiMessageAttachmentsForMessages(userId: string, messageIds: string[]) {
+    if (messageIds.length === 0) {
+      return [];
+    }
+
+    const attachments = await this.db.aiMessageAttachment.findMany({
+      where: {
+        userId,
+        messageId: {
+          in: messageIds
+        }
+      },
+      include: {
+        file: true
+      },
+      orderBy: [
+        {
+          messageId: "asc"
+        },
+        {
+          displayOrder: "asc"
+        }
+      ]
+    });
+
+    return attachments.map(toAiMessageAttachmentSummary);
+  }
+
   async createUploadedFile(input: CreateUploadedFileInput) {
     const uploadedFile = await this.db.uploadedFile.create({
       data: {
         userId: input.userId,
         originalName: input.originalName,
+        kind: input.kind ?? null,
         ext: input.ext,
         mimeType: input.mimeType,
         sizeBytes: input.sizeBytes,
         sha256: input.sha256,
+        storageKey: input.storageKey ?? null,
+        thumbnailKey: input.thumbnailKey ?? null,
         contentText: input.contentText,
+        contentJson: input.contentJson ? toJsonObject(input.contentJson) : Prisma.JsonNull,
         parseStatus: input.parseStatus,
         scanStatus: input.scanStatus,
         riskFlags: input.riskFlags,
-        createdAt: toDate(input.createdAt)
+        createdAt: toDate(input.createdAt),
+        updatedAt: toDate(input.updatedAt ?? input.createdAt)
       }
     });
 
@@ -1068,6 +1465,28 @@ function toUser(user: {
   };
 }
 
+function toUserLegalConsent(consent: {
+  id: string;
+  userId: string;
+  agreementVersion: string;
+  privacyVersion: string;
+  agreedAt: Date;
+  requestIp: string | null;
+  userAgent: string | null;
+  source: string;
+}): UserLegalConsent {
+  return {
+    id: consent.id,
+    userId: consent.userId,
+    agreementVersion: consent.agreementVersion,
+    privacyVersion: consent.privacyVersion,
+    agreedAt: toIso(consent.agreedAt),
+    requestIp: consent.requestIp,
+    userAgent: consent.userAgent,
+    source: consent.source
+  };
+}
+
 function toSmsCode(record: {
   id: string;
   phone: string;
@@ -1246,29 +1665,39 @@ function toUploadedFile(uploadedFile: {
   id: string;
   userId: string;
   originalName: string;
+  kind: string | null;
   ext: string;
   mimeType: string;
   sizeBytes: number;
   sha256: string;
-  contentText: string;
+  storageKey: string | null;
+  thumbnailKey: string | null;
+  contentText: string | null;
+  contentJson: Prisma.JsonValue | null;
   parseStatus: UploadedFile["parseStatus"];
   scanStatus: UploadedFile["scanStatus"];
   riskFlags: Prisma.JsonValue;
   createdAt: Date;
+  updatedAt: Date | null;
 }): UploadedFile {
   return {
     id: uploadedFile.id,
     userId: uploadedFile.userId,
     originalName: uploadedFile.originalName,
+    kind: normalizeUploadedFileKind(uploadedFile.kind, uploadedFile.ext, uploadedFile.mimeType),
     ext: uploadedFile.ext,
     mimeType: uploadedFile.mimeType,
     sizeBytes: uploadedFile.sizeBytes,
     sha256: uploadedFile.sha256,
+    storageKey: uploadedFile.storageKey,
+    thumbnailKey: uploadedFile.thumbnailKey,
     contentText: uploadedFile.contentText,
+    contentJson: uploadedFile.contentJson ? toRecord(uploadedFile.contentJson) : null,
     parseStatus: uploadedFile.parseStatus,
     scanStatus: uploadedFile.scanStatus,
     riskFlags: toStringArray(uploadedFile.riskFlags),
-    createdAt: toIso(uploadedFile.createdAt)
+    createdAt: toIso(uploadedFile.createdAt),
+    updatedAt: uploadedFile.updatedAt ? toIso(uploadedFile.updatedAt) : null
   };
 }
 
@@ -1352,6 +1781,7 @@ function toAdminOrderItem(order: {
     bonusPoints: order.bonusPoints,
     totalPoints: order.totalPoints,
     payChannel: order.payChannel,
+    paymentActionType: toPaymentActionType(order.payChannel),
     status: order.status,
     clientRequestId: order.clientRequestId,
     createdAt,
@@ -1363,6 +1793,18 @@ function toAdminOrderItem(order: {
     latestPaymentProviderTradeNo: latestTransaction?.providerTradeNo ?? null,
     latestPaymentFailedReason: latestTransaction?.failedReason ?? null
   };
+}
+
+function toPaymentActionType(payChannel: RechargeOrder["payChannel"]): AdminOrderPage["items"][number]["paymentActionType"] {
+  if (payChannel === "alipay") {
+    return "redirect";
+  }
+
+  if (payChannel === "wechat") {
+    return "qr_code";
+  }
+
+  return "mock";
 }
 
 function toAdminAiTaskItem(task: {
@@ -1425,9 +1867,125 @@ function toAdminUploadedFileItem(file: {
   };
 }
 
+function toAiConversation(conversation: {
+  id: string;
+  userId: string;
+  mode: AiConversation["mode"];
+  title: string;
+  targetPlatform: string | null;
+  sourcePlatform: string | null;
+  status: AiConversation["status"];
+  lastMessageAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}): AiConversation {
+  return {
+    id: conversation.id,
+    userId: conversation.userId,
+    mode: conversation.mode,
+    title: conversation.title,
+    targetPlatform: conversation.targetPlatform,
+    sourcePlatform: conversation.sourcePlatform,
+    status: conversation.status,
+    lastMessageAt: toIso(conversation.lastMessageAt),
+    createdAt: toIso(conversation.createdAt),
+    updatedAt: toIso(conversation.updatedAt)
+  };
+}
+
+function toAiMessage(message: {
+  id: string;
+  conversationId: string;
+  userId: string;
+  role: AiMessage["role"];
+  taskId: string | null;
+  content: string;
+  contentJson: Prisma.JsonValue | null;
+  createdAt: Date;
+}): AiMessage {
+  return {
+    id: message.id,
+    conversationId: message.conversationId,
+    userId: message.userId,
+    role: message.role,
+    taskId: message.taskId,
+    content: message.content,
+    contentJson: message.contentJson === null ? null : toRecord(message.contentJson),
+    createdAt: toIso(message.createdAt)
+  };
+}
+
+function toAiMessageAttachment(attachment: {
+  id: string;
+  messageId: string;
+  conversationId: string;
+  userId: string;
+  fileId: string;
+  role: AiMessageAttachment["role"];
+  displayOrder: number;
+  caption: string | null;
+  createdAt: Date;
+}): AiMessageAttachment {
+  return {
+    id: attachment.id,
+    messageId: attachment.messageId,
+    conversationId: attachment.conversationId,
+    userId: attachment.userId,
+    fileId: attachment.fileId,
+    role: attachment.role,
+    displayOrder: attachment.displayOrder,
+    caption: attachment.caption,
+    createdAt: toIso(attachment.createdAt)
+  };
+}
+
+function toAiMessageAttachmentSummary(attachment: {
+  id: string;
+  messageId: string;
+  conversationId: string;
+  userId: string;
+  fileId: string;
+  role: AiMessageAttachment["role"];
+  displayOrder: number;
+  caption: string | null;
+  createdAt: Date;
+  file: {
+    id: string;
+    kind: string | null;
+    originalName: string;
+    ext: string;
+    mimeType: string;
+    sizeBytes: number;
+    thumbnailKey: string | null;
+    contentText: string | null;
+    contentJson: Prisma.JsonValue | null;
+    scanStatus: AiMessageAttachmentSummary["file"]["scanStatus"];
+    riskFlags: Prisma.JsonValue;
+    createdAt: Date;
+  };
+}): AiMessageAttachmentSummary {
+  return {
+    ...toAiMessageAttachment(attachment),
+    file: {
+      fileId: attachment.file.id,
+      kind: normalizeUploadedFileKind(attachment.file.kind, attachment.file.ext, attachment.file.mimeType),
+      originalName: attachment.file.originalName,
+      ext: attachment.file.ext,
+      mimeType: attachment.file.mimeType,
+      sizeBytes: attachment.file.sizeBytes,
+      scanStatus: attachment.file.scanStatus,
+      riskFlags: toStringArray(attachment.file.riskFlags),
+      contentPreview: createContentPreview(attachment.file.contentText, attachment.file),
+      hasThumbnail: Boolean(attachment.file.thumbnailKey),
+      createdAt: toIso(attachment.file.createdAt)
+    }
+  };
+}
+
 function toAiTask(task: {
   id: string;
   userId: string;
+  conversationId: string | null;
   type: AiTask["type"];
   status: AiTask["status"];
   scopeStatus: AiTask["scopeStatus"];
@@ -1449,6 +2007,7 @@ function toAiTask(task: {
   return {
     id: task.id,
     userId: task.userId,
+    conversationId: task.conversationId,
     type: task.type,
     status: task.status,
     scopeStatus: task.scopeStatus,
@@ -1527,6 +2086,49 @@ function toRecord(value: Prisma.JsonValue): Record<string, unknown> {
 
 function toJsonObject(value: Record<string, unknown>): Prisma.InputJsonObject {
   return value as Prisma.InputJsonObject;
+}
+
+function createContentPreview(text: string | null, file?: { originalName: string; ext: string; mimeType: string }) {
+  if (text) {
+    return text.length > 800 ? `${text.slice(0, 800)}...` : text;
+  }
+
+  if (file && inferUploadedFileKind(file.ext, file.mimeType) === "image") {
+    return `图片附件：${file.originalName}`;
+  }
+
+  return "";
+}
+
+function inferUploadedFileKind(ext: string, mimeType: string): UploadedFile["kind"] {
+  const normalizedExt = ext.toLowerCase();
+  const normalizedMime = mimeType.toLowerCase();
+
+  if (normalizedMime.startsWith("image/") || [".png", ".jpg", ".jpeg", ".webp"].includes(normalizedExt)) {
+    return "image";
+  }
+
+  if (normalizedExt === ".py") {
+    return "code";
+  }
+
+  if (normalizedExt === ".log") {
+    return "log";
+  }
+
+  if (normalizedExt === ".md") {
+    return "markdown";
+  }
+
+  return "text";
+}
+
+function normalizeUploadedFileKind(kind: string | null, ext: string, mimeType: string): UploadedFile["kind"] {
+  if (kind === "code" || kind === "text" || kind === "log" || kind === "markdown" || kind === "image") {
+    return kind;
+  }
+
+  return inferUploadedFileKind(ext, mimeType);
 }
 
 function toStringArray(value: Prisma.JsonValue) {

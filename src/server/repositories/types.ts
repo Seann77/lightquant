@@ -1,5 +1,13 @@
 import type {
   AiTask,
+  AiConversation,
+  AiConversationMode,
+  AiConversationStatus,
+  AiMessage,
+  AiMessageAttachment,
+  AiMessageAttachmentRole,
+  AiMessageAttachmentSummary,
+  AiMessageRole,
   AiTaskResult,
   AiTaskStatus,
   AiTaskType,
@@ -21,10 +29,38 @@ import type {
   SmsCodeRecord,
   SmsScene,
   UploadedFile,
+  UploadedFileKind,
   UploadedFileParseStatus,
   UploadedFileScanStatus,
-  User
+  User,
+  UserLegalConsent
 } from "@/server/domain";
+
+export type PaymentActionType = "mock" | "redirect" | "qr_code";
+
+export type AiCursor = {
+  id: string;
+  createdAt: string;
+};
+
+export type AiConversationPagination =
+  | {
+      mode: "page";
+      page: number;
+      pageSize: number;
+    }
+  | {
+      mode: "cursor";
+      cursor?: AiCursor;
+      limit: number;
+    };
+
+export type AiMessageListOptions = {
+  limit?: number;
+  ascending?: boolean;
+  cursor?: AiCursor;
+  direction?: "before" | "after";
+};
 
 export type CreateSmsCodeInput = {
   phone: string;
@@ -43,6 +79,16 @@ export type CreateUserInput = {
   referredBy: string | null;
   createdAt: string;
   lastLoginAt: string;
+};
+
+export type CreateUserLegalConsentInput = {
+  userId: string;
+  agreementVersion: string;
+  privacyVersion: string;
+  agreedAt: string;
+  requestIp: string | null;
+  userAgent: string | null;
+  source: string;
 };
 
 export type ApplyCreditLedgerInput = {
@@ -94,6 +140,7 @@ export type CreatePaymentTransactionInput = {
 
 export type CreateAiTaskInput = {
   userId: string;
+  conversationId: string | null;
   type: AiTaskType;
   status: AiTaskStatus;
   scopeStatus: AiTaskScopeStatus;
@@ -125,18 +172,65 @@ export type UpdateAiTaskInput = {
 
 export type CreateAiTaskResultInput = AiTaskResult;
 
+export type CreateAiConversationInput = {
+  userId: string;
+  mode: AiConversationMode;
+  title: string;
+  targetPlatform: string | null;
+  sourcePlatform: string | null;
+  status: AiConversationStatus;
+  lastMessageAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type UpdateAiConversationInput = {
+  title?: string;
+  targetPlatform?: string | null;
+  sourcePlatform?: string | null;
+  status?: AiConversationStatus;
+  lastMessageAt?: string;
+  updatedAt: string;
+};
+
+export type CreateAiMessageInput = {
+  conversationId: string;
+  userId: string;
+  role: AiMessageRole;
+  taskId: string | null;
+  content: string;
+  contentJson: Record<string, unknown> | null;
+  createdAt: string;
+};
+
+export type CreateAiMessageAttachmentInput = {
+  messageId: string;
+  conversationId: string;
+  userId: string;
+  fileId: string;
+  role: AiMessageAttachmentRole;
+  displayOrder: number;
+  caption: string | null;
+  createdAt: string;
+};
+
 export type CreateUploadedFileInput = {
   userId: string;
   originalName: string;
+  kind?: UploadedFileKind | null;
   ext: string;
   mimeType: string;
   sizeBytes: number;
   sha256: string;
-  contentText: string;
+  storageKey?: string | null;
+  thumbnailKey?: string | null;
+  contentText: string | null;
+  contentJson?: Record<string, unknown> | null;
   parseStatus: UploadedFileParseStatus;
   scanStatus: UploadedFileScanStatus;
   riskFlags: string[];
   createdAt: string;
+  updatedAt?: string | null;
 };
 
 export type CreateCreditReservationInput = {
@@ -164,6 +258,12 @@ export type AppliedCreditLedger = {
 export type AiTaskPage = {
   items: AiTask[];
   total: number;
+};
+
+export type AiConversationPage = {
+  items: AiConversation[];
+  total?: number;
+  nextCursor?: string | null;
 };
 
 export type AdminOverview = {
@@ -209,6 +309,7 @@ export type AdminOrderItem = {
   bonusPoints: number;
   totalPoints: number;
   payChannel: PayChannel;
+  paymentActionType: PaymentActionType;
   status: OrderStatus;
   clientRequestId: string;
   createdAt: string;
@@ -275,11 +376,13 @@ export type AdminUploadedFilePage = {
 export interface LightQuantRepository {
   createSmsCode(input: CreateSmsCodeInput): Promise<SmsCodeRecord>;
   findSmsCodeForVerification(phone: string, scene: SmsScene, code: string, now: string): Promise<SmsCodeRecord | null>;
+  findLatestSmsCodeForVerification(phone: string, scene: SmsScene, now: string): Promise<SmsCodeRecord | null>;
   markSmsCodeUsed(id: string, usedAt: string): Promise<void>;
   findUserById(id: string): Promise<User | null>;
   findUserByPhone(phone: string): Promise<User | null>;
   findUserByInviteCode(inviteCode: string): Promise<User | null>;
   createUser(input: CreateUserInput): Promise<User>;
+  createUserLegalConsent(input: CreateUserLegalConsentInput): Promise<UserLegalConsent>;
   updateUserLastLogin(userId: string, lastLoginAt: string): Promise<User>;
   getCreditAccount(userId: string): Promise<CreditAccount | null>;
   ensureCreditAccount(userId: string, now: string): Promise<CreditAccount>;
@@ -292,6 +395,7 @@ export interface LightQuantRepository {
   findRechargeOrderByClientRequestId(userId: string, clientRequestId: string): Promise<RechargeOrder | null>;
   createRechargeOrder(input: CreateRechargeOrderInput): Promise<RechargeOrder>;
   markOrderPaid(orderId: string, paidAt: string): Promise<RechargeOrder>;
+  markOrderFailed(orderId: string, failedAt: string): Promise<RechargeOrder>;
   closeExpiredRechargeOrders(cutoff: string, closedAt: string): Promise<{ count: number }>;
   findPaymentTransactionByIdempotencyKey(idempotencyKey: string): Promise<PaymentTransaction | null>;
   findLatestPaymentTransactionByOrderId(orderId: string): Promise<PaymentTransaction | null>;
@@ -303,6 +407,16 @@ export interface LightQuantRepository {
   createAiTaskResult(input: CreateAiTaskResultInput): Promise<AiTaskResult>;
   findAiTaskResult(taskId: string): Promise<AiTaskResult | null>;
   listAiTasks(userId: string, pagination: Pagination, filters: { type?: AiTaskType; status?: AiTaskStatus }): Promise<AiTaskPage>;
+  listAiTasksForConversation(conversationId: string, options?: { limit?: number; ascending?: boolean }): Promise<AiTask[]>;
+  findAiConversationById(id: string): Promise<AiConversation | null>;
+  createAiConversation(input: CreateAiConversationInput): Promise<AiConversation>;
+  updateAiConversation(conversationId: string, input: UpdateAiConversationInput): Promise<AiConversation>;
+  listAiConversations(userId: string, pagination: AiConversationPagination, filters: { mode?: AiConversationMode; status?: AiConversationStatus }): Promise<AiConversationPage>;
+  createAiMessage(input: CreateAiMessageInput): Promise<AiMessage>;
+  findAiMessageByTaskId(taskId: string): Promise<AiMessage | null>;
+  listAiMessages(conversationId: string, options?: AiMessageListOptions): Promise<AiMessage[]>;
+  createAiMessageAttachment(input: CreateAiMessageAttachmentInput): Promise<AiMessageAttachment>;
+  listAiMessageAttachmentsForMessages(userId: string, messageIds: string[]): Promise<AiMessageAttachmentSummary[]>;
   createUploadedFile(input: CreateUploadedFileInput): Promise<UploadedFile>;
   findUploadedFileById(id: string): Promise<UploadedFile | null>;
   getAdminOverview(todayStart: string): Promise<AdminOverview>;

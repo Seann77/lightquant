@@ -3,12 +3,14 @@ import {
   getAiBaseUrl,
   getAiMaxRetries,
   getAiModelName,
+  getAiSupportsVision,
   getAiTaskTimeoutMs,
   type AiProviderMode,
   ServerConfigError
 } from "@/server/env";
 import type { AiTaskScopeStatus } from "@/server/domain";
 import { ApiError } from "@/server/http/api-response";
+import { loadTextContent } from "@/server/ai/skills/skill-content";
 import type { AiProviderInput, AiProviderResult } from "@/server/ai/providers/types";
 
 type ProviderOptions = {
@@ -21,6 +23,7 @@ type ProviderConfig = {
   model: string;
   timeoutMs: number;
   maxRetries: number;
+  supportsVision: boolean;
 };
 
 type ChatCompletionResponse = {
@@ -38,6 +41,10 @@ type ChatCompletionResponse = {
   } | null;
 };
 
+const COMMON_PROVIDER_PROMPT = loadTextContent("common-provider.md");
+const COMMON_SAFETY_PROMPT = loadTextContent("common-safety.md");
+const JSON_OUTPUT_PROMPT = loadTextContent("provider-json-output.md");
+
 export async function runOpenAiCompatibleProvider(input: AiProviderInput, options: ProviderOptions): Promise<AiProviderResult> {
   const providerConfig = readProviderConfig(options.provider);
   const payload = buildChatCompletionPayload(input, providerConfig);
@@ -49,24 +56,25 @@ export async function runOpenAiCompatibleProvider(input: AiProviderInput, option
     parsed = parseCompletionContent(completion);
   }
 
-  return normalizeProviderResult(input, parsed, {
+  return applyVisionFallback(normalizeProviderResult(input, parsed, {
     model: completion.model || providerConfig.model,
     tokenUsage: {
       promptTokens: numberOrZero(completion.usage?.prompt_tokens),
       completionTokens: numberOrZero(completion.usage?.completion_tokens),
       totalTokens: numberOrZero(completion.usage?.total_tokens)
     }
-  });
+  }), input, providerConfig.supportsVision);
 }
 
-function readProviderConfig(provider: Exclude<AiProviderMode, "mock">) {
+function readProviderConfig(provider: Exclude<AiProviderMode, "mock">): ProviderConfig {
   try {
     return {
       baseUrl: getAiBaseUrl(provider),
       apiKey: getAiApiKey(provider),
       model: getAiModelName(provider),
       timeoutMs: getAiTaskTimeoutMs(),
-      maxRetries: getAiMaxRetries()
+      maxRetries: getAiMaxRetries(),
+      supportsVision: getAiSupportsVision(provider)
     };
   } catch (error) {
     if (error instanceof ServerConfigError) {
@@ -90,7 +98,7 @@ function buildChatCompletionPayload(input: AiProviderInput, providerConfig: Prov
       },
       {
         role: "user",
-        content: buildUserMessage(input)
+        content: buildUserContent(input, providerConfig)
       }
     ],
     response_format: {
@@ -107,28 +115,24 @@ function shouldUseMimoCompatibleParams(config: Pick<ProviderConfig, "baseUrl" | 
   return config.model.toLowerCase().startsWith("mimo-") || config.baseUrl.toLowerCase().includes("xiaomimimo.com");
 }
 
-function buildSystemMessage({ skill, config, task }: AiProviderInput, forceInScope: boolean) {
+function buildSystemMessage(input: AiProviderInput, forceInScope: boolean) {
+  const { skill, config, task } = input;
+  const serverScopeHint = hasTaskRelevantSignal(input) ? "in_scope" : "unknown";
+
   return [
-    forceInScope
-      ? "重要：上一轮把一个明显属于量化策略/代码任务的输入误判为范围外。请纠正判断，本轮必须按 in_scope 输出完整结果。"
+    forceInScope || serverScopeHint === "in_scope"
+      ? "重要：上一轮可能把明显属于量化策略或策略代码任务的输入误判为范围外。请重新判断；如果输入涉及量化策略、策略代码、交易逻辑、指标、回测、调仓、风控或平台迁移，本轮必须按 in_scope 输出完整 JSON 结果。"
+      : "",
+    serverScopeHint === "in_scope"
+      ? "服务端范围预判：in_scope。用户输入已包含量化策略、平台、指标、买卖规则、代码解析或平台迁移信号。除非用户要求个股推荐、收益承诺、市场预测或明显无关内容，否则不要返回 out_of_scope，也不要使用范围外固定回复。"
       : "",
     skill.systemInstruction,
     "",
-    "你是 LightQuant 量化策略助手的服务端 AI 模块。",
-    "你不提供投资建议，不承诺收益，不推荐具体股票，不输出任何诱导实盘交易的保证性话术。",
-    "如果用户要求“不要推荐具体股票”“不要承诺收益”“仅用于回测学习”，这是合规约束，不是范围外请求。",
-    "只要用户请求包含量化策略、交易逻辑、指标、回测、调仓、风控、策略代码解析或平台代码转换，应优先判定为 in_scope。",
-    "你必须遵守当前模块的 scopeRules；如果用户请求超出范围，返回 scopeStatus=out_of_scope，并使用指定的 outOfScopeResponse。",
-    "你必须只输出合法 JSON，不要使用 Markdown 代码围栏，不要输出 JSON 之外的文字。",
-    task.type === "strategy_generation"
-      ? "当前任务是 strategy_generation：只要用户描述了 PTrade、聚宽 JoinQuant、QMT 的均线、指标、买入、卖出、调仓、止盈止损、风控或策略代码，就必须判定为 in_scope，并给出策略代码或伪代码。"
-      : "",
-    task.type === "code_analysis"
-      ? "当前任务是 code_analysis：只要用户提供了 PTrade、聚宽 JoinQuant、QMT 策略代码或交易逻辑，就必须判定为 in_scope，并给出自然语言结构化解析。"
-      : "",
-    task.type === "code_conversion"
-      ? "当前任务是 code_conversion：只要用户提供了 PTrade、聚宽 JoinQuant、QMT 策略代码和平台转换需求，就必须判定为 in_scope，并给出转换代码和迁移说明。"
-      : "",
+    COMMON_PROVIDER_PROMPT,
+    "",
+    COMMON_SAFETY_PROMPT,
+    "",
+    taskSpecificGuidance(task.type),
     "",
     `任务名称：${config.displayName}`,
     `任务范围：${config.scopeDescription}`,
@@ -140,41 +144,81 @@ function buildSystemMessage({ skill, config, task }: AiProviderInput, forceInSco
     "Output schema:",
     skill.outputSchemaDescription,
     "",
-    "必须返回如下 JSON 字段：",
-    JSON.stringify({
-      scopeStatus: "in_scope | out_of_scope",
-      generatedCode: "string | null",
-      explanation: "string | null",
-      migrationNotes: "string | null",
-      riskWarnings: ["string"],
-      reportJson: {}
-    })
-  ].join("\n");
+    JSON_OUTPUT_PROMPT
+  ].filter(Boolean).join("\n");
 }
 
-function buildUserMessage({ task }: AiProviderInput) {
+function taskSpecificGuidance(type: AiProviderInput["task"]["type"]) {
+  if (type === "strategy_generation") {
+    return "当前任务是 strategy_generation：只要用户描述了 PTrade、聚宽 JoinQuant、QMT 的均线、指标、买入、卖出、调仓、止盈止损、风控或策略代码，就应判断为 in_scope，并给出策略代码、伪代码或策略逻辑说明。";
+  }
+
+  if (type === "code_analysis") {
+    return "当前任务是 code_analysis：只要用户提供了 PTrade、聚宽 JoinQuant、QMT 策略代码、策略片段或交易逻辑，就应判断为 in_scope，并给出自然语言结构化解析。";
+  }
+
+  return "当前任务是 code_conversion：只要用户提供了 PTrade、聚宽 JoinQuant、QMT 策略代码和平台转换需求，就应判断为 in_scope，并给出转换代码、迁移说明和兼容性风险。";
+}
+
+function buildUserContent(input: AiProviderInput, providerConfig: ProviderConfig) {
+  const text = buildUserMessage(input, providerConfig);
+  const imageAttachments = getImageAttachments(input);
+
+  if (!providerConfig.supportsVision || imageAttachments.length === 0) {
+    return text;
+  }
+
+  return [
+    {
+      type: "text",
+      text
+    },
+    ...imageAttachments.map((attachment) => ({
+      type: "image_url",
+      image_url: {
+        url: attachment.dataUrl,
+        detail: "auto"
+      }
+    }))
+  ];
+}
+
+function buildUserMessage(input: AiProviderInput, providerConfig: ProviderConfig) {
+  const { task } = input;
+  const imageAttachments = getImageAttachments(input);
+  const imageNote = imageAttachments.length === 0
+    ? ""
+    : providerConfig.supportsVision
+      ? `图片附件：${imageAttachments.map((attachment) => `${attachment.originalName} (${attachment.mimeType}, ${attachment.sizeBytes} bytes)`).join("；")}。请结合图片内容，但不要输出隐私思维链。`
+      : `图片附件未参与模型理解：${imageAttachments.map((attachment) => attachment.originalName).join("、")}。当前模型未配置 vision 能力，请仅基于文字输入处理，并提示用户可补充文字说明或切换支持图片的模型。`;
+
   return [
     `taskType: ${task.type}`,
     `sourcePlatform: ${task.sourcePlatform ?? ""}`,
     `targetPlatform: ${task.targetPlatform ?? ""}`,
+    `serverScopeHint: ${hasTaskRelevantSignal(input) ? "in_scope" : "unknown"}`,
+    "",
+    input.conversationContext
+      ? [
+          "最近对话记忆（服务端已截断，仅用于理解追问和延续修改；不要逐字复述）：",
+          input.conversationContext
+        ].join("\n")
+      : "最近对话记忆：无",
     "",
     "用户需求：",
     task.prompt ?? "",
+    imageNote,
     "",
     "输入代码：",
     task.inputCode ?? ""
   ].join("\n");
 }
 
-async function requestChatCompletion(
-  config: {
-    baseUrl: string;
-    apiKey: string;
-    timeoutMs: number;
-    maxRetries: number;
-  },
-  payload: Record<string, unknown>
-): Promise<ChatCompletionResponse> {
+function getImageAttachments(input: AiProviderInput) {
+  return (input.attachments ?? []).filter((attachment) => attachment.kind === "image");
+}
+
+async function requestChatCompletion(config: ProviderConfig, payload: Record<string, unknown>): Promise<ChatCompletionResponse> {
   let lastError: unknown = null;
   const attempts = Math.max(1, config.maxRetries + 1);
 
@@ -199,10 +243,10 @@ async function requestChatCompletion(
         throw apiErrorForProviderStatus(response.status);
       }
 
-      const json = await response.json();
+      const json = await parseProviderJson(response);
 
       if (!isObject(json)) {
-        throw new ApiError("AI_TASK_FAILED", "AI 任务执行失败，请稍后再试", 500);
+        throw new ApiError("AI_PROVIDER_BAD_RESPONSE", "AI 服务返回格式异常，请稍后重试", 502);
       }
 
       return json as ChatCompletionResponse;
@@ -234,21 +278,33 @@ function apiErrorForProviderStatus(status: number) {
     return new ApiError("AI_PROVIDER_CONFIG_ERROR", "AI 服务配置不可用", 500);
   }
 
-  if (status === 408 || status === 409 || status === 429 || status >= 500) {
+  if (status === 408 || status === 504) {
+    return new ApiError("AI_PROVIDER_TIMEOUT", "AI 服务响应超时，请稍后重试或减少代码量", 504);
+  }
+
+  if (status === 409 || status === 429 || status >= 500) {
     return new ApiError("AI_TASK_FAILED", "AI 服务暂时不可用，请稍后再试", 502);
   }
 
-  return new ApiError("AI_TASK_FAILED", "AI 任务执行失败，请稍后再试", 500);
+  return new ApiError("AI_PROVIDER_BAD_RESPONSE", "AI 服务返回异常，请稍后重试", 502);
 }
 
 function parseCompletionContent(completion: ChatCompletionResponse) {
   const content = completion.choices?.[0]?.message?.content;
 
   if (!content) {
-    throw new ApiError("AI_TASK_FAILED", "AI 任务执行失败，请稍后再试", 500);
+    throw new ApiError("AI_PROVIDER_BAD_RESPONSE", "AI 服务返回内容为空，请稍后重试", 502);
   }
 
   return parseModelJson(content);
+}
+
+async function parseProviderJson(response: Response) {
+  try {
+    return await response.json();
+  } catch {
+    throw new ApiError("AI_PROVIDER_BAD_RESPONSE", "AI 服务返回格式异常，请稍后重试", 502);
+  }
 }
 
 function shouldRetryProviderError(error: unknown, attempt: number, attempts: number) {
@@ -269,7 +325,7 @@ function normalizeProviderError(error: unknown) {
   }
 
   if (error instanceof Error && error.name === "AbortError") {
-    return new ApiError("AI_TASK_FAILED", "AI 服务响应超时，请稍后再试", 504);
+    return new ApiError("AI_PROVIDER_TIMEOUT", "AI 服务响应超时，请稍后重试或减少代码量", 504);
   }
 
   return new ApiError("AI_TASK_FAILED", "AI 服务暂时不可用，请稍后再试", 502);
@@ -287,7 +343,7 @@ function parseModelJson(content: string) {
   const repaired = match ? safeJsonParse(match[0]) : null;
 
   if (!repaired) {
-    throw new ApiError("AI_TASK_FAILED", "AI 任务执行失败，请稍后再试", 500);
+    throw new ApiError("AI_PROVIDER_BAD_RESPONSE", "模型返回内容无法解析，请稍后重试", 502);
   }
 
   return repaired;
@@ -338,9 +394,40 @@ function normalizeProviderResult(
   };
 }
 
-function buildReportJson(input: AiProviderInput, scopeStatus: AiTaskScopeStatus, value: unknown) {
+function applyVisionFallback(result: AiProviderResult, input: AiProviderInput, supportsVision: boolean): AiProviderResult {
+  const imageAttachments = getImageAttachments(input);
+
+  if (supportsVision || imageAttachments.length === 0) {
+    return result;
+  }
+
+  const message = `图片附件未参与模型理解：${imageAttachments.map((attachment) => attachment.originalName).join("、")}。当前模型未配置 vision 能力，本次结果仅基于文字输入生成。`;
+
   return {
-    ...(isObject(value) ? value : {}),
+    ...result,
+    explanation: [message, result.explanation].filter(Boolean).join("\n\n"),
+    riskWarnings: uniqueStrings([message, ...result.riskWarnings]).slice(0, 12),
+    reportJson: {
+      ...(result.reportJson ?? {}),
+      imageFallback: {
+        reason: "provider_without_vision",
+        attachments: imageAttachments.map((attachment) => ({
+          fileId: attachment.fileId,
+          originalName: attachment.originalName,
+          mimeType: attachment.mimeType,
+          sizeBytes: attachment.sizeBytes
+        }))
+      }
+    }
+  };
+}
+
+function buildReportJson(input: AiProviderInput, scopeStatus: AiTaskScopeStatus, value: unknown) {
+  const report = isObject(value) ? value : {};
+
+  return {
+    ...report,
+    processingMode: typeof report.processingMode === "string" ? report.processingMode : "single",
     scopeStatus,
     skillId: input.skill.id,
     skillVersion: input.skill.version,
@@ -380,12 +467,16 @@ function numberOrZero(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
+function uniqueStrings(values: string[]) {
+  return [...new Set(values.filter(Boolean))];
+}
+
 function isObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
-function hasTaskRelevantSignal({ task }: AiProviderInput) {
-  const input = `${task.prompt ?? ""}\n${task.inputCode ?? ""}`.toLowerCase();
+function hasTaskRelevantSignal({ task, conversationContext }: AiProviderInput) {
+  const input = `${task.prompt ?? ""}\n${task.inputCode ?? ""}\n${conversationContext ?? ""}`.toLowerCase();
   const quantSignals = [
     "策略",
     "量化",

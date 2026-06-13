@@ -1,7 +1,7 @@
 import { createSign, createVerify } from "crypto";
 import type { RechargeOrder } from "@/server/domain";
 import { ApiError } from "@/server/http/api-response";
-import { getAlipayConfig, joinUrl } from "@/server/payments/payment-config";
+import { getAlipayConfig, getPaymentOrderExpireMinutes, joinUrl } from "@/server/payments/payment-config";
 import { basePaymentAction, type PaymentAction } from "@/server/payments/payment-action";
 
 type AlipayNotify = {
@@ -23,7 +23,7 @@ export function createAlipayPaymentAction(order: RechargeOrder): PaymentAction {
     total_amount: centsToAmount(order.amountCents),
     subject: `LightQuant ${order.totalPoints} 积分充值`,
     body: `LightQuant 订单 ${order.orderNo}`,
-    timeout_express: "30m"
+    timeout_express: `${getPaymentOrderExpireMinutes()}m`
   });
   const params: Record<string, string> = {
     app_id: config.appId,

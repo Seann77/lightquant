@@ -1,6 +1,10 @@
 import { randomUUID } from "crypto";
 import type {
   AiTask,
+  AiConversation,
+  AiMessage,
+  AiMessageAttachment,
+  AiMessageAttachmentSummary,
   AiTaskResult,
   CreditAccount,
   CreditLedger,
@@ -10,7 +14,8 @@ import type {
   RechargePlan,
   SmsCodeRecord,
   UploadedFile,
-  User
+  User,
+  UserLegalConsent
 } from "@/server/domain";
 import { ApiError } from "@/server/http/api-response";
 import { getOrderExpiresAt, isOrderExpired } from "@/server/payments/payment-config";
@@ -21,18 +26,25 @@ import type {
   AdminOverview,
   AdminUploadedFilePage,
   AdminUserPage,
+  AiConversationPagination,
+  AiMessageListOptions,
   AppliedCreditLedger,
   ApplyCreditLedgerInput,
   CreateAiTaskInput,
+  CreateAiConversationInput,
+  CreateAiMessageAttachmentInput,
+  CreateAiMessageInput,
   CreateAiTaskResultInput,
   CreateCreditReservationInput,
   CreatePaymentTransactionInput,
   CreateRechargeOrderInput,
   CreateSmsCodeInput,
   CreateUploadedFileInput,
+  CreateUserLegalConsentInput,
   CreateUserInput,
   LedgerPage,
   LightQuantRepository,
+  UpdateAiConversationInput,
   UpdateAiTaskInput
 } from "@/server/repositories/types";
 
@@ -84,6 +96,8 @@ export class MockLightQuantRepository implements LightQuantRepository {
   private readonly users = new Map<string, User>();
   private readonly usersByPhone = new Map<string, string>();
   private readonly usersByInviteCode = new Map<string, string>();
+  private readonly legalConsents = new Map<string, UserLegalConsent>();
+  private readonly legalConsentsByVersion = new Map<string, string>();
   private readonly smsCodes = new Map<string, SmsCodeRecord>();
   private readonly creditAccounts = new Map<string, CreditAccount>();
   private readonly creditLedger = new Map<string, CreditLedger>();
@@ -97,6 +111,10 @@ export class MockLightQuantRepository implements LightQuantRepository {
   private readonly aiTasks = new Map<string, AiTask>();
   private readonly aiTasksByClientRequestId = new Map<string, string>();
   private readonly aiTaskResults = new Map<string, AiTaskResult>();
+  private readonly aiConversations = new Map<string, AiConversation>();
+  private readonly aiMessages = new Map<string, AiMessage>();
+  private readonly aiMessagesByTaskId = new Map<string, string>();
+  private readonly aiMessageAttachments = new Map<string, AiMessageAttachment>();
   private readonly uploadedFiles = new Map<string, UploadedFile>();
   private readonly creditReservations = new Map<string, CreditReservation>();
   private readonly creditReservationsByIdempotencyKey = new Map<string, string>();
@@ -120,6 +138,12 @@ export class MockLightQuantRepository implements LightQuantRepository {
       .find((item) => item.mockCode === code);
 
     return matched ?? null;
+  }
+
+  async findLatestSmsCodeForVerification(phone: string, scene: SmsCodeRecord["scene"], now: string) {
+    return [...this.smsCodes.values()]
+      .filter((item) => item.phone === phone && item.scene === scene && !item.usedAt && item.expiresAt > now)
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0] ?? null;
   }
 
   async markSmsCodeUsed(id: string, usedAt: string) {
@@ -159,6 +183,26 @@ export class MockLightQuantRepository implements LightQuantRepository {
     this.usersByInviteCode.set(user.inviteCode, user.id);
 
     return user;
+  }
+
+  async createUserLegalConsent(input: CreateUserLegalConsentInput) {
+    const key = legalConsentKey(input.userId, input.agreementVersion, input.privacyVersion);
+    const existingId = this.legalConsentsByVersion.get(key);
+    const existing = existingId ? this.legalConsents.get(existingId) : null;
+
+    if (existing) {
+      return existing;
+    }
+
+    const consent: UserLegalConsent = {
+      id: randomUUID(),
+      ...input
+    };
+
+    this.legalConsents.set(consent.id, consent);
+    this.legalConsentsByVersion.set(key, consent.id);
+
+    return consent;
   }
 
   async updateUserLastLogin(userId: string, lastLoginAt: string) {
@@ -324,11 +368,40 @@ export class MockLightQuantRepository implements LightQuantRepository {
     return updated;
   }
 
+  async markOrderFailed(orderId: string, failedAt: string) {
+    const order = this.orders.get(orderId);
+
+    if (!order) {
+      throw new Error("Order not found");
+    }
+
+    if (order.status === "PAID") {
+      throw new ApiError("ORDER_ALREADY_PAID", "订单已支付", 409);
+    }
+
+    if (order.status === "CLOSED") {
+      throw new ApiError("ORDER_CLOSED", "订单已关闭", 409);
+    }
+
+    if (order.status !== "PENDING") {
+      throw new ApiError("FORBIDDEN", "当前订单状态不允许标记失败", 403);
+    }
+
+    const updated: RechargeOrder = {
+      ...order,
+      status: "FAILED",
+      updatedAt: failedAt
+    };
+
+    this.orders.set(orderId, updated);
+    return updated;
+  }
+
   async closeExpiredRechargeOrders(cutoff: string, closedAt: string) {
     let count = 0;
 
     for (const order of this.orders.values()) {
-      if (order.status === "PENDING" && order.createdAt < cutoff) {
+      if (order.status === "PENDING" && order.createdAt <= cutoff) {
         this.orders.set(order.id, {
           ...order,
           status: "CLOSED",
@@ -439,10 +512,174 @@ export class MockLightQuantRepository implements LightQuantRepository {
     };
   }
 
+  async listAiTasksForConversation(conversationId: string, options: { limit?: number; ascending?: boolean } = {}) {
+    const items = [...this.aiTasks.values()]
+      .filter((task) => task.conversationId === conversationId)
+      .sort((left, right) => options.ascending ? left.createdAt.localeCompare(right.createdAt) : right.createdAt.localeCompare(left.createdAt));
+
+    return typeof options.limit === "number" ? items.slice(0, options.limit) : items;
+  }
+
+  async findAiConversationById(id: string) {
+    return this.aiConversations.get(id) ?? null;
+  }
+
+  async createAiConversation(input: CreateAiConversationInput) {
+    const conversation: AiConversation = {
+      id: randomUUID(),
+      ...input
+    };
+
+    this.aiConversations.set(conversation.id, conversation);
+    return conversation;
+  }
+
+  async updateAiConversation(conversationId: string, input: UpdateAiConversationInput) {
+    const conversation = this.aiConversations.get(conversationId);
+
+    if (!conversation) {
+      throw new Error("AI conversation not found");
+    }
+
+    const updated: AiConversation = {
+      ...conversation,
+      title: input.title === undefined ? conversation.title : input.title,
+      targetPlatform: input.targetPlatform === undefined ? conversation.targetPlatform : input.targetPlatform,
+      sourcePlatform: input.sourcePlatform === undefined ? conversation.sourcePlatform : input.sourcePlatform,
+      status: input.status === undefined ? conversation.status : input.status,
+      lastMessageAt: input.lastMessageAt === undefined ? conversation.lastMessageAt : input.lastMessageAt,
+      updatedAt: input.updatedAt
+    };
+
+    this.aiConversations.set(conversationId, updated);
+    return updated;
+  }
+
+  async listAiConversations(
+    userId: string,
+    pagination: AiConversationPagination,
+    filters: { mode?: AiConversation["mode"]; status?: AiConversation["status"] }
+  ) {
+    const items = [...this.aiConversations.values()]
+      .filter((conversation) => conversation.userId === userId)
+      .filter((conversation) => (filters.mode ? conversation.mode === filters.mode : true))
+      .filter((conversation) => (filters.status ? conversation.status === filters.status : true))
+      .sort(compareConversationDesc);
+
+    if (pagination.mode === "cursor") {
+      const cursorIndex = pagination.cursor
+        ? items.findIndex((conversation) => conversation.id === pagination.cursor?.id && conversation.lastMessageAt === pagination.cursor.createdAt)
+        : -1;
+      const start = cursorIndex >= 0 ? cursorIndex + 1 : 0;
+
+      return {
+        items: items.slice(start, start + pagination.limit)
+      };
+    }
+
+    const start = (pagination.page - 1) * pagination.pageSize;
+
+    return {
+      items: items.slice(start, start + pagination.pageSize),
+      total: items.length
+    };
+  }
+
+  async createAiMessage(input: CreateAiMessageInput) {
+    if (input.taskId) {
+      const existingId = this.aiMessagesByTaskId.get(input.taskId);
+      const existing = existingId ? this.aiMessages.get(existingId) : null;
+
+      if (existing) {
+        return existing;
+      }
+    }
+
+    const message: AiMessage = {
+      id: randomUUID(),
+      ...input
+    };
+
+    this.aiMessages.set(message.id, message);
+
+    if (message.taskId) {
+      this.aiMessagesByTaskId.set(message.taskId, message.id);
+    }
+
+    return message;
+  }
+
+  async findAiMessageByTaskId(taskId: string) {
+    const messageId = this.aiMessagesByTaskId.get(taskId);
+    return messageId ? this.aiMessages.get(messageId) ?? null : null;
+  }
+
+  async listAiMessages(conversationId: string, options: AiMessageListOptions = {}) {
+    const sorted = [...this.aiMessages.values()]
+      .filter((message) => message.conversationId === conversationId)
+      .sort(compareMessageAsc);
+    const direction = options.direction ?? "before";
+    const cursorIndex = options.cursor
+      ? sorted.findIndex((message) => message.id === options.cursor?.id && message.createdAt === options.cursor.createdAt)
+      : -1;
+    const filtered = options.cursor
+      ? direction === "after"
+        ? sorted.slice(cursorIndex >= 0 ? cursorIndex + 1 : sorted.length)
+        : sorted.slice(0, cursorIndex >= 0 ? cursorIndex : 0)
+      : sorted;
+    const maxLimit = options.limit && options.limit > 0 ? Math.min(options.limit, 100) : undefined;
+    const limited = maxLimit
+      ? direction === "after"
+        ? filtered.slice(0, maxLimit)
+        : filtered.slice(-maxLimit)
+      : filtered;
+
+    return options.ascending === false ? [...limited].reverse() : limited;
+  }
+
+  async createAiMessageAttachment(input: CreateAiMessageAttachmentInput) {
+    const existing = [...this.aiMessageAttachments.values()].find((attachment) =>
+      attachment.messageId === input.messageId &&
+      attachment.fileId === input.fileId &&
+      attachment.role === input.role
+    );
+
+    if (existing) {
+      return existing;
+    }
+
+    const attachment: AiMessageAttachment = {
+      id: randomUUID(),
+      ...input
+    };
+
+    this.aiMessageAttachments.set(attachment.id, attachment);
+    return attachment;
+  }
+
+  async listAiMessageAttachmentsForMessages(userId: string, messageIds: string[]) {
+    const messageIdSet = new Set(messageIds);
+
+    return [...this.aiMessageAttachments.values()]
+      .filter((attachment) => attachment.userId === userId && messageIdSet.has(attachment.messageId))
+      .sort((left, right) => {
+        const message = left.messageId.localeCompare(right.messageId);
+
+        return message !== 0 ? message : left.displayOrder - right.displayOrder;
+      })
+      .map((attachment) => toAiMessageAttachmentSummary(attachment, this.uploadedFiles))
+      .filter((attachment): attachment is AiMessageAttachmentSummary => Boolean(attachment));
+  }
+
   async createUploadedFile(input: CreateUploadedFileInput) {
     const uploadedFile: UploadedFile = {
       id: randomUUID(),
-      ...input
+      ...input,
+      kind: input.kind ?? inferUploadedFileKind(input.ext, input.mimeType),
+      storageKey: input.storageKey ?? null,
+      thumbnailKey: input.thumbnailKey ?? null,
+      contentJson: input.contentJson ?? null,
+      updatedAt: input.updatedAt ?? input.createdAt
     };
 
     this.uploadedFiles.set(uploadedFile.id, uploadedFile);
@@ -593,6 +830,10 @@ function clientRequestKey(userId: string, clientRequestId: string) {
   return `${userId}:${clientRequestId}`;
 }
 
+function legalConsentKey(userId: string, agreementVersion: string, privacyVersion: string) {
+  return `${userId}:${agreementVersion}:${privacyVersion}`;
+}
+
 function toAdminUserItem(user: User, creditAccounts: Map<string, CreditAccount>, creditLedger: Map<string, CreditLedger>): AdminUserPage["items"][number] {
   const account = creditAccounts.get(user.id);
   const latestLedger = [...creditLedger.values()]
@@ -635,6 +876,7 @@ function toAdminOrderItem(order: RechargeOrder, users: Map<string, User>, plans:
     bonusPoints: order.bonusPoints,
     totalPoints: order.totalPoints,
     payChannel: order.payChannel,
+    paymentActionType: toPaymentActionType(order.payChannel),
     status: order.status,
     clientRequestId: order.clientRequestId,
     createdAt: order.createdAt,
@@ -645,6 +887,55 @@ function toAdminOrderItem(order: RechargeOrder, users: Map<string, User>, plans:
     latestPaymentStatus: latestTransaction?.status ?? null,
     latestPaymentProviderTradeNo: latestTransaction?.providerTradeNo ?? null,
     latestPaymentFailedReason: latestTransaction?.failedReason ?? null
+  };
+}
+
+function toPaymentActionType(payChannel: RechargeOrder["payChannel"]): AdminOrderPage["items"][number]["paymentActionType"] {
+  if (payChannel === "alipay") {
+    return "redirect";
+  }
+
+  if (payChannel === "wechat") {
+    return "qr_code";
+  }
+
+  return "mock";
+}
+
+function compareConversationDesc(left: AiConversation, right: AiConversation) {
+  const time = right.lastMessageAt.localeCompare(left.lastMessageAt);
+
+  return time !== 0 ? time : right.id.localeCompare(left.id);
+}
+
+function compareMessageAsc(left: AiMessage, right: AiMessage) {
+  const time = left.createdAt.localeCompare(right.createdAt);
+
+  return time !== 0 ? time : left.id.localeCompare(right.id);
+}
+
+function toAiMessageAttachmentSummary(attachment: AiMessageAttachment, files: Map<string, UploadedFile>): AiMessageAttachmentSummary | null {
+  const file = files.get(attachment.fileId);
+
+  if (!file) {
+    return null;
+  }
+
+  return {
+    ...attachment,
+    file: {
+      fileId: file.id,
+      kind: file.kind ?? inferUploadedFileKind(file.ext, file.mimeType),
+      originalName: file.originalName,
+      ext: file.ext,
+      mimeType: file.mimeType,
+      sizeBytes: file.sizeBytes,
+      scanStatus: file.scanStatus,
+      riskFlags: file.riskFlags,
+      contentPreview: createContentPreview(file.contentText, file),
+      hasThumbnail: Boolean(file.thumbnailKey),
+      createdAt: file.createdAt
+    }
   };
 }
 
@@ -687,4 +978,39 @@ function truncateText(value: string | null, maxLength: number) {
   }
 
   return `${value.slice(0, maxLength)}...`;
+}
+
+function createContentPreview(value: string | null, file?: { originalName: string; ext: string; mimeType: string }) {
+  if (value) {
+    return value.length > 800 ? `${value.slice(0, 800)}...` : value;
+  }
+
+  if (file && inferUploadedFileKind(file.ext, file.mimeType) === "image") {
+    return `图片附件：${file.originalName}`;
+  }
+
+  return "";
+}
+
+function inferUploadedFileKind(ext: string, mimeType: string): UploadedFile["kind"] {
+  const normalizedExt = ext.toLowerCase();
+  const normalizedMime = mimeType.toLowerCase();
+
+  if (normalizedMime.startsWith("image/") || [".png", ".jpg", ".jpeg", ".webp"].includes(normalizedExt)) {
+    return "image";
+  }
+
+  if (normalizedExt === ".py") {
+    return "code";
+  }
+
+  if (normalizedExt === ".log") {
+    return "log";
+  }
+
+  if (normalizedExt === ".md") {
+    return "markdown";
+  }
+
+  return "text";
 }

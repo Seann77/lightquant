@@ -2,7 +2,8 @@ export class ServerConfigError extends Error {}
 
 export type DataMode = "mock" | "database";
 export type PaymentMode = "mock" | "wechat" | "alipay";
-export type AiProviderMode = "mock" | "deepseek" | "zhipu" | "openai_compatible";
+export type AiProviderMode = "mock" | "deepseek" | "openai_compatible";
+export type SmsProviderMode = "mock" | "aliyun";
 
 export function getDataMode(): DataMode {
   const mode = process.env.LIGHTQUANT_DATA_MODE ?? (process.env.NODE_ENV === "production" ? "database" : "mock");
@@ -38,8 +39,62 @@ export function getDatabaseUrl() {
   return databaseUrl;
 }
 
+export function getSmsProviderMode(): SmsProviderMode {
+  const explicitMode = process.env.LIGHTQUANT_SMS_PROVIDER?.trim();
+  const mode = explicitMode || (hasAliyunSmsCredentials() ? "aliyun" : "mock");
+
+  if (mode !== "mock" && mode !== "aliyun") {
+    throw new ServerConfigError("LIGHTQUANT_SMS_PROVIDER must be mock or aliyun");
+  }
+
+  if (process.env.NODE_ENV === "production" && mode === "mock" && process.env.LIGHTQUANT_ALLOW_MOCK_SMS_IN_PRODUCTION !== "true") {
+    throw new ServerConfigError("LIGHTQUANT_SMS_PROVIDER=mock is not allowed in production");
+  }
+
+  return mode;
+}
+
 export function shouldExposeMockSmsCode() {
-  return process.env.NODE_ENV !== "production" && getDataMode() === "mock";
+  return process.env.NODE_ENV !== "production" && getSmsProviderMode() === "mock";
+}
+
+export function getAliyunSmsConfig() {
+  const accessKeyId = process.env.ALIBABA_CLOUD_ACCESS_KEY_ID?.trim();
+  const accessKeySecret = process.env.ALIBABA_CLOUD_ACCESS_KEY_SECRET?.trim();
+  const signName = process.env.ALIYUN_DYPNS_SIGN_NAME?.trim();
+  const templateCode = process.env.ALIYUN_DYPNS_TEMPLATE_CODE?.trim();
+
+  if (!accessKeyId || !accessKeySecret || !signName || !templateCode) {
+    throw new ServerConfigError("Aliyun SMS requires ALIBABA_CLOUD_ACCESS_KEY_ID, ALIBABA_CLOUD_ACCESS_KEY_SECRET, ALIYUN_DYPNS_SIGN_NAME, and ALIYUN_DYPNS_TEMPLATE_CODE");
+  }
+
+  return {
+    accessKeyId,
+    accessKeySecret,
+    signName,
+    templateCode,
+    endpoint: process.env.ALIYUN_DYPNS_ENDPOINT?.trim() || "dypnsapi.aliyuncs.com",
+    countryCode: process.env.ALIYUN_DYPNS_COUNTRY_CODE?.trim() || "86",
+    validTimeSeconds: getPositiveInteger(process.env.ALIYUN_DYPNS_VALID_TIME, 300),
+    intervalSeconds: getPositiveInteger(process.env.ALIYUN_DYPNS_INTERVAL, 60),
+    codeLength: getBoundedInteger(process.env.ALIYUN_DYPNS_CODE_LENGTH, 6, 4, 8)
+  };
+}
+
+function hasAliyunSmsCredentials() {
+  return Boolean(process.env.ALIBABA_CLOUD_ACCESS_KEY_ID?.trim() && process.env.ALIBABA_CLOUD_ACCESS_KEY_SECRET?.trim());
+}
+
+function getPositiveInteger(raw: string | undefined, fallback: number) {
+  const value = Number(raw);
+
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
+}
+
+function getBoundedInteger(raw: string | undefined, fallback: number, min: number, max: number) {
+  const value = getPositiveInteger(raw, fallback);
+
+  return Math.min(max, Math.max(min, value));
 }
 
 export function getPaymentMode(): PaymentMode {
@@ -63,8 +118,8 @@ export function isMockPaymentEnabled() {
 export function getAiProviderMode(): AiProviderMode {
   const provider = process.env.LIGHTQUANT_AI_PROVIDER ?? (process.env.NODE_ENV === "production" ? "deepseek" : "mock");
 
-  if (provider !== "mock" && provider !== "deepseek" && provider !== "zhipu" && provider !== "openai_compatible") {
-    throw new ServerConfigError("LIGHTQUANT_AI_PROVIDER must be mock, deepseek, zhipu, or openai_compatible");
+  if (provider !== "mock" && provider !== "deepseek" && provider !== "openai_compatible") {
+    throw new ServerConfigError("LIGHTQUANT_AI_PROVIDER must be mock, deepseek, or openai_compatible");
   }
 
   if (process.env.NODE_ENV === "production" && provider === "mock" && process.env.LIGHTQUANT_ALLOW_MOCK_AI_IN_PRODUCTION !== "true") {
@@ -85,10 +140,6 @@ export function getAiBaseUrl(provider: AiProviderMode = getAiProviderMode()) {
     return "https://api.deepseek.com";
   }
 
-  if (provider === "zhipu") {
-    return "https://open.bigmodel.cn/api/paas/v4";
-  }
-
   if (provider === "mock") {
     return "mock://lightquant-ai";
   }
@@ -99,8 +150,7 @@ export function getAiBaseUrl(provider: AiProviderMode = getAiProviderMode()) {
 export function getAiApiKey(provider: AiProviderMode = getAiProviderMode()) {
   const key =
     process.env.LIGHTQUANT_AI_API_KEY?.trim() ||
-    (provider === "deepseek" ? process.env.DEEPSEEK_API_KEY?.trim() : "") ||
-    (provider === "zhipu" ? process.env.ZHIPU_API_KEY?.trim() : "");
+    (provider === "deepseek" ? process.env.DEEPSEEK_API_KEY?.trim() : "");
 
   if (!key) {
     throw new ServerConfigError("LIGHTQUANT_AI_API_KEY must be set");
@@ -120,15 +170,11 @@ export function getAiModelName(provider: AiProviderMode = getAiProviderMode()) {
     return "deepseek-chat";
   }
 
-  if (provider === "zhipu") {
-    return "glm-4-flash-250414";
-  }
-
   if (provider === "mock") {
     return "lightquant-mock-model";
   }
 
-  throw new ServerConfigError("LIGHTQUANT_AI_MODEL must be set for openai_compatible");
+  throw new ServerConfigError("LIGHTQUANT_AI_MODEL must be set for the selected AI provider");
 }
 
 export function getAiTaskTimeoutMs() {
@@ -147,21 +193,53 @@ export function getAiMaxRetries() {
   return Math.min(3, Math.floor(value));
 }
 
-export function getFileUploadMaxBytes() {
-  const value = Number(process.env.FILE_UPLOAD_MAX_BYTES ?? "262144");
+export function getAiSupportsVision(provider: AiProviderMode = getAiProviderMode()) {
+  const raw = process.env.LIGHTQUANT_AI_SUPPORTS_VISION?.trim().toLowerCase();
 
-  return Number.isFinite(value) && value > 0 ? Math.floor(value) : 262144;
+  if (raw === "true" || raw === "1" || raw === "yes") {
+    return true;
+  }
+
+  if (raw === "false" || raw === "0" || raw === "no") {
+    return false;
+  }
+
+  if (provider === "mock") {
+    return true;
+  }
+
+  if (provider === "deepseek") {
+    return false;
+  }
+
+  return looksLikeVisionModel(getAiModelName(provider));
+}
+
+export function getFileUploadMaxBytes() {
+  const value = Number(process.env.FILE_UPLOAD_MAX_BYTES ?? "1048576");
+
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : 1048576;
+}
+
+export function getImageUploadMaxBytes() {
+  const value = Number(process.env.FILE_IMAGE_UPLOAD_MAX_BYTES ?? "8388608");
+
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : 8388608;
+}
+
+export function getFileStorageRoot() {
+  return process.env.FILE_STORAGE_ROOT?.trim() || ".lightquant/uploads";
 }
 
 export function getFileAllowedExtensions() {
-  const raw = process.env.FILE_ALLOWED_EXTENSIONS ?? ".py,.txt";
+  const raw = process.env.FILE_ALLOWED_EXTENSIONS ?? ".py,.txt,.log,.md,.png,.jpg,.jpeg,.webp";
   const extensions = raw
     .split(",")
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean)
     .map((item) => (item.startsWith(".") ? item : `.${item}`));
 
-  return extensions.length > 0 ? extensions : [".py", ".txt"];
+  return extensions.length > 0 ? extensions : [".py", ".txt", ".log", ".md", ".png", ".jpg", ".jpeg", ".webp"];
 }
 
 export function getAdminPhoneWhitelist() {
@@ -171,4 +249,20 @@ export function getAdminPhoneWhitelist() {
     .split(",")
     .map((phone) => phone.trim())
     .filter(Boolean);
+}
+
+function looksLikeVisionModel(model: string) {
+  const normalized = model.toLowerCase();
+
+  return [
+    "vision",
+    "vl",
+    "gpt-4o",
+    "gpt-4.1",
+    "gemini",
+    "qwen-vl",
+    "glm-4v",
+    "claude-3",
+    "claude-4"
+  ].some((keyword) => normalized.includes(keyword));
 }

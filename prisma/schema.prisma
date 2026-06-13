@@ -78,6 +78,29 @@ enum AiTaskScopeStatus {
   out_of_scope
 }
 
+enum AiConversationMode {
+  strategy
+  convert
+  analysis
+}
+
+enum AiConversationStatus {
+  active
+  archived
+}
+
+enum AiMessageRole {
+  user
+  assistant
+  system
+}
+
+enum AiMessageAttachmentRole {
+  input
+  reference
+  generated
+}
+
 enum CreditReservationStatus {
   RESERVED
   CONFIRMED
@@ -111,9 +134,30 @@ model User {
   creditReservations CreditReservation[]
   rechargeOrders     RechargeOrder[]
   aiTasks            AiTask[]
+  aiConversations    AiConversation[]
+  aiMessages         AiMessage[]
+  aiMessageAttachments AiMessageAttachment[]
   uploadedFiles      UploadedFile[]
+  legalConsents      UserLegalConsent[]
 
   @@map("users")
+}
+
+model UserLegalConsent {
+  id               String   @id @default(uuid()) @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  agreementVersion String   @map("agreement_version") @db.VarChar(40)
+  privacyVersion   String   @map("privacy_version") @db.VarChar(40)
+  agreedAt         DateTime @map("agreed_at") @db.Timestamptz(3)
+  requestIp        String?  @map("request_ip") @db.VarChar(80)
+  userAgent        String?  @map("user_agent") @db.VarChar(512)
+  source           String   @db.VarChar(40)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, agreementVersion, privacyVersion])
+  @@index([userId, agreedAt])
+  @@map("user_legal_consents")
 }
 
 model SmsCode {
@@ -225,6 +269,7 @@ model RechargeOrder {
 
   @@unique([userId, clientRequestId])
   @@index([userId, createdAt])
+  @@index([planId])
   @@index([status, createdAt])
   @@map("orders")
 }
@@ -256,20 +301,27 @@ model UploadedFile {
   id           String                  @id @default(uuid()) @db.Uuid
   userId       String                  @map("user_id") @db.Uuid
   originalName String                  @map("original_name") @db.VarChar(255)
+  kind         String?                 @db.VarChar(40)
   ext          String                  @db.VarChar(16)
   mimeType     String                  @map("mime_type") @db.VarChar(120)
   sizeBytes    Int                     @map("size_bytes")
   sha256       String                  @db.VarChar(64)
-  contentText  String                  @map("content_text") @db.Text
+  storageKey   String?                 @map("storage_key") @db.VarChar(512)
+  thumbnailKey String?                 @map("thumbnail_key") @db.VarChar(512)
+  contentText  String?                 @map("content_text") @db.Text
+  contentJson  Json?                   @map("content_json")
   parseStatus  UploadedFileParseStatus @map("parse_status")
   scanStatus   UploadedFileScanStatus  @map("scan_status")
   riskFlags    Json                    @map("risk_flags")
   createdAt    DateTime                @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime?               @map("updated_at") @db.Timestamptz(3)
 
   user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   aiTasks AiTask[]
+  messageAttachments AiMessageAttachment[]
 
   @@index([userId, createdAt])
+  @@index([userId, kind, createdAt])
   @@index([sha256])
   @@map("uploaded_files")
 }
@@ -277,6 +329,7 @@ model UploadedFile {
 model AiTask {
   id              String            @id @default(uuid()) @db.Uuid
   userId          String            @map("user_id") @db.Uuid
+  conversationId  String?           @map("conversation_id") @db.Uuid
   type            AiTaskType
   status          AiTaskStatus
   scopeStatus     AiTaskScopeStatus @default(in_scope) @map("scope_status")
@@ -295,13 +348,16 @@ model AiTask {
   createdAt       DateTime          @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime          @map("updated_at") @db.Timestamptz(3)
 
-  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  inputFile   UploadedFile?      @relation(fields: [inputFileId], references: [id], onDelete: SetNull)
-  result      AiTaskResult?
-  reservation CreditReservation?
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation AiConversation?     @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  inputFile    UploadedFile?       @relation(fields: [inputFileId], references: [id], onDelete: SetNull)
+  result       AiTaskResult?
+  reservation  CreditReservation?
+  messages     AiMessage[]
 
   @@unique([userId, clientRequestId])
   @@index([userId, createdAt])
+  @@index([conversationId, createdAt])
   @@index([inputFileId])
   @@map("ai_tasks")
 }
@@ -322,4 +378,70 @@ model AiTaskResult {
   task AiTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@map("ai_task_results")
+}
+
+model AiConversation {
+  id             String               @id @default(uuid()) @db.Uuid
+  userId         String               @map("user_id") @db.Uuid
+  mode           AiConversationMode
+  title          String               @db.VarChar(120)
+  targetPlatform String?              @map("target_platform") @db.VarChar(80)
+  sourcePlatform String?              @map("source_platform") @db.VarChar(80)
+  status         AiConversationStatus @default(active)
+  lastMessageAt  DateTime             @map("last_message_at") @db.Timestamptz(3)
+  createdAt      DateTime             @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime             @map("updated_at") @db.Timestamptz(3)
+
+  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks    AiTask[]
+  messages AiMessage[]
+  attachments AiMessageAttachment[]
+
+  @@index([userId, mode, lastMessageAt])
+  @@index([status, lastMessageAt])
+  @@map("ai_conversations")
+}
+
+model AiMessage {
+  id             String        @id @default(uuid()) @db.Uuid
+  conversationId String        @map("conversation_id") @db.Uuid
+  userId         String        @map("user_id") @db.Uuid
+  role           AiMessageRole
+  taskId         String?       @unique @map("task_id") @db.Uuid
+  content        String        @db.Text
+  contentJson    Json?         @map("content_json")
+  createdAt      DateTime      @map("created_at") @db.Timestamptz(3)
+
+  conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task         AiTask?        @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  attachments  AiMessageAttachment[]
+
+  @@index([conversationId, createdAt])
+  @@index([userId, createdAt])
+  @@map("ai_messages")
+}
+
+model AiMessageAttachment {
+  id             String                  @id @default(uuid()) @db.Uuid
+  messageId      String                  @map("message_id") @db.Uuid
+  conversationId String                  @map("conversation_id") @db.Uuid
+  userId         String                  @map("user_id") @db.Uuid
+  fileId         String                  @map("file_id") @db.Uuid
+  role           AiMessageAttachmentRole @default(input)
+  displayOrder   Int                     @default(0) @map("display_order")
+  caption        String?                 @db.VarChar(255)
+  createdAt      DateTime                @map("created_at") @db.Timestamptz(3)
+
+  message      AiMessage      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  file         UploadedFile   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, fileId, role])
+  @@index([messageId, displayOrder])
+  @@index([conversationId, createdAt])
+  @@index([fileId])
+  @@index([userId, createdAt])
+  @@map("ai_message_attachments")
 }

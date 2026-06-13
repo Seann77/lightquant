@@ -46,6 +46,30 @@ type LedgerData = {
   totalPages: number;
 };
 
+type ReturnedPaymentStatus = {
+  order: {
+    id: string;
+    orderNo: string;
+    status: string;
+    expiresAt?: string;
+  };
+  payment: {
+    paid: boolean;
+    creditGranted: boolean;
+    expired: boolean;
+    channel: string;
+    latestTransactionStatus?: string | null;
+    failedReason?: string | null;
+  };
+};
+
+type PaymentReturnNotice = {
+  kind: "info" | "success" | "warning" | "error";
+  orderId: string;
+  message: string;
+  checking: boolean;
+};
+
 function amountClass(amount: number) {
   return amount > 0 ? "text-[#0b63ff]" : "text-[#d92d20]";
 }
@@ -80,6 +104,7 @@ export function CreditsClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [paymentReturnNotice, setPaymentReturnNotice] = useState<PaymentReturnNotice | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -140,6 +165,80 @@ export function CreditsClient() {
     };
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paymentReturn = params.get("paymentReturn");
+    const orderId = params.get("orderId");
+
+    if (paymentReturn !== "1" || !orderId) {
+      return;
+    }
+
+    setPaymentReturnNotice({
+      kind: "info",
+      orderId,
+      message: "已从支付页面返回，正在查询服务端支付确认状态。",
+      checking: true
+    });
+    void refreshReturnedPaymentStatus(orderId, false);
+  }, []);
+
+  async function refreshReturnedPaymentStatus(orderId: string, manual: boolean) {
+    setPaymentReturnNotice((current) => ({
+      kind: current?.kind ?? "info",
+      orderId,
+      message: manual ? "正在刷新支付状态，请稍候。" : current?.message ?? "正在查询服务端支付确认状态。",
+      checking: true
+    }));
+
+    try {
+      const response = await fetch(`/api/v1/payments/${encodeURIComponent(orderId)}/status`, {
+        cache: "no-store"
+      });
+      const payload = (await response.json()) as ApiResponse<ReturnedPaymentStatus>;
+
+      if (!payload.success) {
+        throw new Error(payload.error.message);
+      }
+
+      if (payload.data.payment.paid && payload.data.payment.creditGranted) {
+        setPaymentReturnNotice({
+          kind: "success",
+          orderId,
+          message: "支付成功，积分已到账。",
+          checking: false
+        });
+        setRefreshKey((value) => value + 1);
+        window.dispatchEvent(new Event("lightquant:credits-updated"));
+        return;
+      }
+
+      if (payload.data.order.status === "CLOSED" || payload.data.payment.expired) {
+        setPaymentReturnNotice({
+          kind: "warning",
+          orderId,
+          message: "订单已过期或关闭，请重新下单。",
+          checking: false
+        });
+        return;
+      }
+
+      setPaymentReturnNotice({
+        kind: "info",
+        orderId,
+        message: "支付仍未确认。到账只以服务端回调验签结果为准，请稍后刷新。",
+        checking: false
+      });
+    } catch (statusError) {
+      setPaymentReturnNotice({
+        kind: "error",
+        orderId,
+        message: statusError instanceof Error ? statusError.message : "支付状态查询失败",
+        checking: false
+      });
+    }
+  }
+
   const summary = useMemo(() => {
     const monthlyChange = ledger?.items.reduce((total, item) => total + item.amount, 0) ?? 0;
 
@@ -159,6 +258,36 @@ export function CreditsClient() {
         <h1>积分流水</h1>
         <p>查看积分获取、消耗和退回记录。</p>
       </header>
+
+      {paymentReturnNotice ? (
+        <section
+          aria-live="polite"
+          className={`mb-lg rounded-lg border px-md py-sm text-caption-md ${
+            paymentReturnNotice.kind === "success"
+              ? "border-[#9ee6d8] bg-[#e8fff8] text-[#04705f]"
+              : paymentReturnNotice.kind === "warning"
+                ? "border-[#fde68a] bg-[#fffbeb] text-[#92400e]"
+                : paymentReturnNotice.kind === "error"
+                  ? "border-[#fecaca] bg-[#fff1f2] text-[#b42318]"
+                  : "border-[#bfdbfe] bg-[#eff6ff] text-[#0b63ff]"
+          }`}
+        >
+          <div className="flex flex-col gap-xs md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="m-0 font-bold">支付返回状态</p>
+              <p className="m-0">{paymentReturnNotice.message}</p>
+            </div>
+            <button
+              className="rounded-md border border-current px-sm py-xs text-caption-bold disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={paymentReturnNotice.checking}
+              onClick={() => void refreshReturnedPaymentStatus(paymentReturnNotice.orderId, true)}
+              type="button"
+            >
+              {paymentReturnNotice.checking ? "查询中..." : "刷新支付状态"}
+            </button>
+          </div>
+        </section>
+      ) : null}
 
       <section aria-label="积分统计" className="lq-stat-grid">
         {summary.map((item) => {

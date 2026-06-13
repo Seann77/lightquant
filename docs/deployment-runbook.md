@@ -1,0 +1,131 @@
+# LightQuant 部署 Runbook
+
+本文记录当前 Ubuntu 一键部署脚本的使用方式和安全边界，不包含任何真实密钥、数据库密码、模型 Key 或支付私钥。
+
+## 一键部署脚本
+
+脚本位置：
+
+```bash
+deploy/ubuntu-one-click-deploy.sh
+```
+
+首次部署示例：
+
+```bash
+APP_DOMAIN=admin.example.com \
+REPO_URL=https://github.com/your-name/lightquant.git \
+ADMIN_PHONE=13800138000 \
+LIGHTQUANT_AI_API_KEY=your_mimo_key \
+LIGHTQUANT_PAYMENT_MODE=alipay \
+bash deploy/ubuntu-one-click-deploy.sh
+```
+
+如果不想把 `LIGHTQUANT_AI_API_KEY` 放在命令行里，也可以不传该变量，脚本会交互式隐藏输入。留空时部署仍可继续，但真实 AI 调用会在配置补齐前返回 `AI_PROVIDER_CONFIG_ERROR`。
+
+## 输入预检查
+
+脚本会在安装系统包和写入配置前做轻量校验，尽量让错误早一点、清楚一点暴露出来：
+
+- `APP_DOMAIN` 只能包含字母、数字、点和连字符，不能包含路径、端口或空格。
+- `APP_PORT` 必须是 `1-65535` 范围内的整数。
+- `DB_NAME`、`DB_USER` 必须是安全的 PostgreSQL 标识符，只能使用字母、数字和下划线，且不能以数字开头。
+- `LIGHTQUANT_PAYMENT_MODE` 生产部署只允许 `alipay` 或 `wechat`，不会允许 `mock`。
+- `LIGHTQUANT_SMS_PROVIDER` 生产部署只允许 `aliyun`。
+- 支付、短信、模型等密钥变量必须以单行形式传入；PEM 换行请使用字面量 `\n`，不要直接传多行内容。
+
+## 当前默认生产配置
+
+部署脚本会生成服务端 `.env`，关键配置形态如下：
+
+```bash
+NODE_ENV=production
+LIGHTQUANT_DATA_MODE=database
+LIGHTQUANT_PAYMENT_MODE=wechat
+PAYMENT_MOCK_ENABLED=false
+LIGHTQUANT_AI_PROVIDER=openai_compatible
+LIGHTQUANT_AI_BASE_URL=https://api.xiaomimimo.com/v1
+LIGHTQUANT_AI_MODEL=mimo-v2.5-pro
+LIGHTQUANT_ALLOW_MOCK_AI_IN_PRODUCTION=false
+```
+
+实际部署时仍需要根据商户和域名配置支付变量、短信变量和 `LIGHTQUANT_AI_API_KEY`。
+
+## 短信变量
+
+生产环境默认使用 Aliyun SMS，不允许自动落回 mock SMS。执行部署脚本前需要配置：
+
+```bash
+LIGHTQUANT_SMS_PROVIDER=aliyun
+ALIBABA_CLOUD_ACCESS_KEY_ID=
+ALIBABA_CLOUD_ACCESS_KEY_SECRET=
+ALIYUN_DYPNS_ENDPOINT=dypnsapi.aliyuncs.com
+ALIYUN_DYPNS_COUNTRY_CODE=86
+ALIYUN_DYPNS_SIGN_NAME=
+ALIYUN_DYPNS_TEMPLATE_CODE=100001
+ALIYUN_DYPNS_VALID_TIME=300
+ALIYUN_DYPNS_INTERVAL=60
+ALIYUN_DYPNS_CODE_LENGTH=6
+```
+
+如果短信密钥或签名模板缺失，生产登录发码会返回稳定配置错误，不会暴露密钥或内部堆栈。
+
+## 支付变量
+
+`LIGHTQUANT_PAYMENT_MODE` 支持：
+
+- `alipay`
+- `wechat`
+
+脚本默认值为 `wechat`，也可以在执行脚本前通过环境变量覆盖。对应渠道的商户变量会原样写入服务端 `.env`，例如：
+
+```bash
+ALIPAY_APP_ID=
+ALIPAY_PRIVATE_KEY=
+ALIPAY_PUBLIC_KEY=
+ALIPAY_SELLER_ID=
+ALIPAY_GATEWAY_URL=
+WECHAT_PAY_APP_ID=
+WECHAT_PAY_MCH_ID=
+WECHAT_PAY_API_KEY=
+WECHAT_PAY_CERT_SERIAL_NO=
+WECHAT_PAY_PRIVATE_KEY=
+WECHAT_PAY_PLATFORM_CERT_SERIAL_NO=
+WECHAT_PAY_PLATFORM_CERTIFICATE=
+WECHAT_PAY_GATEWAY_URL=
+```
+
+私钥和证书建议使用单行内容，或使用 `\n` 表示换行，服务端会在读取时恢复 PEM 格式。不要把真实支付密钥写入文档或仓库。
+
+## 安全注意
+
+- 不要提交服务器生成的 `.env`。
+- 不要把 `DATABASE_URL`、`AUTH_SECRET`、`LIGHTQUANT_AI_API_KEY`、支付私钥或短信密钥写进文档、前端代码或仓库。
+- 部署脚本不会在完成摘要中打印 `LIGHTQUANT_AI_API_KEY`、数据库密码或 Basic Auth 密码。
+- 首次部署生成的 bootstrap 密码会写入服务器上的 `${APP_DIR}/.deploy-secrets`，该文件权限为 `600`，请妥善保存并避免进入自动化日志。
+- 生产环境不允许 mock 数据层、mock 支付或 mock AI，除非显式临时放开对应变量并清楚知道风险。
+- `return_url` 只用于页面展示，充值到账必须以服务端支付 notify 验签成功为准。
+
+## 部署后建议检查
+
+进入应用目录后运行：
+
+```bash
+npm run check:quick
+npm run check:db
+npm run build
+```
+
+如果本地或服务器上已经启动服务，也可以运行：
+
+```bash
+PORT=3000 npm run verify:local
+```
+
+如果服务监听的不是默认端口，也可以显式指定：
+
+```bash
+SMOKE_BASE_URL=http://127.0.0.1:3000 npm run verify:local
+```
+
+真实支付上线前，请继续使用支付渠道沙箱或小额真实订单验证 notify 验签、订单 `PAID`、积分到账和重复通知幂等。

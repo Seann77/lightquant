@@ -36,6 +36,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams?:
             <Th>金额</Th>
             <Th>积分快照</Th>
             <Th>渠道</Th>
+            <Th>支付动作</Th>
             <Th>订单状态</Th>
             <Th>请求 ID</Th>
             <Th>过期</Th>
@@ -56,6 +57,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams?:
               <Td>{formatMoney(order.amountCents)}</Td>
               <Td>{order.totalPoints} ({order.points}+{order.bonusPoints})</Td>
               <Td>{order.payChannel}</Td>
+              <Td>{order.paymentActionType}</Td>
               <Td><StatusPill tone={statusTone(order.status)}>{order.status}</StatusPill></Td>
               <Td>{shortText(order.clientRequestId)}</Td>
               <Td>
@@ -70,7 +72,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams?:
               <Td>{formatDate(order.closedAt)}</Td>
             </tr>
           ))}
-          {data.items.length === 0 ? <EmptyRow colSpan={15} /> : null}
+          {data.items.length === 0 ? <EmptyRow colSpan={16} /> : null}
         </tbody>
       </AdminTable>
 

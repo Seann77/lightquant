@@ -100,8 +100,8 @@ const config: Config = {
         "caption-bold": ["14px", { lineHeight: "1.3", fontWeight: "700" }],
         "caption-sm": ["12px", { lineHeight: "1.33", fontWeight: "400" }],
         "link-md": ["16px", { lineHeight: "1.38", fontWeight: "500" }],
-        "button-md": ["14px", { lineHeight: "1.4", letterSpacing: "0.7px", fontWeight: "600" }],
-        "button-sm": ["12.6px", { lineHeight: "1", letterSpacing: "0.126px", fontWeight: "700" }],
+        "button-md": ["14px", { lineHeight: "1.4", letterSpacing: "0", fontWeight: "600" }],
+        "button-sm": ["12.6px", { lineHeight: "1", letterSpacing: "0", fontWeight: "700" }],
         "price-md": ["24px", { lineHeight: "1.17", fontWeight: "500" }]
       },
       boxShadow: {

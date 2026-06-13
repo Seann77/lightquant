@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { ArrowRight, CircleDollarSign, Gift, LockKeyhole, Phone, Ticket, X } from "lucide-react";
 
 type CurrentUserData = {
@@ -50,8 +50,17 @@ export function LoginModal({ onClose, onLoginSuccess, open }: LoginModalProps) {
   const [inviteCode, setInviteCode] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
+  const [legalError, setLegalError] = useState("");
   const [sendingCode, setSendingCode] = useState(false);
   const [loggingIn, setLoggingIn] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setAcceptedLegal(false);
+      setLegalError("");
+    }
+  }, [open]);
 
   if (!open) {
     return null;
@@ -90,9 +99,16 @@ export function LoginModal({ onClose, onLoginSuccess, open }: LoginModalProps) {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setLoggingIn(true);
     setError("");
     setMessage("");
+
+    if (!acceptedLegal) {
+      setLegalError("请先阅读并同意用户协议和隐私政策");
+      return;
+    }
+
+    setLegalError("");
+    setLoggingIn(true);
 
     try {
       const response = await fetch("/api/v1/auth/login", {
@@ -103,7 +119,8 @@ export function LoginModal({ onClose, onLoginSuccess, open }: LoginModalProps) {
         body: JSON.stringify({
           phone,
           code,
-          inviteCode: inviteCode.trim() || undefined
+          inviteCode: inviteCode.trim() || undefined,
+          acceptedLegal
         })
       });
       const payload = (await response.json()) as ApiResponse<CurrentUserData>;
@@ -200,6 +217,33 @@ export function LoginModal({ onClose, onLoginSuccess, open }: LoginModalProps) {
               />
             </span>
           </label>
+
+          <div className="lq-legal-consent">
+            <div className="lq-legal-consent-line">
+              <label className="lq-legal-consent-check">
+                <input
+                  checked={acceptedLegal}
+                  onChange={(event) => {
+                    setAcceptedLegal(event.target.checked);
+
+                    if (event.target.checked) {
+                      setLegalError("");
+                    }
+                  }}
+                  type="checkbox"
+                />
+                <span>我已阅读并同意</span>
+              </label>
+              <a href="/legal/user-agreement" rel="noreferrer" target="_blank">
+                《用户协议》
+              </a>
+              <span>和</span>
+              <a href="/legal/privacy-policy" rel="noreferrer" target="_blank">
+                《隐私政策》
+              </a>
+            </div>
+            {legalError ? <div className="lq-legal-consent-error">{legalError}</div> : null}
+          </div>
 
           {message ? <div className="lq-modal-message">{message}</div> : null}
           {error ? <div className="lq-modal-error">{error}</div> : null}

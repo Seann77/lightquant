@@ -15,6 +15,7 @@ next-dev-database-logs/
 qa-screenshots
 test-results/
 .codex-artifacts/
+.lightquant/
 tmp/
 output/
 outputs/

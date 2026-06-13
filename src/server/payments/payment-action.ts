@@ -23,6 +23,8 @@ type PaymentActionBase = {
   status: RechargeOrder["status"];
   orderId: string;
   orderNo: string;
+  amountCents: number;
+  totalPoints: number;
   expiresAt: string;
   pollUrl: string;
 };
@@ -34,6 +36,8 @@ export function basePaymentAction(order: RechargeOrder): PaymentActionBase {
     status: order.status,
     orderId: order.id,
     orderNo: order.orderNo,
+    amountCents: order.amountCents,
+    totalPoints: order.totalPoints,
     expiresAt: getOrderExpiresAt(order.createdAt),
     pollUrl: `/api/v1/payments/${order.id}/status`
   };
