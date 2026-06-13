@@ -1,6 +1,7 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, Clock3, Layers3, LoaderCircle } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Clock3, Layers3, LoaderCircle } from "lucide-react";
 
 export type AiTaskProgress = {
   phase?: string | null;
@@ -19,8 +20,25 @@ export type AiTaskProgress = {
   failureStage?: string | null;
 };
 
+export type AiRunEventData = {
+  id: string;
+  taskId: string;
+  conversationId?: string | null;
+  seq: number;
+  type: string;
+  status: "pending" | "running" | "completed" | "failed" | "skipped";
+  title: string;
+  summary?: string | null;
+  detailJson?: Record<string, unknown> | null;
+  progressPercent?: number | null;
+  visibility?: string | null;
+  createdAt: string;
+};
+
 type AiTaskProgressPanelProps = {
+  taskId?: string | null;
   progress?: AiTaskProgress | null;
+  events?: AiRunEventData[] | null;
   taskType: "code_conversion" | "code_analysis";
   elapsedSeconds?: number;
   status?: string | null;
@@ -31,18 +49,22 @@ type AiTaskProgressPanelProps = {
 
 type AiTaskCompletionSummaryProps = {
   task: {
+    id?: string | null;
     status: string;
     startedAt?: string | null;
     finishedAt?: string | null;
     costPoints?: number | null;
   };
   progress?: AiTaskProgress | null;
+  events?: AiRunEventData[] | null;
 };
 
 const PHASE_ORDER = ["queued", "scanning", "chunking", "processing", "merging", "validating", "completed", "failed"];
 
 export function AiTaskProgressPanel({
+  taskId,
   progress,
+  events,
   taskType,
   elapsedSeconds = 0,
   status,
@@ -125,12 +147,14 @@ export function AiTaskProgressPanel({
         ))}
       </div>
 
+      <RunEventTimeline events={events} status={status} taskId={taskId} tone={tone} />
+
       {failed ? <p className="lq-task-advice">{getFailureAdvice(errorCode)}</p> : null}
     </div>
   );
 }
 
-export function AiTaskCompletionSummary({ task, progress }: AiTaskCompletionSummaryProps) {
+export function AiTaskCompletionSummary({ task, progress, events }: AiTaskCompletionSummaryProps) {
   if (task.status !== "SUCCEEDED") {
     return null;
   }
@@ -140,14 +164,163 @@ export function AiTaskCompletionSummary({ task, progress }: AiTaskCompletionSumm
   const processingMode = progress?.processingMode === "chunked" ? "分段处理" : "单次处理";
 
   return (
-    <div className="lq-completion-summary">
+    <>
+      <div className="lq-completion-summary">
       <CheckCircle2 aria-hidden="true" size={17} />
       <span>已完成</span>
       {duration ? <span>用时 {duration}</span> : null}
       <span>{processingMode}</span>
       {chunkCount ? <span>{progress?.completedChunks ?? chunkCount} / {chunkCount} 段</span> : null}
+      </div>
+      <RunEventTimeline events={events} status={task.status} taskId={task.id} />
+    </>
+  );
+}
+
+type RunEventTimelineProps = {
+  taskId?: string | null;
+  events?: AiRunEventData[] | null;
+  status?: string | null;
+  tone?: "light" | "dark";
+};
+
+export function RunEventTimeline({ taskId, events, status, tone = "light" }: RunEventTimelineProps) {
+  const mergedEvents = useRunEvents(taskId, events, status);
+  const running = status === "PENDING" || status === "RUNNING";
+  const failed = status === "FAILED" || status === "CANCELLED" || mergedEvents.some((event) => event.status === "failed");
+  const [expanded, setExpanded] = useState(running || failed);
+
+  useEffect(() => {
+    if (running || failed) {
+      setExpanded(true);
+    }
+  }, [failed, running, taskId]);
+
+  if (mergedEvents.length === 0) {
+    return null;
+  }
+
+  const latest = mergedEvents.at(-1);
+  const summary = running
+    ? `LightQuant 正在处理 · ${mergedEvents.length} 个过程事件`
+    : failed
+      ? `处理未完成 · ${mergedEvents.length} 个过程事件`
+      : `已完成 · ${mergedEvents.length} 个过程事件`;
+
+  return (
+    <div className={`lq-run-events is-${tone} ${running ? "is-running" : ""} ${failed ? "is-failed" : ""}`}>
+      <button className="lq-run-events-summary" onClick={() => setExpanded((value) => !value)} type="button">
+        {expanded ? <ChevronDown aria-hidden="true" size={16} /> : <ChevronRight aria-hidden="true" size={16} />}
+        <span>{summary}{latest?.title ? ` · ${latest.title}` : ""}</span>
+      </button>
+      {expanded ? (
+        <ol className="lq-run-event-list">
+          {mergedEvents.map((event) => (
+            <li className={`is-${event.status}`} key={`${event.taskId}-${event.seq}`}>
+              <span>{event.seq}</span>
+              <p>
+                <strong>{event.title}</strong>
+                {event.summary ? <em>{event.summary}</em> : null}
+              </p>
+            </li>
+          ))}
+        </ol>
+      ) : null}
     </div>
   );
+}
+
+function useRunEvents(taskId: string | null | undefined, seedEvents: AiRunEventData[] | null | undefined, status: string | null | undefined) {
+  const [events, setEvents] = useState<AiRunEventData[]>(() => normalizeRunEvents(seedEvents));
+  const latestSeqRef = useRef(0);
+  const polling = status === "PENDING" || status === "RUNNING";
+
+  useEffect(() => {
+    const normalized = normalizeRunEvents(seedEvents);
+    latestSeqRef.current = getLatestSeq(normalized);
+    setEvents(normalized);
+  }, [seedEvents, taskId]);
+
+  useEffect(() => {
+    if (!taskId) {
+      return;
+    }
+
+    let cancelled = false;
+    const currentTaskId = taskId;
+
+    async function load(afterSeq?: number) {
+      const params = new URLSearchParams({
+        limit: "100"
+      });
+
+      if (afterSeq && afterSeq > 0) {
+        params.set("afterSeq", String(afterSeq));
+      }
+
+      const response = await fetch(`/api/v1/ai/tasks/${encodeURIComponent(currentTaskId)}/events?${params.toString()}`, {
+        cache: "no-store"
+      });
+      const payload = await response.json() as {
+        success?: boolean;
+        data?: {
+          events?: AiRunEventData[];
+          nextAfterSeq?: number;
+        };
+      };
+
+      if (cancelled || !payload.success) {
+        return;
+      }
+
+      setEvents((current) => {
+        const merged = mergeRunEvents(current, payload.data?.events ?? []);
+        latestSeqRef.current = Math.max(getLatestSeq(merged), payload.data?.nextAfterSeq ?? 0);
+        return merged;
+      });
+    }
+
+    void load();
+
+    if (!polling) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const timer = window.setInterval(() => {
+      void load(latestSeqRef.current);
+    }, 3000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [polling, taskId]);
+
+  return events;
+}
+
+function normalizeRunEvents(events: AiRunEventData[] | null | undefined) {
+  return mergeRunEvents([], events ?? []);
+}
+
+function mergeRunEvents(current: AiRunEventData[], incoming: AiRunEventData[]) {
+  const bySeq = new Map<number, AiRunEventData>();
+
+  for (const event of current) {
+    bySeq.set(event.seq, event);
+  }
+
+  for (const event of incoming) {
+    bySeq.set(event.seq, event);
+  }
+
+  return [...bySeq.values()].sort((left, right) => left.seq - right.seq);
+}
+
+function getLatestSeq(events: AiRunEventData[]) {
+  return events.reduce((max, event) => Math.max(max, event.seq), 0);
 }
 
 function normalizePhase(phase?: string | null, status?: string | null) {

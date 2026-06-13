@@ -144,14 +144,14 @@ export async function runChunkedCodeProcessing(input: AiProviderInput, runSingle
     return runSingleProvider(input);
   }
 
-  input.progressReporter?.({
+  await input.progressReporter?.({
     phase: "scanning",
     processingMode: "chunked",
     progressPercent: 8,
     statusMessage: "正在识别代码结构、入口函数、调度函数、数据接口和下单接口。"
   });
   const scan = scanCodeStructure(input.task);
-  input.progressReporter?.({
+  await input.progressReporter?.({
     phase: "chunking",
     processingMode: "chunked",
     inputChars: scan.inputChars,
@@ -164,7 +164,7 @@ export async function runChunkedCodeProcessing(input: AiProviderInput, runSingle
     throw new ApiError("AI_TASK_FAILED", "分段处理失败（chunk）：未能拆分出可处理的代码段。", 500);
   }
 
-  input.progressReporter?.({
+  await input.progressReporter?.({
     phase: "chunking",
     processingMode: "chunked",
     inputChars: scan.inputChars,
@@ -178,7 +178,7 @@ export async function runChunkedCodeProcessing(input: AiProviderInput, runSingle
 
   for (const chunk of chunks) {
     try {
-      input.progressReporter?.({
+      await input.progressReporter?.({
         phase: "processing",
         processingMode: "chunked",
         inputChars: scan.inputChars,
@@ -194,7 +194,7 @@ export async function runChunkedCodeProcessing(input: AiProviderInput, runSingle
         chunk,
         result
       });
-      input.progressReporter?.({
+      await input.progressReporter?.({
         phase: "processing",
         processingMode: "chunked",
         inputChars: scan.inputChars,
@@ -208,7 +208,7 @@ export async function runChunkedCodeProcessing(input: AiProviderInput, runSingle
     }
   }
 
-  input.progressReporter?.({
+  await input.progressReporter?.({
     phase: "merging",
     processingMode: "chunked",
     inputChars: scan.inputChars,
@@ -356,12 +356,12 @@ function buildChunkConversationContext(conversationContext: string | undefined, 
   ].filter(Boolean).join("\n\n");
 }
 
-function mergeChunkResults(
+async function mergeChunkResults(
   input: AiProviderInput,
   scan: CodeStructureScan,
   chunks: CodeChunk[],
   chunkResults: ChunkResult[]
-): AiProviderResult {
+): Promise<AiProviderResult> {
   const taskType: CodeProcessingTaskType = input.task.type === "code_conversion" ? "code_conversion" : "code_analysis";
   const scopeStatus = chunkResults.some((item) => item.result.scopeStatus === "in_scope") ? "in_scope" : "out_of_scope";
   const tokenUsage = sumTokenUsage(chunkResults.map((item) => item.result.tokenUsage));
@@ -406,7 +406,7 @@ function mergeChunkResults(
   const migrationNotes = taskType === "code_conversion"
     ? buildMergedMigrationNotes(scan, chunkResults, manualReviewItems)
     : buildAnalysisMigrationNotes(chunkResults, manualReviewItems);
-  input.progressReporter?.({
+  await input.progressReporter?.({
     phase: "validating",
     processingMode: "chunked",
     inputChars: scan.inputChars,

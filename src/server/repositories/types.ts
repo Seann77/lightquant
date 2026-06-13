@@ -8,6 +8,9 @@ import type {
   AiMessageAttachmentRole,
   AiMessageAttachmentSummary,
   AiMessageRole,
+  AiRunEvent,
+  AiRunEventStatus,
+  AiRunEventVisibility,
   AiTaskResult,
   AiTaskStatus,
   AiTaskType,
@@ -60,6 +63,11 @@ export type AiMessageListOptions = {
   ascending?: boolean;
   cursor?: AiCursor;
   direction?: "before" | "after";
+};
+
+export type AiRunEventListOptions = {
+  afterSeq?: number;
+  limit?: number;
 };
 
 export type CreateSmsCodeInput = {
@@ -211,6 +219,21 @@ export type CreateAiMessageAttachmentInput = {
   role: AiMessageAttachmentRole;
   displayOrder: number;
   caption: string | null;
+  createdAt: string;
+};
+
+export type CreateAiRunEventInput = {
+  taskId: string;
+  conversationId: string | null;
+  userId: string;
+  seq: number;
+  type: string;
+  status: AiRunEventStatus;
+  title: string;
+  summary: string | null;
+  detailJson: Record<string, unknown> | null;
+  progressPercent: number | null;
+  visibility: AiRunEventVisibility;
   createdAt: string;
 };
 
@@ -417,6 +440,10 @@ export interface LightQuantRepository {
   listAiMessages(conversationId: string, options?: AiMessageListOptions): Promise<AiMessage[]>;
   createAiMessageAttachment(input: CreateAiMessageAttachmentInput): Promise<AiMessageAttachment>;
   listAiMessageAttachmentsForMessages(userId: string, messageIds: string[]): Promise<AiMessageAttachmentSummary[]>;
+  createAiRunEvent(input: CreateAiRunEventInput): Promise<AiRunEvent>;
+  listAiRunEvents(taskId: string, options?: AiRunEventListOptions): Promise<AiRunEvent[]>;
+  findLatestAiRunEvent(taskId: string): Promise<AiRunEvent | null>;
+  getNextRunEventSeq(taskId: string): Promise<number>;
   createUploadedFile(input: CreateUploadedFileInput): Promise<UploadedFile>;
   findUploadedFileById(id: string): Promise<UploadedFile | null>;
   getAdminOverview(todayStart: string): Promise<AdminOverview>;

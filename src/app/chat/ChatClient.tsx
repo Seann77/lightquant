@@ -27,7 +27,7 @@ import {
 import { getFileUploadFriendlyError, getScanStatusText, uploadCodeFile, type UploadedCodeFile } from "@/lib/file-upload";
 import { chatPlatformOptions, convertPlatforms } from "@/lib/mock-data";
 import { PlatformDropdown } from "@/components/ui/PlatformDropdown";
-import { AiTaskCompletionSummary, AiTaskProgressPanel, type AiTaskProgress } from "@/components/ai/AiTaskProgressPanel";
+import { AiTaskCompletionSummary, AiTaskProgressPanel, RunEventTimeline, type AiRunEventData, type AiTaskProgress } from "@/components/ai/AiTaskProgressPanel";
 
 type ApiResponse<T> =
   | { success: true; data: T; requestId: string }
@@ -52,6 +52,7 @@ type AiTaskData = {
     createdAt?: string | null;
     updatedAt?: string | null;
     progress?: AiTaskProgress | null;
+    events?: AiRunEventData[] | null;
   };
   result: {
     scopeStatus: "in_scope" | "out_of_scope";
@@ -67,6 +68,7 @@ type AiTaskData = {
   duplicated?: boolean;
   conversation?: AiConversationData | null;
   messages?: AiMessageData[];
+  events?: AiRunEventData[];
 };
 
 type AiConversationData = {
@@ -185,6 +187,7 @@ type StrategyJob = {
   task?: AiTaskData["task"];
   result?: AiTaskData["result"];
   request?: StrategyJobRequest;
+  events?: AiRunEventData[];
 };
 
 const conversionTabs = ["目标平台代码", "迁移说明", "风险提醒"] as const;
@@ -487,6 +490,7 @@ function StrategyModeContent() {
     const nextJob = createStrategyJobFromTask(data.task, {
       conversationId: responseConversationId,
       result: data.result,
+      events: data.events,
       previous: previousJob,
       request: options.request ?? previousJob?.request
     });
@@ -1079,11 +1083,13 @@ function ConvertModeContent() {
                   </pre>
                 ) : shouldShowTaskProgress ? (
                   <AiTaskProgressPanel
+                    events={taskData?.events ?? taskData?.task.events}
                     elapsedSeconds={elapsedSeconds}
                     errorCode={taskData?.task.errorCode}
                     inputChars={conversionInputChars}
                     progress={taskData?.task.progress}
                     status={taskData?.task.status ?? (loading ? "RUNNING" : "PENDING")}
+                    taskId={taskData?.task.id}
                     taskType="code_conversion"
                     tone="dark"
                   />
@@ -1095,7 +1101,7 @@ function ConvertModeContent() {
                 )}
               </div>
             </div>
-            {result && taskData?.task ? <AiTaskCompletionSummary progress={taskData.task.progress} task={taskData.task} /> : null}
+            {result && taskData?.task ? <AiTaskCompletionSummary events={taskData.events ?? taskData.task.events} progress={taskData.task.progress} task={taskData.task} /> : null}
             {result ? <ResultNotes migrationNotes={result.migrationNotes} riskWarnings={result.riskWarnings} /> : null}
             {error ? <ErrorPanel message={error} /> : null}
           </div>
@@ -1256,6 +1262,7 @@ function StrategyJobBubble({
               ))}
             </ol>
           ) : null}
+          <RunEventTimeline events={job.events} status={job.task?.status ?? (running ? "RUNNING" : completed ? "SUCCEEDED" : failed || canceled ? "FAILED" : null)} taskId={job.task?.id} />
           <div className="lq-job-actions">
             {running ? (
               <button className="lq-job-action" onClick={onCancel} type="button">
@@ -1316,6 +1323,7 @@ function AgentWorkLog({
           ))}
         </ol>
       ) : null}
+      <RunEventTimeline status={task?.status ?? (status === "running" ? "RUNNING" : status === "failed" ? "FAILED" : status === "succeeded" ? "SUCCEEDED" : null)} taskId={task?.id} />
     </div>
   );
 }
@@ -1589,6 +1597,7 @@ function createStrategyJobFromTask(
   input: {
     conversationId: string;
     result?: AiTaskData["result"];
+    events?: AiRunEventData[];
     previous?: StrategyJob;
     request?: StrategyJobRequest;
   }
@@ -1618,7 +1627,8 @@ function createStrategyJobFromTask(
     finishedAt: task.finishedAt ?? input.previous?.finishedAt ?? undefined,
     task,
     result: input.result ?? input.previous?.result,
-    request: input.request ?? input.previous?.request
+    request: input.request ?? input.previous?.request,
+    events: input.events ?? task.events ?? input.previous?.events
   };
 }
 
@@ -2402,7 +2412,8 @@ async function waitForAiTaskResult(initialData: AiTaskData, onUpdate: (data: AiT
       result: next.result,
       creditAccount: next.creditAccount ?? latest.creditAccount,
       conversation: next.conversation ?? latest.conversation,
-      messages: next.messages ?? latest.messages
+      messages: next.messages ?? latest.messages,
+      events: next.events ?? latest.events
     };
     onUpdate(latest);
 

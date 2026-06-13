@@ -101,6 +101,20 @@ enum AiMessageAttachmentRole {
   generated
 }
 
+enum AiRunEventStatus {
+  pending
+  running
+  completed
+  failed
+  skipped
+}
+
+enum AiRunEventVisibility {
+  public
+  debug
+  admin_only
+}
+
 enum CreditReservationStatus {
   RESERVED
   CONFIRMED
@@ -137,6 +151,7 @@ model User {
   aiConversations    AiConversation[]
   aiMessages         AiMessage[]
   aiMessageAttachments AiMessageAttachment[]
+  aiRunEvents        AiRunEvent[]
   uploadedFiles      UploadedFile[]
   legalConsents      UserLegalConsent[]
 
@@ -354,6 +369,7 @@ model AiTask {
   result       AiTaskResult?
   reservation  CreditReservation?
   messages     AiMessage[]
+  runEvents    AiRunEvent[]
 
   @@unique([userId, clientRequestId])
   @@index([userId, createdAt])
@@ -396,6 +412,7 @@ model AiConversation {
   tasks    AiTask[]
   messages AiMessage[]
   attachments AiMessageAttachment[]
+  runEvents AiRunEvent[]
 
   @@index([userId, mode, lastMessageAt])
   @@index([status, lastMessageAt])
@@ -444,4 +461,30 @@ model AiMessageAttachment {
   @@index([fileId])
   @@index([userId, createdAt])
   @@map("ai_message_attachments")
+}
+
+model AiRunEvent {
+  id              String               @id @default(uuid()) @db.Uuid
+  taskId          String               @map("task_id") @db.Uuid
+  conversationId  String?              @map("conversation_id") @db.Uuid
+  userId          String               @map("user_id") @db.Uuid
+  seq             Int
+  type            String               @db.VarChar(80)
+  status          AiRunEventStatus     @default(running)
+  title           String               @db.VarChar(160)
+  summary         String?              @db.Text
+  detailJson      Json?                @map("detail_json")
+  progressPercent Int?                 @map("progress_percent")
+  visibility      AiRunEventVisibility @default(public)
+  createdAt       DateTime             @map("created_at") @db.Timestamptz(3)
+
+  task         AiTask          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  conversation AiConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, seq])
+  @@index([taskId, createdAt])
+  @@index([conversationId, createdAt])
+  @@index([userId, createdAt])
+  @@map("ai_run_events")
 }

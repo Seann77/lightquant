@@ -18,7 +18,7 @@ import {
 import { getFileUploadFriendlyError, getScanStatusText, uploadCodeFile, type UploadedCodeFile } from "@/lib/file-upload";
 import { codeAnalysisPlatforms, codeAnalysisTabs } from "@/lib/mock-data";
 import { PlatformDropdown } from "@/components/ui/PlatformDropdown";
-import { AiTaskCompletionSummary, AiTaskProgressPanel, type AiTaskProgress } from "@/components/ai/AiTaskProgressPanel";
+import { AiTaskCompletionSummary, AiTaskProgressPanel, type AiRunEventData, type AiTaskProgress } from "@/components/ai/AiTaskProgressPanel";
 
 type ApiResponse<T> =
   | { success: true; data: T; requestId: string }
@@ -43,6 +43,7 @@ type AiTaskData = {
     createdAt?: string | null;
     updatedAt?: string | null;
     progress?: AiTaskProgress | null;
+    events?: AiRunEventData[] | null;
   };
   result: {
     scopeStatus: "in_scope" | "out_of_scope";
@@ -54,6 +55,7 @@ type AiTaskData = {
   } | null;
   conversation?: AiConversationData | null;
   messages?: AiMessageData[];
+  events?: AiRunEventData[];
 };
 
 type AiConversationData = {
@@ -330,15 +332,17 @@ export function CodeAnalysisClient() {
         </div>
 
         {data?.result ? (
-          <AnalysisResult activeTab={activeTab} costPoints={data.task.costPoints} report={report} result={data.result} task={data.task} />
+          <AnalysisResult activeTab={activeTab} costPoints={data.task.costPoints} events={data.events} report={report} result={data.result} task={data.task} />
         ) : shouldShowTaskProgress ? (
           <div className="lq-empty-result is-progress">
             <AiTaskProgressPanel
+              events={data?.events ?? data?.task.events}
               elapsedSeconds={elapsedSeconds}
               errorCode={data?.task.errorCode}
               inputChars={analysisInputChars}
               progress={data?.task.progress}
               status={data?.task.status ?? (loading ? "RUNNING" : "PENDING")}
+              taskId={data?.task.id}
               taskType="code_analysis"
             />
           </div>
@@ -392,12 +396,14 @@ function FileUploadStatus({ file, message }: { file: UploadedCodeFile | null; me
 function AnalysisResult({
   activeTab,
   costPoints,
+  events,
   report,
   result,
   task
 }: {
   activeTab: string;
   costPoints: number;
+  events?: AiRunEventData[] | null;
   report: Record<string, unknown> | null | undefined;
   result: NonNullable<AiTaskData["result"]>;
   task: AiTaskData["task"];
@@ -410,7 +416,7 @@ function AnalysisResult({
         <h2 className="m-0 text-lg font-extrabold text-[#111827]">{activeTab}</h2>
         <span className="lq-cost-tag">已扣除 {costPoints} 积分</span>
       </div>
-      <AiTaskCompletionSummary progress={task.progress} task={task} />
+      <AiTaskCompletionSummary events={events ?? task.events} progress={task.progress} task={task} />
       <div className="grid gap-3">
         {content.map((item) => (
           <p className="m-0" key={item}>{item}</p>
@@ -773,7 +779,12 @@ async function waitForAiTaskResult(initialData: AiTaskData, onUpdate: (data: AiT
 
   while (Date.now() - startedAt < AI_TASK_POLL_TIMEOUT_MS) {
     await delay(AI_TASK_POLL_INTERVAL_MS);
-    latest = await fetchAiTaskResult(initialData.task.id);
+    const next = await fetchAiTaskResult(initialData.task.id);
+    latest = {
+      ...latest,
+      ...next,
+      events: next.events ?? latest.events
+    };
     onUpdate(latest);
 
     if (latest.result || latest.task.status === "SUCCEEDED") {

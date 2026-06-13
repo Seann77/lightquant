@@ -6,6 +6,7 @@ import type {
   AiMessage,
   AiMessageAttachment,
   AiMessageAttachmentSummary,
+  AiRunEvent,
   AiTaskResult,
   CreditAccount,
   CreditLedger,
@@ -36,6 +37,7 @@ import type {
   CreateAiConversationInput,
   CreateAiMessageAttachmentInput,
   CreateAiMessageInput,
+  CreateAiRunEventInput,
   CreateAiTaskResultInput,
   CreateCreditReservationInput,
   CreatePaymentTransactionInput,
@@ -1062,6 +1064,93 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
     return attachments.map(toAiMessageAttachmentSummary);
   }
 
+  async createAiRunEvent(input: CreateAiRunEventInput) {
+    try {
+      const event = await this.db.aiRunEvent.create({
+        data: {
+          taskId: input.taskId,
+          conversationId: input.conversationId,
+          userId: input.userId,
+          seq: input.seq,
+          type: input.type,
+          status: input.status,
+          title: input.title,
+          summary: input.summary,
+          detailJson: input.detailJson === null ? Prisma.JsonNull : toJsonObject(input.detailJson),
+          progressPercent: input.progressPercent,
+          visibility: input.visibility,
+          createdAt: toDate(input.createdAt)
+        }
+      });
+
+      return toAiRunEvent(event);
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        const existing = await this.db.aiRunEvent.findUnique({
+          where: {
+            taskId_seq: {
+              taskId: input.taskId,
+              seq: input.seq
+            }
+          }
+        });
+
+        if (existing) {
+          return toAiRunEvent(existing);
+        }
+      }
+
+      throw error;
+    }
+  }
+
+  async listAiRunEvents(taskId: string, options: { afterSeq?: number; limit?: number } = {}) {
+    const limit = options.limit && options.limit > 0 ? Math.min(options.limit, 200) : 100;
+    const events = await this.db.aiRunEvent.findMany({
+      where: {
+        taskId,
+        seq: options.afterSeq === undefined
+          ? undefined
+          : {
+              gt: options.afterSeq
+            },
+        visibility: "public"
+      },
+      orderBy: {
+        seq: "asc"
+      },
+      take: limit
+    });
+
+    return events.map(toAiRunEvent);
+  }
+
+  async findLatestAiRunEvent(taskId: string) {
+    const event = await this.db.aiRunEvent.findFirst({
+      where: {
+        taskId
+      },
+      orderBy: {
+        seq: "desc"
+      }
+    });
+
+    return event ? toAiRunEvent(event) : null;
+  }
+
+  async getNextRunEventSeq(taskId: string) {
+    const result = await this.db.aiRunEvent.aggregate({
+      where: {
+        taskId
+      },
+      _max: {
+        seq: true
+      }
+    });
+
+    return (result._max.seq ?? 0) + 1;
+  }
+
   async createUploadedFile(input: CreateUploadedFileInput) {
     const uploadedFile = await this.db.uploadedFile.create({
       data: {
@@ -1979,6 +2068,38 @@ function toAiMessageAttachmentSummary(attachment: {
       hasThumbnail: Boolean(attachment.file.thumbnailKey),
       createdAt: toIso(attachment.file.createdAt)
     }
+  };
+}
+
+function toAiRunEvent(event: {
+  id: string;
+  taskId: string;
+  conversationId: string | null;
+  userId: string;
+  seq: number;
+  type: string;
+  status: AiRunEvent["status"];
+  title: string;
+  summary: string | null;
+  detailJson: Prisma.JsonValue | null;
+  progressPercent: number | null;
+  visibility: AiRunEvent["visibility"];
+  createdAt: Date;
+}): AiRunEvent {
+  return {
+    id: event.id,
+    taskId: event.taskId,
+    conversationId: event.conversationId,
+    userId: event.userId,
+    seq: event.seq,
+    type: event.type,
+    status: event.status,
+    title: event.title,
+    summary: event.summary,
+    detailJson: event.detailJson === null ? null : toRecord(event.detailJson),
+    progressPercent: event.progressPercent,
+    visibility: event.visibility,
+    createdAt: toIso(event.createdAt)
   };
 }
 

@@ -132,6 +132,8 @@ export type AiConversationMode = "strategy" | "convert" | "analysis";
 export type AiConversationStatus = "active" | "archived";
 export type AiMessageRole = "user" | "assistant" | "system";
 export type AiMessageAttachmentRole = "input" | "reference" | "generated";
+export type AiRunEventStatus = "pending" | "running" | "completed" | "failed" | "skipped";
+export type AiRunEventVisibility = "public" | "debug" | "admin_only";
 export type CreditReservationStatus = "RESERVED" | "CONFIRMED" | "RELEASED";
 export type UploadedFileParseStatus = "PENDING" | "SUCCEEDED" | "FAILED";
 export type UploadedFileScanStatus = "PASSED" | "BLOCKED" | "WARNING";
@@ -230,6 +232,22 @@ export type AiMessageAttachmentSummary = AiMessageAttachment & {
     hasThumbnail: boolean;
     createdAt: string;
   };
+};
+
+export type AiRunEvent = {
+  id: string;
+  taskId: string;
+  conversationId: string | null;
+  userId: string;
+  seq: number;
+  type: string;
+  status: AiRunEventStatus;
+  title: string;
+  summary: string | null;
+  detailJson: Record<string, unknown> | null;
+  progressPercent: number | null;
+  visibility: AiRunEventVisibility;
+  createdAt: string;
 };
 
 export type AiTaskResult = {

@@ -5,6 +5,7 @@ import type {
   AiMessage,
   AiMessageAttachment,
   AiMessageAttachmentSummary,
+  AiRunEvent,
   AiTaskResult,
   CreditAccount,
   CreditLedger,
@@ -34,6 +35,7 @@ import type {
   CreateAiConversationInput,
   CreateAiMessageAttachmentInput,
   CreateAiMessageInput,
+  CreateAiRunEventInput,
   CreateAiTaskResultInput,
   CreateCreditReservationInput,
   CreatePaymentTransactionInput,
@@ -115,6 +117,7 @@ export class MockLightQuantRepository implements LightQuantRepository {
   private readonly aiMessages = new Map<string, AiMessage>();
   private readonly aiMessagesByTaskId = new Map<string, string>();
   private readonly aiMessageAttachments = new Map<string, AiMessageAttachment>();
+  private readonly aiRunEvents = new Map<string, AiRunEvent>();
   private readonly uploadedFiles = new Map<string, UploadedFile>();
   private readonly creditReservations = new Map<string, CreditReservation>();
   private readonly creditReservationsByIdempotencyKey = new Map<string, string>();
@@ -671,6 +674,45 @@ export class MockLightQuantRepository implements LightQuantRepository {
       .filter((attachment): attachment is AiMessageAttachmentSummary => Boolean(attachment));
   }
 
+  async createAiRunEvent(input: CreateAiRunEventInput) {
+    const existing = [...this.aiRunEvents.values()].find((event) => event.taskId === input.taskId && event.seq === input.seq);
+
+    if (existing) {
+      return existing;
+    }
+
+    const event: AiRunEvent = {
+      id: randomUUID(),
+      ...input
+    };
+
+    this.aiRunEvents.set(event.id, event);
+    return event;
+  }
+
+  async listAiRunEvents(taskId: string, options: { afterSeq?: number; limit?: number } = {}) {
+    const limit = options.limit && options.limit > 0 ? Math.min(options.limit, 200) : 100;
+
+    return [...this.aiRunEvents.values()]
+      .filter((event) => event.taskId === taskId && event.visibility === "public")
+      .filter((event) => options.afterSeq === undefined || event.seq > options.afterSeq)
+      .sort(compareRunEventAsc)
+      .slice(0, limit);
+  }
+
+  async findLatestAiRunEvent(taskId: string) {
+    return [...this.aiRunEvents.values()]
+      .filter((event) => event.taskId === taskId)
+      .sort((left, right) => right.seq - left.seq)
+      .at(0) ?? null;
+  }
+
+  async getNextRunEventSeq(taskId: string) {
+    const latest = await this.findLatestAiRunEvent(taskId);
+
+    return (latest?.seq ?? 0) + 1;
+  }
+
   async createUploadedFile(input: CreateUploadedFileInput) {
     const uploadedFile: UploadedFile = {
       id: randomUUID(),
@@ -912,6 +954,10 @@ function compareMessageAsc(left: AiMessage, right: AiMessage) {
   const time = left.createdAt.localeCompare(right.createdAt);
 
   return time !== 0 ? time : left.id.localeCompare(right.id);
+}
+
+function compareRunEventAsc(left: AiRunEvent, right: AiRunEvent) {
+  return left.seq !== right.seq ? left.seq - right.seq : left.createdAt.localeCompare(right.createdAt);
 }
 
 function toAiMessageAttachmentSummary(attachment: AiMessageAttachment, files: Map<string, UploadedFile>): AiMessageAttachmentSummary | null {

@@ -1,11 +1,11 @@
-import type { AiTask, AiConversation, AiConversationMode, AiConversationStatus, AiMessage, AiMessageAttachmentSummary, AiTaskResult, AiTaskStatus, AiTaskType, Pagination, UploadedFile } from "@/server/domain";
+import type { AiTask, AiConversation, AiConversationMode, AiConversationStatus, AiMessage, AiMessageAttachmentSummary, AiRunEvent, AiRunEventStatus, AiTaskResult, AiTaskStatus, AiTaskType, Pagination, UploadedFile } from "@/server/domain";
 import { getCreditAccountForUser, confirmReservation, refundConfirmedAiTaskCost, releaseReservation, reserveCredits } from "@/server/credits/credit-service";
 import { ApiError } from "@/server/http/api-response";
 import { getRepository, withRepositoryTransaction } from "@/server/repositories";
 import { getAiTaskConfig, getTotalInputChars, parseAiTaskType } from "@/server/ai/ai-task-config";
 import { runAiProvider } from "@/server/ai/ai-provider";
-import { getAiTaskProgress, setAiTaskProgress } from "@/server/ai/ai-task-progress";
-import { getAiModelName, getAiProviderMode, getAiTaskTimeoutMs } from "@/server/env";
+import { getAiTaskProgress, setAiTaskProgress, type AiTaskProgressSnapshot, type AiTaskProgressUpdate } from "@/server/ai/ai-task-progress";
+import { getAiModelName, getAiProviderMode, getAiSupportsVision, getAiTaskTimeoutMs } from "@/server/env";
 import { getUploadedImageDataUrl, inferUploadedFileKind } from "@/server/files/file-service";
 import type { AiProviderAttachment } from "@/server/ai/providers/types";
 
@@ -38,6 +38,11 @@ type GetAiConversationMessagesOptions = {
   includeTaskResults?: string;
 };
 
+type ListAiTaskEventsOptions = {
+  afterSeq?: number;
+  limit?: number;
+};
+
 const MAX_CONTEXT_MESSAGES = 10;
 const MAX_CONTEXT_CHARS = 24000;
 const DEFAULT_CONVERSATION_CURSOR_LIMIT = 20;
@@ -46,6 +51,9 @@ const DEFAULT_CONVERSATION_MESSAGE_LIMIT = 20;
 const MAX_CONVERSATION_MESSAGE_LIMIT = 100;
 const DEFAULT_CONVERSATION_TASK_LIMIT = 5;
 const MAX_CONVERSATION_TASK_LIMIT = 30;
+const DEFAULT_TASK_EVENT_LIMIT = 100;
+const MAX_TASK_EVENT_LIMIT = 200;
+const TASK_RESPONSE_EVENT_LIMIT = 40;
 
 export async function createAiTask(userId: string, input: CreateAiTaskRequest, requestId: string) {
   const type = normalizeTaskType(input.type);
@@ -156,6 +164,16 @@ export async function createAiTask(userId: string, input: CreateAiTaskRequest, r
         }
       }
 
+      await appendRunEvent(createdTask, {
+        type: "queued",
+        status: "completed",
+        title: "任务已进入队列",
+        summary: "LightQuant 已接收任务，等待后台执行。",
+        progressPercent: 2,
+        createdAt: now
+      });
+      await appendInputFileRunEvents(createdTask, resolvedInput.inputFileName ?? null, now);
+
       await reserveCredits({
         userId,
         taskId: createdTask.id,
@@ -210,7 +228,7 @@ export async function runAiTask(taskId: string, requestId: string) {
     logAiTaskStatus(runningProviderTask, "RUNNING", {
       requestId
     });
-    setAiTaskProgress(runningProviderTask, {
+    await recordAiTaskProgress(runningProviderTask, {
       phase: runningProviderTask.type === "code_analysis" || runningProviderTask.type === "code_conversion" ? "scanning" : "processing",
       progressPercent: runningProviderTask.type === "code_analysis" || runningProviderTask.type === "code_conversion" ? 8 : 20,
       statusMessage: runningProviderTask.type === "code_analysis" || runningProviderTask.type === "code_conversion"
@@ -221,12 +239,79 @@ export async function runAiTask(taskId: string, requestId: string) {
     const taskConfig = getAiTaskConfig(runningProviderTask.type);
     const conversationContext = await buildProviderConversationContext(runningProviderTask, taskConfig.maxTotalInputChars);
     const providerAttachments = await buildProviderAttachmentsForTask(runningProviderTask);
+    await appendRunEvent(runningProviderTask, {
+      type: "generate_plan",
+      status: "completed",
+      title: getPlanningEventTitle(runningProviderTask.type),
+      summary: buildPlanningEventSummary(runningProviderTask, providerAttachments),
+      progressPercent: runningProviderTask.type === "strategy_generation" ? 28 : 18,
+      detailJson: {
+        taskType: runningProviderTask.type,
+        sourcePlatform: runningProviderTask.sourcePlatform,
+        targetPlatform: runningProviderTask.targetPlatform,
+        hasConversationContext: Boolean(conversationContext),
+        attachmentCount: providerAttachments.length
+      }
+    });
+    const providerDiagnostics = getAiProviderDiagnostics();
+    await appendRunEvent(runningProviderTask, {
+      type: "call_model",
+      status: "running",
+      title: "调用 AI 模型",
+      summary: buildProviderCallSummary(providerAttachments),
+      progressPercent: runningProviderTask.type === "strategy_generation" ? 42 : 24,
+      detailJson: {
+        provider: providerDiagnostics.provider,
+        model: providerDiagnostics.model,
+        visionAttachments: providerAttachments.length
+      }
+    });
     const providerResult = await runAiProvider(
       runningProviderTask,
       conversationContext,
-      (progress) => setAiTaskProgress(runningProviderTask, progress),
+      async (progress) => {
+        await recordAiTaskProgress(runningProviderTask, progress);
+      },
       providerAttachments
     );
+    const latestAfterProvider = await repository.findAiTaskById(runningProviderTask.id);
+
+    if (!latestAfterProvider) {
+      throw new ApiError("NOT_FOUND", "AI 任务不存在", 404);
+    }
+
+    if (latestAfterProvider.status === "SUCCEEDED" || latestAfterProvider.status === "FAILED" || latestAfterProvider.status === "CANCELLED") {
+      return buildAiTaskResponse(latestAfterProvider, {
+        duplicated: true
+      });
+    }
+
+    await appendRunEvent(runningProviderTask, {
+      type: "stream_output",
+      status: "completed",
+      title: "模型输出已返回",
+      summary: "AI 模型已返回完整输出，正在整理结构化结果。",
+      progressPercent: 86,
+      detailJson: {
+        resultType: runningProviderTask.type,
+        scopeStatus: providerResult.scopeStatus,
+        model: providerResult.model,
+        tokenUsage: providerResult.tokenUsage
+      }
+    });
+    await appendRunEvent(runningProviderTask, {
+      type: "validate_result",
+      status: "completed",
+      title: "校验输出结构",
+      summary: "已完成结果结构、空结果和风险提示检查。",
+      progressPercent: 94,
+      detailJson: {
+        scopeStatus: providerResult.scopeStatus,
+        riskWarningCount: providerResult.riskWarnings.length,
+        hasGeneratedCode: Boolean(providerResult.generatedCode),
+        hasReport: Boolean(providerResult.reportJson)
+      }
+    });
 
     const latestTask = await repository.findAiTaskById(runningProviderTask.id);
 
@@ -268,6 +353,20 @@ export async function runAiTask(taskId: string, requestId: string) {
       });
 
       await createAssistantMessageForTask(updatedTask, result, finishedAt);
+      await appendRunEvent(updatedTask, {
+        type: "create_artifact",
+        status: "completed",
+        title: "保存最终结果消息",
+        summary: "已将任务结果写入会话消息，供历史恢复使用。",
+        progressPercent: 98,
+        createdAt: finishedAt,
+        detailJson: {
+          resultType: result.resultType,
+          scopeStatus: result.scopeStatus,
+          hasGeneratedCode: Boolean(result.generatedCode),
+          hasReport: Boolean(result.reportJson)
+        }
+      });
 
       return {
         credit,
@@ -280,10 +379,24 @@ export async function runAiTask(taskId: string, requestId: string) {
       requestId,
       model: completed.result.model
     });
-    setAiTaskProgress(completed.task, {
+    await recordAiTaskProgress(completed.task, {
       phase: "completed",
       progressPercent: 100,
       statusMessage: "任务已完成，结果已生成。"
+    });
+
+    await appendRunEvent(completed.task, {
+      type: "completed",
+      status: "completed",
+      title: "任务已完成",
+      summary: "最终结果已生成并可在当前会话中恢复查看。",
+      progressPercent: 100,
+      createdAt: completed.task.finishedAt ?? new Date().toISOString(),
+      detailJson: {
+        scopeStatus: completed.task.scopeStatus,
+        model: completed.result.model,
+        tokenUsage: completed.result.tokenUsage
+      }
     });
 
     return buildAiTaskResponse(completed.task, {
@@ -312,7 +425,7 @@ export async function runAiTask(taskId: string, requestId: string) {
       errorCode: apiError.code,
       message: apiError.message
     });
-    setAiTaskProgress(taskToFail, {
+    await recordAiTaskProgress(taskToFail, {
       phase: "failed",
       progressPercent: 100,
       failureStage: apiError.code === "AI_PROVIDER_BAD_RESPONSE" ? "validating" : "processing",
@@ -335,6 +448,17 @@ export async function runAiTask(taskId: string, requestId: string) {
       });
 
       await createAssistantErrorMessageForTask(failedTask, apiError, failedAt);
+      await appendRunEvent(failedTask, {
+        type: "failed",
+        status: "failed",
+        title: "任务执行失败",
+        summary: apiError.message,
+        progressPercent: 100,
+        createdAt: failedAt,
+        detailJson: {
+          errorCode: apiError.code
+        }
+      });
 
       return failedTask;
     });
@@ -380,6 +504,24 @@ export async function getAiTaskResultForUser(userId: string, taskId: string) {
   return buildAiTaskResponse(task, {
     result
   });
+}
+
+export async function listAiTaskEventsForUser(userId: string, taskId: string, options: ListAiTaskEventsOptions = {}) {
+  const task = await getOwnedTask(userId, taskId);
+  const limit = normalizeLimit(options.limit ?? DEFAULT_TASK_EVENT_LIMIT, MAX_TASK_EVENT_LIMIT, "limit");
+  const afterSeq = normalizeAfterSeq(options.afterSeq);
+  const events = await getRepository().listAiRunEvents(task.id, {
+    afterSeq,
+    limit
+  });
+  const lastEvent = events.at(-1);
+
+  return {
+    task: toTaskResponse(task),
+    events: events.map(toRunEventResponse),
+    nextAfterSeq: lastEvent?.seq ?? afterSeq ?? 0,
+    limit
+  };
 }
 
 export async function listAiTasksForUser(
@@ -506,7 +648,7 @@ export async function cancelAiTaskForUser(userId: string, taskId: string, reques
     updatedAt: canceledAt
   });
 
-  setAiTaskProgress(canceledTask, {
+  await recordAiTaskProgress(canceledTask, {
     phase: "failed",
     progressPercent: 100,
     failureStage: "processing",
@@ -514,6 +656,17 @@ export async function cancelAiTaskForUser(userId: string, taskId: string, reques
   });
 
   await createAssistantErrorMessageForTask(canceledTask, new ApiError("TASK_CANCELED", "任务已取消", 409), canceledAt);
+  await appendRunEvent(canceledTask, {
+    type: "cancelled",
+    status: "failed",
+    title: "任务已取消",
+    summary: "用户已取消本次 AI 任务，积分预留已释放。",
+    progressPercent: 100,
+    createdAt: canceledAt,
+    detailJson: {
+      requestId
+    }
+  });
   logAiTaskStatus(canceledTask, "CANCELLED", {
     requestId
   });
@@ -610,6 +763,23 @@ export function toResultResponse(result: AiTaskResult) {
   };
 }
 
+function toRunEventResponse(event: AiRunEvent) {
+  return {
+    id: event.id,
+    taskId: event.taskId,
+    conversationId: event.conversationId,
+    seq: event.seq,
+    type: event.type,
+    status: event.status,
+    title: event.title,
+    summary: event.summary,
+    detailJson: event.detailJson,
+    progressPercent: event.progressPercent,
+    visibility: event.visibility,
+    createdAt: event.createdAt
+  };
+}
+
 function toConversationResponse(conversation: AiConversation) {
   return {
     id: conversation.id,
@@ -685,6 +855,9 @@ async function buildAiTaskResponse(
       })
     : [];
   const attachmentsByMessageId = conversation ? await buildMessageAttachmentsByMessageId(task.userId, messages) : new Map<string, AiMessageAttachmentSummary[]>();
+  const events = await getRepository().listAiRunEvents(task.id, {
+    limit: TASK_RESPONSE_EVENT_LIMIT
+  });
 
   return {
     task: toTaskResponse(task, result),
@@ -692,7 +865,8 @@ async function buildAiTaskResponse(
     creditAccount: options.creditAccount ?? await getCreditAccountForUser(task.userId),
     duplicated: options.duplicated ?? false,
     conversation: conversation ? toConversationResponse(conversation) : null,
-    messages: messages.map((message) => toMessageResponse(message, attachmentsByMessageId.get(message.id) ?? []))
+    messages: messages.map((message) => toMessageResponse(message, attachmentsByMessageId.get(message.id) ?? [])),
+    events: events.map(toRunEventResponse)
   };
 }
 
@@ -939,6 +1113,322 @@ async function prepareConversationForTask(
     conversation,
     contextText
   };
+}
+
+async function appendRunEvent(
+  task: AiTask,
+  input: {
+    type: string;
+    status: AiRunEventStatus;
+    title: string;
+    summary?: string | null;
+    detailJson?: Record<string, unknown> | null;
+    progressPercent?: number | null;
+    visibility?: AiRunEvent["visibility"];
+    createdAt?: string;
+  }
+) {
+  const repository = getRepository();
+  const latest = await repository.findLatestAiRunEvent(task.id);
+  const normalized = {
+    type: input.type,
+    status: input.status,
+    title: truncateText(input.title, 150),
+    summary: input.summary ? truncateText(input.summary, 500) : null,
+    detailJson: sanitizeRunEventDetail(input.detailJson ?? null),
+    progressPercent: input.progressPercent === null || input.progressPercent === undefined ? null : Math.max(0, Math.min(100, Math.round(input.progressPercent))),
+    visibility: input.visibility ?? "public" as const,
+    createdAt: input.createdAt ?? new Date().toISOString()
+  };
+
+  if (latest && isDuplicateRunEvent(latest, normalized)) {
+    return latest;
+  }
+
+  return repository.createAiRunEvent({
+    taskId: task.id,
+    conversationId: task.conversationId,
+    userId: task.userId,
+    seq: (latest?.seq ?? 0) + 1,
+    ...normalized
+  });
+}
+
+async function appendInputFileRunEvents(task: AiTask, inputFileName: string | null, createdAt: string) {
+  if (!task.inputFileId) {
+    return;
+  }
+
+  const file = await getRepository().findUploadedFileById(task.inputFileId);
+
+  if (!file || file.userId !== task.userId) {
+    return;
+  }
+
+  const kind = inferUploadedFileKind(file);
+  const fileSummary = `${inputFileName ?? file.originalName}，${formatFileSize(file.sizeBytes)}`;
+
+  await appendRunEvent(task, {
+    type: "upload_received",
+    status: "completed",
+    title: "收到输入附件",
+    summary: fileSummary,
+    progressPercent: 4,
+    createdAt,
+    detailJson: buildFileEventDetail(file, kind)
+  });
+  await appendRunEvent(task, {
+    type: "read_attachment",
+    status: "completed",
+    title: "读取附件元信息",
+    summary: `${file.originalName} 已完成解析和安全扫描，状态：${file.scanStatus}。`,
+    progressPercent: 6,
+    createdAt,
+    detailJson: buildFileEventDetail(file, kind)
+  });
+
+  if (kind === "image") {
+    const supportsVision = safeGetAiSupportsVision();
+
+    await appendRunEvent(task, {
+      type: "parse_image",
+      status: supportsVision ? "completed" : "skipped",
+      title: supportsVision ? "准备图片视觉输入" : "图片视觉理解已跳过",
+      summary: supportsVision
+        ? `${file.originalName} 已准备为 vision 输入。`
+        : `${file.originalName} 已作为附件保留；当前模型未配置 vision 能力，本次仅使用文字上下文。`,
+      progressPercent: supportsVision ? 10 : 8,
+      createdAt,
+      detailJson: {
+        ...buildFileEventDetail(file, kind),
+        supportsVision
+      }
+    });
+    return;
+  }
+
+  await appendRunEvent(task, {
+    type: "parse_text",
+    status: "completed",
+    title: "解析文本输入",
+    summary: `${file.originalName} 已抽取文本内容并合并到本次任务输入。`,
+    progressPercent: 10,
+    createdAt,
+    detailJson: {
+      ...buildFileEventDetail(file, kind),
+      contentChars: file.contentText?.length ?? 0,
+      contentPreview: normalizePreview(file.contentText, 180)
+    }
+  });
+}
+
+async function recordAiTaskProgress(task: AiTask, update: AiTaskProgressUpdate) {
+  const snapshot = setAiTaskProgress(task, update);
+  const event = progressToRunEvent(task, snapshot);
+
+  if (event) {
+    await appendRunEvent(task, event);
+  }
+
+  return snapshot;
+}
+
+function progressToRunEvent(task: AiTask, progress: AiTaskProgressSnapshot) {
+  if (progress.phase === "completed" || progress.phase === "failed") {
+    return null;
+  }
+
+  const detailJson = {
+    phase: progress.phase,
+    inputChars: progress.inputChars,
+    processingMode: progress.processingMode,
+    chunkCount: progress.chunkCount,
+    completedChunks: progress.completedChunks,
+    currentChunk: progress.currentChunk
+  };
+
+  if (progress.phase === "scanning") {
+    return {
+      type: task.type === "strategy_generation" ? "generate_plan" : "detect_platform",
+      status: "running" as const,
+      title: progress.phaseLabel || "结构扫描",
+      summary: progress.statusMessage,
+      progressPercent: progress.progressPercent,
+      detailJson
+    };
+  }
+
+  if (progress.phase === "chunking") {
+    return {
+      type: "analyze_code",
+      status: "running" as const,
+      title: "拆分长代码",
+      summary: progress.statusMessage,
+      progressPercent: progress.progressPercent,
+      detailJson
+    };
+  }
+
+  if (progress.phase === "processing") {
+    return {
+      type: task.type === "strategy_generation" ? "call_model" : "analyze_code",
+      status: "running" as const,
+      title: progress.phaseLabel || "处理任务输入",
+      summary: progress.statusMessage,
+      progressPercent: progress.progressPercent,
+      detailJson
+    };
+  }
+
+  if (progress.phase === "merging") {
+    return {
+      type: "generate_plan",
+      status: "running" as const,
+      title: progress.phaseLabel || "合并结果",
+      summary: progress.statusMessage,
+      progressPercent: progress.progressPercent,
+      detailJson
+    };
+  }
+
+  if (progress.phase === "validating") {
+    return {
+      type: "validate_result",
+      status: "running" as const,
+      title: progress.phaseLabel || "校验结果",
+      summary: progress.statusMessage,
+      progressPercent: progress.progressPercent,
+      detailJson
+    };
+  }
+
+  return {
+    type: "queued",
+    status: "pending" as const,
+    title: progress.phaseLabel || "任务排队",
+    summary: progress.statusMessage,
+    progressPercent: progress.progressPercent,
+    detailJson
+  };
+}
+
+function buildFileEventDetail(file: UploadedFile, kind: ReturnType<typeof inferUploadedFileKind>) {
+  return {
+    fileId: file.id,
+    originalName: file.originalName,
+    kind,
+    ext: file.ext,
+    mimeType: file.mimeType,
+    sizeBytes: file.sizeBytes,
+    scanStatus: file.scanStatus,
+    riskFlags: file.riskFlags,
+    hasThumbnail: Boolean(file.thumbnailKey)
+  };
+}
+
+function buildPlanningEventSummary(task: AiTask, attachments: AiProviderAttachment[]) {
+  const mode = task.type === "code_conversion" ? "代码转换" : task.type === "code_analysis" ? "代码解析" : "策略生成";
+  const platform = [task.sourcePlatform, task.targetPlatform].filter(Boolean).join(" -> ");
+  const attachmentText = attachments.length > 0 ? `，包含 ${attachments.length} 个图片附件` : "";
+
+  return `${mode}计划已整理${platform ? `，平台：${platform}` : ""}${attachmentText}。`;
+}
+
+function getPlanningEventTitle(type: AiTaskType) {
+  if (type === "code_conversion") {
+    return "整理转换计划";
+  }
+
+  if (type === "code_analysis") {
+    return "整理解析计划";
+  }
+
+  return "整理策略生成计划";
+}
+
+function buildProviderCallSummary(attachments: AiProviderAttachment[]) {
+  if (attachments.length === 0) {
+    return "正在调用模型处理文字输入。";
+  }
+
+  return `正在调用模型处理文字输入和 ${attachments.length} 个图片附件。`;
+}
+
+function isDuplicateRunEvent(
+  latest: AiRunEvent,
+  next: Pick<AiRunEvent, "type" | "status" | "title" | "summary" | "progressPercent">
+) {
+  return latest.type === next.type &&
+    latest.status === next.status &&
+    latest.title === next.title &&
+    latest.summary === next.summary &&
+    latest.progressPercent === next.progressPercent;
+}
+
+function sanitizeRunEventDetail(value: Record<string, unknown> | null): Record<string, unknown> | null {
+  if (!value) {
+    return null;
+  }
+
+  return sanitizeDetailObject(value, 0);
+}
+
+function sanitizeDetailObject(value: Record<string, unknown>, depth: number): Record<string, unknown> {
+  const output: Record<string, unknown> = {};
+  const entries = Object.entries(value).slice(0, 24);
+
+  for (const [key, item] of entries) {
+    if (isLargeOrPrivateDetailKey(key)) {
+      continue;
+    }
+
+    output[key] = sanitizeDetailValue(item, depth + 1);
+  }
+
+  return output;
+}
+
+function sanitizeDetailValue(value: unknown, depth: number): unknown {
+  if (value === null || value === undefined || typeof value === "number" || typeof value === "boolean") {
+    return value ?? null;
+  }
+
+  if (typeof value === "string") {
+    return truncateText(value, 500);
+  }
+
+  if (Array.isArray(value)) {
+    return value.slice(0, 20).map((item) => sanitizeDetailValue(item, depth + 1));
+  }
+
+  if (typeof value === "object") {
+    if (depth > 2) {
+      return "[object]";
+    }
+
+    return sanitizeDetailObject(value as Record<string, unknown>, depth);
+  }
+
+  return String(value);
+}
+
+function isLargeOrPrivateDetailKey(key: string) {
+  const normalized = key.toLowerCase();
+
+  return normalized.includes("code") ||
+    normalized.includes("contenttext") ||
+    normalized.includes("dataurl") ||
+    normalized.includes("base64") ||
+    normalized.includes("binary") ||
+    normalized.includes("raw");
+}
+
+function safeGetAiSupportsVision() {
+  try {
+    return getAiSupportsVision();
+  } catch {
+    return false;
+  }
 }
 
 async function buildProviderConversationContext(task: AiTask, maxTotalInputChars: number) {
@@ -1256,6 +1746,18 @@ function normalizeLimit(value: number, max: number, field: string) {
   return Math.min(value, max);
 }
 
+function normalizeAfterSeq(value: number | undefined) {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (!Number.isInteger(value) || value < 0) {
+    throw new ApiError("VALIDATION_ERROR", "afterSeq 参数不正确", 400);
+  }
+
+  return value;
+}
+
 function normalizeMessageDirection(value: string | undefined): "before" | "after" {
   if (!value || value === "before") {
     return "before";
@@ -1412,6 +1914,24 @@ function normalizePreview(value: string | null, maxLength = 60) {
   }
 
   return normalized.length > maxLength ? `${normalized.slice(0, maxLength)}...` : normalized;
+}
+
+function truncateText(value: string, maxLength: number) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+
+  return normalized.length > maxLength ? `${normalized.slice(0, maxLength)}...` : normalized;
+}
+
+function formatFileSize(sizeBytes: number) {
+  if (sizeBytes < 1024) {
+    return `${sizeBytes} B`;
+  }
+
+  if (sizeBytes < 1024 * 1024) {
+    return `${(sizeBytes / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(sizeBytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
 function createContentPreview(text: string | null, file?: Pick<UploadedFile, "originalName" | "ext" | "mimeType" | "kind">) {

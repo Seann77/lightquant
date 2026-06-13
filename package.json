@@ -51,6 +51,7 @@
     "smoke:ui:pages": "node scripts/smoke-ui-pages-local.mjs",
     "smoke:ai:config-check": "node scripts/smoke-ai-config-check.mjs",
     "smoke:ai:local": "node scripts/smoke-ai-async-local.mjs",
+    "smoke:ai:events": "node scripts/smoke-ai-run-events-local.mjs",
     "smoke:ai:three": "node scripts/smoke-ai-three-tasks-local.mjs",
     "smoke:files:local": "node scripts/smoke-files-local.mjs",
     "smoke:files:image": "node scripts/smoke-files-image-local.mjs",

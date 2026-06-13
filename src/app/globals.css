@@ -1037,6 +1037,126 @@ textarea {
   margin: 1px 0 0;
 }
 
+.lq-run-events {
+  width: 100%;
+  margin-top: 12px;
+  border: 1px solid rgba(201, 220, 248, 0.82);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.64);
+}
+
+.lq-run-events.is-dark {
+  border-color: rgba(145, 160, 184, 0.18);
+  background: rgba(16, 24, 40, 0.28);
+}
+
+.lq-run-events.is-running {
+  border-color: rgba(11, 99, 255, 0.2);
+}
+
+.lq-run-events.is-failed {
+  border-color: rgba(248, 113, 113, 0.34);
+}
+
+.lq-run-events-summary {
+  display: flex;
+  width: 100%;
+  min-height: 38px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 11px;
+  border: 0;
+  background: transparent;
+  color: #40506a;
+  font-size: 12px;
+  font-weight: 780;
+  line-height: 1.3;
+  text-align: left;
+}
+
+.lq-run-events.is-dark .lq-run-events-summary {
+  color: #c8d5ea;
+}
+
+.lq-run-events-summary svg {
+  flex: 0 0 auto;
+  color: var(--lq-brand);
+}
+
+.lq-run-event-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0 11px 11px 13px;
+  list-style: none;
+}
+
+.lq-run-event-list li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  color: #5b6472;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.lq-run-events.is-dark .lq-run-event-list li {
+  color: #aab8cf;
+}
+
+.lq-run-event-list li > span {
+  display: inline-flex;
+  width: 24px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(185, 209, 244, 0.9);
+  border-radius: 999px;
+  background: rgba(234, 242, 255, 0.72);
+  color: var(--lq-brand);
+  font-size: 10px;
+  font-weight: 840;
+}
+
+.lq-run-events.is-dark .lq-run-event-list li > span {
+  border-color: rgba(145, 160, 184, 0.22);
+  background: rgba(200, 213, 234, 0.1);
+  color: #8eece1;
+}
+
+.lq-run-event-list li.is-running > span {
+  background: linear-gradient(180deg, #2787ff, var(--lq-brand));
+  color: #fff;
+}
+
+.lq-run-event-list li.is-failed > span {
+  border-color: rgba(217, 45, 32, 0.24);
+  background: rgba(255, 241, 240, 0.92);
+  color: #d92d20;
+}
+
+.lq-run-event-list p {
+  display: grid;
+  gap: 2px;
+  margin: 1px 0 0;
+}
+
+.lq-run-event-list strong {
+  color: inherit;
+  font-weight: 780;
+}
+
+.lq-run-event-list em {
+  color: #667084;
+  font-style: normal;
+  overflow-wrap: anywhere;
+}
+
+.lq-run-events.is-dark .lq-run-event-list em {
+  color: #8f9fb8;
+}
+
 .lq-job-actions {
   display: flex;
   flex-wrap: wrap;

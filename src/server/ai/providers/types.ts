@@ -20,5 +20,5 @@ export type AiProviderInput = {
   config: AiTaskConfig;
   conversationContext?: string;
   attachments?: AiProviderAttachment[];
-  progressReporter?: (update: AiTaskProgressUpdate) => void;
+  progressReporter?: (update: AiTaskProgressUpdate) => void | Promise<void>;
 };
