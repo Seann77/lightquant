@@ -1,6 +1,6 @@
 # LightQuant 变更清单
 
-更新时间：2026-06-13
+更新时间：2026-06-14
 
 本文用于提交前审计和交接，不包含任何密钥、数据库连接串、模型 Key、短信 AccessKey 或支付私钥。
 
@@ -13,6 +13,7 @@
 - 积分账户、积分流水、积分预占、AI 扣费。
 - 支付订单、支付宝/微信 provider、notify 验签与回归脚本。
 - AI Skill 文件化、MiMo Pro OpenAI-compatible provider、异步 runner 自愈。
+- AI Workbench 阶段 1-6：统一会话、轻量 recent/messages、附件卡片、图片/vision fallback、RunEvent、三模块共享恢复层和 `uiState`。
 - 文件上传、服务端扫描、上传文件入库。
 - 只读后台 MVP。
 - 本地验收、部署、支付、AI、文件、后台相关 smoke/check 脚本。
@@ -73,6 +74,7 @@
 ## 文档
 
 - `docs/current-status.md`：当前能力、已验证证据、下一步建议和交付提醒。
+- `docs/lightquant-ai-workbench-implementation-status.md`：AI Workbench 阶段 1-6 完成状态、阶段 7 验收命令、生产部署注意事项、未做事项和风险。
 - `docs/local-testing-runbook.md`：本地启动、检查、低成本回归和真实 AI 验收。
 - `docs/payment-real-mvp-runbook.md`：真实支付 MVP 联调步骤。
 - `docs/deployment-runbook.md`：Ubuntu 一键部署和生产环境边界。

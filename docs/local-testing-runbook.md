@@ -73,6 +73,27 @@ npm run smoke:ui:pages
 
 该命令只请求本地页面并检查关键文案，不登录、不提交表单、不写业务数据、不调用真实模型或真实支付。
 
+## AI Workbench 专项验收
+
+阶段 1-6 的 Workbench 验收说明见 [lightquant-ai-workbench-implementation-status.md](./lightquant-ai-workbench-implementation-status.md)。本地复跑时建议先启动数据库模式和 mock 外部服务：
+
+```bash
+npm run dev:database:mock:3010
+```
+
+然后按顺序运行：
+
+```bash
+npm run smoke:ai:workbench
+npm run smoke:ai:events
+npm run smoke:files:local
+npm run smoke:files:image
+npm run smoke:ai:three
+npm run smoke:ui:pages
+```
+
+这些脚本覆盖三类 AI 任务、最近对话恢复、附件/图片上传、RunEvent 时间线和核心页面入口。`smoke:ai:three` 会创建三类任务；在真实 provider 配置下会消耗模型额度和业务积分，在 mock 服务模式下用于低成本回归。
+
 ## 会消耗 MiMo 额度的 AI 验收
 
 当前真实模型配置为 OpenAI-compatible MiMo Pro 时，以下命令会调用真实模型并按业务规则扣积分。

@@ -1,11 +1,12 @@
 # LightQuant 当前状态
 
-更新时间：2026-06-13
+更新时间：2026-06-14
 
 本文只记录项目交接状态和验收入口，不包含任何密钥、数据库密码、模型 Key、支付私钥或真实连接串。
 
 ## 当前可用能力
 
+- AI Workbench 阶段 1-6 已完成：三类任务统一写入 `AiConversation`，最近对话轻量化，消息分页，附件卡片，图片上传/vision fallback，RunEvent 时间线，`uiState` active tab 恢复，以及三大模块共享恢复层。详见 [lightquant-ai-workbench-implementation-status.md](./lightquant-ai-workbench-implementation-status.md)。
 - 用户登录/session、用户状态、用户协议同意记录。
 - Supabase PostgreSQL 持久化数据层。
 - 积分账户、积分流水、新用户 500 积分赠送。
