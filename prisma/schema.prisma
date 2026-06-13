@@ -404,6 +404,7 @@ model AiConversation {
   targetPlatform String?              @map("target_platform") @db.VarChar(80)
   sourcePlatform String?              @map("source_platform") @db.VarChar(80)
   status         AiConversationStatus @default(active)
+  uiState        Json?                @map("ui_state")
   lastMessageAt  DateTime             @map("last_message_at") @db.Timestamptz(3)
   createdAt      DateTime             @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime             @map("updated_at") @db.Timestamptz(3)

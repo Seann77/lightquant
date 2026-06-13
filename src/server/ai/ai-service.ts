@@ -38,6 +38,13 @@ type GetAiConversationMessagesOptions = {
   includeTaskResults?: string;
 };
 
+type UpdateAiConversationRequest = {
+  title?: unknown;
+  sourcePlatform?: unknown;
+  targetPlatform?: unknown;
+  uiState?: unknown;
+};
+
 type ListAiTaskEventsOptions = {
   afterSeq?: number;
   limit?: number;
@@ -590,6 +597,42 @@ export async function listAiConversationsForUser(
   };
 }
 
+export async function getAiConversationForUser(userId: string, conversationId: string) {
+  return toConversationResponse(await getOwnedConversation(userId, conversationId));
+}
+
+export async function updateAiConversationForUser(userId: string, conversationId: string, input: UpdateAiConversationRequest) {
+  const conversation = await getOwnedConversation(userId, conversationId);
+  const now = new Date().toISOString();
+  const updateInput: {
+    title?: string;
+    targetPlatform?: string | null;
+    sourcePlatform?: string | null;
+    uiState?: Record<string, unknown> | null;
+    updatedAt: string;
+  } = {
+    updatedAt: now
+  };
+
+  if (input.title !== undefined) {
+    updateInput.title = normalizeOptionalText(input.title) ?? conversation.title;
+  }
+
+  if (input.sourcePlatform !== undefined) {
+    updateInput.sourcePlatform = normalizeOptionalText(input.sourcePlatform);
+  }
+
+  if (input.targetPlatform !== undefined) {
+    updateInput.targetPlatform = normalizeOptionalText(input.targetPlatform);
+  }
+
+  if (input.uiState !== undefined) {
+    updateInput.uiState = normalizeConversationUiState(input.uiState);
+  }
+
+  return toConversationResponse(await getRepository().updateAiConversation(conversation.id, updateInput));
+}
+
 export async function getAiConversationMessagesForUser(userId: string, conversationId: string, options: GetAiConversationMessagesOptions = {}) {
   const conversation = await getOwnedConversation(userId, conversationId);
   const repository = getRepository();
@@ -788,6 +831,7 @@ function toConversationResponse(conversation: AiConversation) {
     targetPlatform: conversation.targetPlatform,
     sourcePlatform: conversation.sourcePlatform,
     status: conversation.status,
+    uiState: conversation.uiState,
     lastMessageAt: conversation.lastMessageAt,
     createdAt: conversation.createdAt,
     updatedAt: conversation.updatedAt
@@ -1024,10 +1068,39 @@ function normalizeTaskInput(type: AiTaskType, input: CreateAiTaskRequest) {
   };
 }
 
-function normalizeOptionalText(value: string | undefined) {
-  const normalized = value?.trim();
+function normalizeOptionalText(value: unknown) {
+  const normalized = typeof value === "string" ? value.trim() : "";
 
   return normalized || null;
+}
+
+function normalizeConversationUiState(value: unknown) {
+  if (value === null) {
+    return null;
+  }
+
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new ApiError("VALIDATION_ERROR", "uiState 必须是对象", 400);
+  }
+
+  const output: Record<string, unknown> = {};
+
+  for (const [key, item] of Object.entries(value).slice(0, 20)) {
+    if (!/^[A-Za-z0-9_.-]{1,64}$/.test(key)) {
+      continue;
+    }
+
+    if (item === null || typeof item === "boolean" || typeof item === "number") {
+      output[key] = item;
+      continue;
+    }
+
+    if (typeof item === "string") {
+      output[key] = truncateText(item, 200);
+    }
+  }
+
+  return output;
 }
 
 async function resolveInputFile(

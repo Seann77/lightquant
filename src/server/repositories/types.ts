@@ -187,6 +187,7 @@ export type CreateAiConversationInput = {
   targetPlatform: string | null;
   sourcePlatform: string | null;
   status: AiConversationStatus;
+  uiState?: Record<string, unknown> | null;
   lastMessageAt: string;
   createdAt: string;
   updatedAt: string;
@@ -197,6 +198,7 @@ export type UpdateAiConversationInput = {
   targetPlatform?: string | null;
   sourcePlatform?: string | null;
   status?: AiConversationStatus;
+  uiState?: Record<string, unknown> | null;
   lastMessageAt?: string;
   updatedAt: string;
 };

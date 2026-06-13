@@ -530,7 +530,8 @@ export class MockLightQuantRepository implements LightQuantRepository {
   async createAiConversation(input: CreateAiConversationInput) {
     const conversation: AiConversation = {
       id: randomUUID(),
-      ...input
+      ...input,
+      uiState: input.uiState ?? null
     };
 
     this.aiConversations.set(conversation.id, conversation);
@@ -550,6 +551,7 @@ export class MockLightQuantRepository implements LightQuantRepository {
       targetPlatform: input.targetPlatform === undefined ? conversation.targetPlatform : input.targetPlatform,
       sourcePlatform: input.sourcePlatform === undefined ? conversation.sourcePlatform : input.sourcePlatform,
       status: input.status === undefined ? conversation.status : input.status,
+      uiState: input.uiState === undefined ? conversation.uiState : input.uiState,
       lastMessageAt: input.lastMessageAt === undefined ? conversation.lastMessageAt : input.lastMessageAt,
       updatedAt: input.updatedAt
     };

@@ -2,38 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Clock3, Layers3, LoaderCircle } from "lucide-react";
+import type { AiRunEventData, AiTaskProgress } from "@/lib/ai/workbench-types";
 
-export type AiTaskProgress = {
-  phase?: string | null;
-  phaseLabel?: string | null;
-  progressPercent?: number | null;
-  estimatedSecondsMin?: number | null;
-  estimatedSecondsMax?: number | null;
-  statusMessage?: string | null;
-  inputChars?: number | null;
-  processingMode?: string | null;
-  chunkCount?: number | null;
-  completedChunks?: number | null;
-  currentChunk?: number | null;
-  startedAt?: string | null;
-  updatedAt?: string | null;
-  failureStage?: string | null;
-};
-
-export type AiRunEventData = {
-  id: string;
-  taskId: string;
-  conversationId?: string | null;
-  seq: number;
-  type: string;
-  status: "pending" | "running" | "completed" | "failed" | "skipped";
-  title: string;
-  summary?: string | null;
-  detailJson?: Record<string, unknown> | null;
-  progressPercent?: number | null;
-  visibility?: string | null;
-  createdAt: string;
-};
+export type { AiRunEventData, AiTaskProgress } from "@/lib/ai/workbench-types";
 
 type AiTaskProgressPanelProps = {
   taskId?: string | null;
@@ -166,11 +137,11 @@ export function AiTaskCompletionSummary({ task, progress, events }: AiTaskComple
   return (
     <>
       <div className="lq-completion-summary">
-      <CheckCircle2 aria-hidden="true" size={17} />
-      <span>已完成</span>
-      {duration ? <span>用时 {duration}</span> : null}
-      <span>{processingMode}</span>
-      {chunkCount ? <span>{progress?.completedChunks ?? chunkCount} / {chunkCount} 段</span> : null}
+        <CheckCircle2 aria-hidden="true" size={17} />
+        <span>已完成</span>
+        {duration ? <span>用时 {duration}</span> : null}
+        <span>{processingMode}</span>
+        {chunkCount ? <span>{progress?.completedChunks ?? chunkCount} / {chunkCount} 段</span> : null}
       </div>
       <RunEventTimeline events={events} status={task.status} taskId={task.id} />
     </>

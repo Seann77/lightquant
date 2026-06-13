@@ -797,6 +797,7 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
         targetPlatform: input.targetPlatform,
         sourcePlatform: input.sourcePlatform,
         status: input.status,
+        uiState: input.uiState === undefined ? undefined : input.uiState === null ? Prisma.JsonNull : toJsonObject(input.uiState),
         lastMessageAt: toDate(input.lastMessageAt),
         createdAt: toDate(input.createdAt),
         updatedAt: toDate(input.updatedAt)
@@ -816,6 +817,7 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
         targetPlatform: input.targetPlatform,
         sourcePlatform: input.sourcePlatform,
         status: input.status,
+        uiState: input.uiState === undefined ? undefined : input.uiState === null ? Prisma.JsonNull : toJsonObject(input.uiState),
         lastMessageAt: input.lastMessageAt ? toDate(input.lastMessageAt) : undefined,
         updatedAt: toDate(input.updatedAt)
       }
@@ -847,6 +849,7 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
       targetPlatform: true,
       sourcePlatform: true,
       status: true,
+      uiState: true,
       lastMessageAt: true,
       createdAt: true,
       updatedAt: true
@@ -1964,6 +1967,7 @@ function toAiConversation(conversation: {
   targetPlatform: string | null;
   sourcePlatform: string | null;
   status: AiConversation["status"];
+  uiState: Prisma.JsonValue | null;
   lastMessageAt: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -1976,6 +1980,7 @@ function toAiConversation(conversation: {
     targetPlatform: conversation.targetPlatform,
     sourcePlatform: conversation.sourcePlatform,
     status: conversation.status,
+    uiState: conversation.uiState === null ? null : toRecord(conversation.uiState),
     lastMessageAt: toIso(conversation.lastMessageAt),
     createdAt: toIso(conversation.createdAt),
     updatedAt: toIso(conversation.updatedAt)

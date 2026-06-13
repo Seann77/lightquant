@@ -190,6 +190,7 @@ export type AiConversation = {
   targetPlatform: string | null;
   sourcePlatform: string | null;
   status: AiConversationStatus;
+  uiState: Record<string, unknown> | null;
   lastMessageAt: string;
   createdAt: string;
   updatedAt: string;
