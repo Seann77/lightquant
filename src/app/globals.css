@@ -961,6 +961,205 @@ textarea {
   gap: 10px;
 }
 
+.lq-thinking-message {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 12px;
+  border: 1px solid rgba(201, 220, 248, 0.92);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.84);
+  padding: 14px;
+  box-shadow: 0 18px 42px rgba(53, 86, 138, 0.08);
+}
+
+.lq-thinking-message.is-dark {
+  border-color: rgba(74, 100, 145, 0.78);
+  background: rgba(17, 27, 46, 0.92);
+  box-shadow: none;
+}
+
+.lq-thinking-message-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #2787ff, var(--lq-brand));
+  color: #fff;
+  box-shadow: 0 10px 18px rgba(11, 99, 255, 0.18);
+}
+
+.lq-thinking-message-mark svg {
+  width: 18px;
+  height: 18px;
+}
+
+.lq-thinking-message-body {
+  min-width: 0;
+}
+
+.lq-thinking-section,
+.lq-final-section {
+  min-width: 0;
+}
+
+.lq-final-section {
+  margin-top: 12px;
+  border-top: 1px solid rgba(217, 228, 245, 0.8);
+  padding-top: 12px;
+}
+
+.lq-thinking-message.is-dark .lq-final-section {
+  border-top-color: rgba(74, 100, 145, 0.64);
+}
+
+.lq-thinking-title,
+.lq-final-title,
+.lq-thinking-collapse-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: #0b1324;
+  font-size: 14px;
+  font-weight: 820;
+}
+
+.lq-thinking-message.is-dark .lq-thinking-title,
+.lq-thinking-message.is-dark .lq-final-title,
+.lq-thinking-message.is-dark .lq-thinking-collapse-toggle {
+  color: #e8f0ff;
+}
+
+.lq-thinking-title em,
+.lq-final-title em,
+.lq-thinking-collapse-toggle em {
+  color: #667084;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 650;
+}
+
+.lq-thinking-message.is-dark .lq-thinking-title em,
+.lq-thinking-message.is-dark .lq-final-title em,
+.lq-thinking-message.is-dark .lq-thinking-collapse-toggle em {
+  color: #91a0b8;
+}
+
+.lq-thinking-collapse-toggle {
+  width: 100%;
+  justify-content: flex-start;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.lq-thinking-stream,
+.lq-thinking-placeholder,
+.lq-final-placeholder {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #5b6472;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.72;
+}
+
+.lq-thinking-stream {
+  max-height: none;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.lq-thinking-message.is-dark .lq-thinking-stream,
+.lq-thinking-message.is-dark .lq-thinking-placeholder,
+.lq-thinking-message.is-dark .lq-final-placeholder {
+  color: #b9c6dc;
+}
+
+.lq-thinking-message.is-dark .lq-thinking-stream {
+  border-color: transparent;
+  background: transparent;
+}
+
+.lq-streaming-markdown {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  color: #40506a;
+  font-size: 14px;
+  line-height: 1.72;
+}
+
+.lq-streaming-markdown h2,
+.lq-streaming-markdown h3,
+.lq-streaming-markdown p,
+.lq-streaming-markdown ul {
+  margin: 0;
+}
+
+.lq-streaming-markdown h2 {
+  color: #0b1324;
+  font-size: 16px;
+  font-weight: 850;
+}
+
+.lq-streaming-markdown h3 {
+  color: #1f2b3d;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.lq-streaming-markdown ul {
+  padding-left: 20px;
+}
+
+.lq-streaming-markdown li + li {
+  margin-top: 4px;
+}
+
+.lq-thinking-message.is-dark .lq-streaming-markdown {
+  color: #c8d5ea;
+}
+
+.lq-thinking-message.is-dark .lq-streaming-markdown h2,
+.lq-thinking-message.is-dark .lq-streaming-markdown h3 {
+  color: #f4f7ff;
+}
+
+.lq-code-preview .lq-thinking-message {
+  grid-column: 1 / -1;
+  font-family: var(--font-sans), "Inter", system-ui, sans-serif;
+  line-height: 1.6;
+}
+
+.lq-empty-result .lq-thinking-message {
+  width: 100%;
+  text-align: left;
+}
+
+.lq-analysis-results .lq-thinking-message {
+  margin-top: 14px;
+}
+
+.lq-thinking-error {
+  margin-top: 12px;
+  border: 1px solid rgba(239, 68, 68, 0.24);
+  border-radius: 8px;
+  background: rgba(254, 242, 242, 0.82);
+  padding: 10px 12px;
+  color: #b42318;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
 .lq-agent-log {
   width: 100%;
   overflow: hidden;

@@ -1,7 +1,8 @@
 import { getAiModelName } from "@/server/env";
 import type { AiTask, AiTaskScopeStatus } from "@/server/domain";
 import { ApiError } from "@/server/http/api-response";
-import type { AiProviderInput, AiProviderResult } from "@/server/ai/providers/types";
+import { escapeHtml, formatProviderResultAsMarkdown } from "@/server/ai/streaming-markdown-result";
+import type { AiProviderInput, AiProviderResult, AiProviderStreamCallbacks, AiProviderStreamResult } from "@/server/ai/providers/types";
 
 export async function runMockAiProvider(input: AiProviderInput): Promise<AiProviderResult> {
   const { task } = input;
@@ -23,6 +24,34 @@ export async function runMockAiProvider(input: AiProviderInput): Promise<AiProvi
   }
 
   return applyMockImageContext(mockCodeAnalysis(input), input);
+}
+
+export async function runMockAiProviderStream(input: AiProviderInput, callbacks: AiProviderStreamCallbacks = {}): Promise<AiProviderStreamResult> {
+  const result = await runMockAiProvider(input);
+  const visibleThinking = escapeHtml("正在识别任务类型、平台和输入内容。\n正在整理最终 Markdown 结构。");
+  const finalAnswerMarkdown = formatProviderResultAsMarkdown(result, input.task);
+
+  for (const delta of chunkText(visibleThinking, 12)) {
+    await callbacks.onDelta?.({
+      type: "thinking_delta",
+      delta
+    });
+    await delay(8);
+  }
+
+  for (const delta of chunkText(finalAnswerMarkdown, 18)) {
+    await callbacks.onDelta?.({
+      type: "final_delta",
+      delta
+    });
+    await delay(8);
+  }
+
+  return {
+    result,
+    visibleThinking,
+    finalAnswerMarkdown
+  };
 }
 
 function applyMockImageContext(result: AiProviderResult, input: AiProviderInput): AiProviderResult {
@@ -261,4 +290,17 @@ function hasTaskRelevantSignal(task: AiTask, input: string) {
 
 function containsFailureTrigger(value: string | null) {
   return Boolean(value?.includes("__FAIL__") || value?.includes("失败测试"));
+}
+function chunkText(value: string, size: number) {
+  const chunks: string[] = [];
+
+  for (let index = 0; index < value.length; index += size) {
+    chunks.push(value.slice(index, index + size));
+  }
+
+  return chunks;
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

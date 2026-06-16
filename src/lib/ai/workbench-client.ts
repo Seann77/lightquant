@@ -4,6 +4,7 @@ import type {
   AiConversationMessagesData,
   AiMessageData,
   AiTaskData,
+  AiTaskStreamEventData,
   ApiResponse,
   MessageAttachmentData,
   RestoredUploadedFileSnapshot,
@@ -118,6 +119,74 @@ export async function createWorkbenchAiTask(input: {
   }
 
   return payload.data;
+}
+
+export type StreamWorkbenchAiTaskHandlers = {
+  signal?: AbortSignal;
+  onTask?: (data: AiTaskData) => void;
+  onThinkingDelta?: (delta: string) => void;
+  onFinalDelta?: (delta: string) => void;
+  onDone?: (data: AiTaskData, event: Extract<AiTaskStreamEventData, { type: "done" }>) => void;
+  onEvent?: (event: AiTaskStreamEventData) => void;
+};
+
+export async function streamWorkbenchAiTask(input: Parameters<typeof createWorkbenchAiTask>[0], handlers: StreamWorkbenchAiTaskHandlers = {}) {
+  const response = await fetch("/api/v1/ai/tasks/stream", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(input),
+    signal: handlers.signal
+  });
+
+  if (!response.ok || !response.body) {
+    const payload = await safeReadApiError(response);
+    throw new Error(`${payload.code}:${payload.message}`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let completed: AiTaskData | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+
+    if (done) {
+      break;
+    }
+
+    buffer += decoder.decode(value, { stream: true });
+    const parts = buffer.split(/\n\n/);
+    buffer = parts.pop() ?? "";
+
+    for (const part of parts) {
+      const event = parseStreamEvent(part);
+
+      if (!event) {
+        continue;
+      }
+
+      completed = handleWorkbenchStreamEvent(event, handlers) ?? completed;
+    }
+  }
+
+  buffer += decoder.decode();
+
+  if (buffer.trim()) {
+    const event = parseStreamEvent(buffer);
+
+    if (event) {
+      completed = handleWorkbenchStreamEvent(event, handlers) ?? completed;
+    }
+  }
+
+  if (!completed) {
+    throw new Error("AI_TASK_FAILED:流式任务未返回完成事件");
+  }
+
+  return completed;
 }
 
 export async function fetchAiTaskResult(taskId: string) {
@@ -279,6 +348,9 @@ export function getLatestTaskDataFromMessages(messages: AiMessageData[], taskTyp
     return {
       task,
       result: readAiTaskResult(contentJson?.result),
+      visibleThinking: readNullableString(contentJson?.visibleThinking),
+      finalAnswerMarkdown: readNullableString(contentJson?.finalAnswerMarkdown),
+      parsedResult: readAiTaskResult(contentJson?.parsedResult),
       conversation: null,
       messages
     };
@@ -562,6 +634,75 @@ export function readAiTaskResult(value: unknown): AiTaskData["result"] | null {
   };
 }
 
+export function getAiTaskStreamingContent(data: AiTaskData | null | undefined, taskId?: string | null) {
+  const directThinking = readNullableString(data?.visibleThinking);
+  const directFinal = readNullableString(data?.finalAnswerMarkdown);
+  const directParsed = data?.parsedResult ?? null;
+
+  if (directThinking || directFinal || directParsed) {
+    return {
+      visibleThinking: directThinking ?? "",
+      finalAnswerMarkdown: directFinal ?? "",
+      parsedResult: directParsed
+    };
+  }
+
+  const messages = data?.messages ?? [];
+  const targetTaskId = taskId ?? data?.task.id ?? null;
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+
+    if (message.role !== "assistant") {
+      continue;
+    }
+
+    if (targetTaskId && message.taskId !== targetTaskId) {
+      continue;
+    }
+
+    const contentJson = readRecord(message.contentJson);
+    const finalAnswerMarkdown = readNullableString(contentJson?.finalAnswerMarkdown)
+      ?? (message.content.includes("## ") ? message.content : "");
+    const visibleThinking = readNullableString(contentJson?.visibleThinking) ?? "";
+    const parsedResult = readAiTaskResult(contentJson?.parsedResult) ?? readAiTaskResult(contentJson?.result);
+
+    if (finalAnswerMarkdown || visibleThinking || parsedResult) {
+      return {
+        visibleThinking,
+        finalAnswerMarkdown,
+        parsedResult
+      };
+    }
+  }
+
+  return {
+    visibleThinking: "",
+    finalAnswerMarkdown: data?.result ? formatAiTaskResultAsMarkdown(data.result, data.task.type as WorkbenchTaskType) : "",
+    parsedResult: data?.result ?? null
+  };
+}
+
+export function formatAiTaskResultAsMarkdown(result: NonNullable<AiTaskData["result"]>, taskType: WorkbenchTaskType | string | null | undefined) {
+  return [
+    "## 结论摘要",
+    result.explanation?.trim() || "已完成处理。",
+    "",
+    "## 代码块 / 目标平台代码",
+    result.generatedCode?.trim()
+      ? `\`\`\`python\n${result.generatedCode.trim()}\n\`\`\``
+      : taskType === "code_analysis" ? "本次任务不需要生成目标平台代码。" : "暂无可直接运行的目标平台代码。",
+    "",
+    "## 迁移说明 / 解析说明",
+    result.migrationNotes?.trim() || (taskType === "code_conversion" ? "请按目标平台 API 逐项复核后再运行。" : "请结合输入代码和业务场景复核结论。"),
+    "",
+    "## 风险提醒",
+    result.riskWarnings.length > 0
+      ? result.riskWarnings.map((warning) => `- ${warning}`).join("\n")
+      : "- 请在回测和模拟盘中验证结果，不构成投资建议。"
+  ].join("\n");
+}
+
 export function readRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
 }
@@ -585,6 +726,84 @@ function mergeAiTaskData(previous: AiTaskData, next: AiTaskData): AiTaskData {
     },
     events: next.events ?? previous.events
   };
+}
+
+async function safeReadApiError(response: Response) {
+  try {
+    const payload = await response.json() as ApiResponse<unknown>;
+
+    if (!payload.success) {
+      return payload.error;
+    }
+  } catch {
+    // Fall through to a generic transport error.
+  }
+
+  return {
+    code: "AI_TASK_FAILED",
+    message: "AI 任务连接失败，请稍后重试"
+  };
+}
+
+function parseStreamEvent(block: string): AiTaskStreamEventData | null {
+  const data = block
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith("data:"))
+    .map((line) => line.slice(5).trimStart())
+    .join("\n")
+    .trim();
+
+  if (!data) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(data) as AiTaskStreamEventData;
+
+    if (!parsed || typeof parsed !== "object" || !("type" in parsed)) {
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function handleWorkbenchStreamEvent(event: AiTaskStreamEventData, handlers: StreamWorkbenchAiTaskHandlers) {
+  handlers.onEvent?.(event);
+
+  if (event.type === "task") {
+    handlers.onTask?.(event.data);
+    return null;
+  }
+
+  if (event.type === "thinking_delta") {
+    handlers.onThinkingDelta?.(event.delta);
+    return null;
+  }
+
+  if (event.type === "final_delta") {
+    handlers.onFinalDelta?.(event.delta);
+    return null;
+  }
+
+  if (event.type === "done") {
+    const data = {
+      ...event.data,
+      visibleThinking: event.visibleThinking ?? event.data.visibleThinking,
+      finalAnswerMarkdown: event.finalAnswerMarkdown ?? event.data.finalAnswerMarkdown,
+      parsedResult: event.parsedResult ?? event.data.parsedResult
+    };
+    handlers.onDone?.(data, event);
+    return data;
+  }
+
+  if (event.type === "error") {
+    throw new Error(`${event.error.code}:${event.error.message}`);
+  }
+
+  return null;
 }
 
 function createLegacyMessageAttachment(message: AiMessageData, fileId: string, originalName: string, contentPreview: string | null): MessageAttachmentData {

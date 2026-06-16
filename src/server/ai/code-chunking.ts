@@ -147,7 +147,7 @@ export async function runChunkedCodeProcessing(input: AiProviderInput, runSingle
   await input.progressReporter?.({
     phase: "scanning",
     processingMode: "chunked",
-    progressPercent: 8,
+    progressPercent: 18,
     statusMessage: input.task.type === "code_analysis"
       ? "正在识别策略结构、平台依赖和关键函数。"
       : "正在识别代码结构、入口函数、调度函数、数据接口和下单接口。"
@@ -157,7 +157,7 @@ export async function runChunkedCodeProcessing(input: AiProviderInput, runSingle
     phase: "chunking",
     processingMode: "chunked",
     inputChars: scan.inputChars,
-    progressPercent: 14,
+    progressPercent: 25,
     statusMessage: input.task.type === "code_analysis"
       ? "正在梳理策略结构，准备解析交易逻辑。"
       : "正在按函数边界拆分长代码。"
@@ -174,7 +174,7 @@ export async function runChunkedCodeProcessing(input: AiProviderInput, runSingle
     inputChars: scan.inputChars,
     chunkCount: chunks.length,
     completedChunks: 0,
-    progressPercent: 18,
+    progressPercent: 28,
     statusMessage: input.task.type === "code_analysis"
       ? "策略结构已识别，正在准备解析。"
       : `已拆分为 ${chunks.length} 段，准备逐段处理。`
@@ -469,7 +469,7 @@ function buildMergedExplanation(type: CodeProcessingTaskType, scan: CodeStructur
     .map((value, index) => `${index + 1}. ${value}`);
   const scanOverview = [
     type === "code_conversion" ? "处理模式：分段转换。" : "已完成策略结构与交易逻辑解析。",
-    type === "code_conversion" ? `服务端先完成结构扫描，共 ${scan.inputLines} 行、${scan.inputChars.toLocaleString("zh-CN")} 字符。` : "",
+    type === "code_conversion" ? `服务端先完成结构扫描，共 ${scan.inputLines} 行。` : "",
     `识别平台：${scan.detectedPlatform}（置信度 ${scan.platformConfidence}）。`,
     scan.entryFunctions.length ? `入口函数：${scan.entryFunctions.join(", ")}。` : "",
     scan.schedulerFunctions.length ? `调度信号：${scan.schedulerFunctions.join(", ")}。` : "",

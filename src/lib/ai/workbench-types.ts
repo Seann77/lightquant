@@ -69,6 +69,9 @@ export type AiTaskData = {
     riskWarnings: string[];
     reportJson: Record<string, unknown> | null;
   } | null;
+  visibleThinking?: string | null;
+  finalAnswerMarkdown?: string | null;
+  parsedResult?: AiTaskData["result"] | null;
   creditAccount?: {
     balance: number;
   };
@@ -144,6 +147,30 @@ export type AiConversationMessagesData = {
   messages: AiMessageData[];
   tasks?: AiTaskData["task"][];
 };
+
+export type AiTaskStreamEventData =
+  | {
+      type: "task";
+      data: AiTaskData;
+    }
+  | {
+      type: "thinking_delta" | "final_delta";
+      delta: string;
+    }
+  | {
+      type: "done";
+      data: AiTaskData;
+      visibleThinking?: string | null;
+      finalAnswerMarkdown?: string | null;
+      parsedResult?: AiTaskData["result"] | null;
+    }
+  | {
+      type: "error";
+      error: {
+        code: string;
+        message: string;
+      };
+    };
 
 export type RestoredWorkbenchSnapshot = {
   sourcePlatform: string | null;

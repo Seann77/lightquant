@@ -12,13 +12,11 @@ import type { MessageAttachmentData } from "@/lib/ai/workbench-types";
 export function WorkbenchFileUploadStatus({
   className = "",
   file,
-  message,
-  showPreview = true
+  message
 }: {
   className?: string;
   file: UploadedCodeFile | null;
   message: string;
-  showPreview?: boolean;
 }) {
   if (!file && !message) {
     return null;
@@ -46,7 +44,6 @@ export function WorkbenchFileUploadStatus({
         <span>{formatFileSize(file.sizeBytes)}</span>
         <span>{getScanStatusText(file)}</span>
       </div>
-      {showPreview && file.contentPreview ? <div className="mt-1 line-clamp-2 break-words text-xs">{file.contentPreview}</div> : null}
       {file.riskFlags.length > 0 ? <div className="mt-1 break-words">风险标记：{file.riskFlags.join("、")}</div> : null}
     </div>
   );
@@ -84,7 +81,6 @@ export function AttachmentPreviewCard({ attachment }: { attachment: MessageAttac
         <span>{formatFileSize(file.sizeBytes)}</span>
         <span>{getAttachmentScanText(attachment)}</span>
       </div>
-      {file.contentPreview ? <div className="mt-1 line-clamp-2 break-words text-xs">{file.contentPreview}</div> : null}
       {file.riskFlags.length > 0 ? <div className="mt-1 break-words">风险标记：{file.riskFlags.join("、")}</div> : null}
     </div>
   );

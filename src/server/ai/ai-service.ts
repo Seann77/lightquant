@@ -3,11 +3,11 @@ import { getCreditAccountForUser, confirmReservation, refundConfirmedAiTaskCost,
 import { ApiError } from "@/server/http/api-response";
 import { getRepository, withRepositoryTransaction } from "@/server/repositories";
 import { getAiTaskConfig, getTotalInputChars, parseAiTaskType } from "@/server/ai/ai-task-config";
-import { runAiProvider } from "@/server/ai/ai-provider";
+import { runAiProvider, runAiProviderStream } from "@/server/ai/ai-provider";
 import { getAiTaskProgress, setAiTaskProgress, type AiTaskProgressSnapshot, type AiTaskProgressUpdate } from "@/server/ai/ai-task-progress";
 import { getAiModelName, getAiProviderMode, getAiSupportsVision, getAiTaskTimeoutMs } from "@/server/env";
 import { getUploadedImageDataUrl, inferUploadedFileKind } from "@/server/files/file-service";
-import type { AiProviderAttachment } from "@/server/ai/providers/types";
+import type { AiProviderAttachment, AiProviderStreamDelta } from "@/server/ai/providers/types";
 
 type CreateAiTaskRequest = {
   type: string;
@@ -49,6 +49,19 @@ type ListAiTaskEventsOptions = {
   afterSeq?: number;
   limit?: number;
 };
+
+type AiTaskResponse = Awaited<ReturnType<typeof buildAiTaskResponse>>;
+
+export type AiTaskStreamEvent =
+  | { type: "task"; data: AiTaskResponse }
+  | AiProviderStreamDelta
+  | {
+      type: "done";
+      data: AiTaskResponse;
+      visibleThinking?: string;
+      finalAnswerMarkdown?: string;
+      parsedResult?: ReturnType<typeof toResultResponse>;
+    };
 
 const MAX_CONTEXT_MESSAGES = 10;
 const MAX_CONTEXT_CHARS = 24000;
@@ -174,7 +187,7 @@ export async function createAiTask(userId: string, input: CreateAiTaskRequest, r
       await appendRunEvent(createdTask, {
         type: "queued",
         status: "completed",
-        title: "任务已进入队列",
+        title: "任务已提交",
         summary: "LightQuant 已接收任务，等待后台执行。",
         progressPercent: 2,
         createdAt: now
@@ -237,7 +250,7 @@ export async function runAiTask(taskId: string, requestId: string) {
     });
     await recordAiTaskProgress(runningProviderTask, {
       phase: runningProviderTask.type === "code_analysis" || runningProviderTask.type === "code_conversion" ? "scanning" : "processing",
-      progressPercent: runningProviderTask.type === "code_analysis" || runningProviderTask.type === "code_conversion" ? 8 : 20,
+      progressPercent: runningProviderTask.type === "code_analysis" || runningProviderTask.type === "code_conversion" ? 18 : 40,
       statusMessage: runningProviderTask.type === "code_analysis" || runningProviderTask.type === "code_conversion"
         ? runningProviderTask.type === "code_analysis" ? "正在识别策略结构和平台依赖。" : "正在识别代码结构和平台依赖。"
         : "正在调用 AI 模型生成结果。"
@@ -251,7 +264,7 @@ export async function runAiTask(taskId: string, requestId: string) {
       status: "completed",
       title: getPlanningEventTitle(runningProviderTask.type),
       summary: buildPlanningEventSummary(runningProviderTask, providerAttachments),
-      progressPercent: runningProviderTask.type === "strategy_generation" ? 28 : 18,
+      progressPercent: runningProviderTask.type === "strategy_generation" ? 32 : 32,
       detailJson: {
         taskType: runningProviderTask.type,
         sourcePlatform: runningProviderTask.sourcePlatform,
@@ -266,7 +279,7 @@ export async function runAiTask(taskId: string, requestId: string) {
       status: "running",
       title: "调用 AI 模型",
       summary: buildProviderCallSummary(providerAttachments),
-      progressPercent: runningProviderTask.type === "strategy_generation" ? 42 : 24,
+      progressPercent: runningProviderTask.type === "strategy_generation" ? 42 : 42,
       detailJson: {
         provider: providerDiagnostics.provider,
         model: providerDiagnostics.model,
@@ -483,6 +496,301 @@ export async function createAndRunAiTask(userId: string, input: CreateAiTaskRequ
   }
 
   return runAiTask(created.task.id, requestId);
+}
+
+export async function createAndStreamAiTask(
+  userId: string,
+  input: CreateAiTaskRequest,
+  requestId: string,
+  emit: (event: AiTaskStreamEvent) => void | Promise<void>
+) {
+  const created = await createAiTask(userId, input, requestId);
+  await emit({
+    type: "task",
+    data: created
+  });
+
+  if (created.result || created.task.status === "SUCCEEDED" || created.task.status === "FAILED" || created.task.status === "CANCELLED") {
+    await emit({
+      type: "done",
+      data: created
+    });
+    return created;
+  }
+
+  if (created.duplicated && (created.task.status === "PENDING" || created.task.status === "RUNNING")) {
+    throw new ApiError("IDEMPOTENCY_CONFLICT", "同一请求正在处理中，请等待当前任务完成。", 409);
+  }
+
+  return runAiTaskStreaming(created.task.id, requestId, emit);
+}
+
+async function runAiTaskStreaming(
+  taskId: string,
+  requestId: string,
+  emit: (event: AiTaskStreamEvent) => void | Promise<void>
+) {
+  const repository = getRepository();
+  let task = await repository.findAiTaskById(taskId);
+
+  if (!task) {
+    throw new ApiError("NOT_FOUND", "AI 任务不存在", 404);
+  }
+
+  if (task.status === "SUCCEEDED" || task.status === "FAILED" || task.status === "CANCELLED") {
+    const response = await buildAiTaskResponse(task, {
+      duplicated: true
+    });
+    await emit({
+      type: "done",
+      data: response
+    });
+    return response;
+  }
+
+  const shouldRestartRunningTask = task.status === "RUNNING" && isStaleRunningTask(task);
+
+  if (task.status === "RUNNING" && !shouldRestartRunningTask) {
+    throw new ApiError("IDEMPOTENCY_CONFLICT", "AI 任务正在处理中，请等待当前任务完成。", 409);
+  }
+
+  try {
+    const now = new Date().toISOString();
+
+    task = await repository.updateAiTask(task.id, {
+      status: "RUNNING",
+      startedAt: shouldRestartRunningTask ? now : task.startedAt ?? now,
+      errorCode: null,
+      errorMessage: null,
+      updatedAt: now
+    });
+    const runningTask = task;
+
+    logAiTaskStatus(runningTask, "RUNNING", {
+      requestId
+    });
+    await recordAiTaskProgress(runningTask, {
+      phase: "processing",
+      progressPercent: 35,
+      statusMessage: "正在思考并生成结果。"
+    });
+
+    const taskConfig = getAiTaskConfig(runningTask.type);
+    const conversationContext = await buildProviderConversationContext(runningTask, taskConfig.maxTotalInputChars);
+    const providerAttachments = await buildProviderAttachmentsForTask(runningTask);
+    const providerDiagnostics = getAiProviderDiagnostics();
+
+    await appendRunEvent(runningTask, {
+      type: "call_model_stream",
+      status: "running",
+      title: "Streaming model response",
+      summary: "Model thinking and final answer are being streamed to the user.",
+      progressPercent: 42,
+      detailJson: {
+        provider: providerDiagnostics.provider,
+        model: providerDiagnostics.model,
+        visionAttachments: providerAttachments.length
+      }
+    });
+
+    await emit({
+      type: "task",
+      data: await buildAiTaskResponse(runningTask, {
+        result: null
+      })
+    });
+
+    const providerStream = await runAiProviderStream(
+      runningTask,
+      conversationContext,
+      {
+        onDelta: emit
+      },
+      providerAttachments
+    );
+    const latestAfterProvider = await repository.findAiTaskById(runningTask.id);
+
+    if (!latestAfterProvider) {
+      throw new ApiError("NOT_FOUND", "AI 任务不存在", 404);
+    }
+
+    if (latestAfterProvider.status === "SUCCEEDED" || latestAfterProvider.status === "FAILED" || latestAfterProvider.status === "CANCELLED") {
+      const response = await buildAiTaskResponse(latestAfterProvider, {
+        duplicated: true
+      });
+      await emit({
+        type: "done",
+        data: response
+      });
+      return response;
+    }
+
+    await appendRunEvent(runningTask, {
+      type: "stream_output",
+      status: "completed",
+      title: "Streaming output completed",
+      summary: "Model thinking and final answer stream completed.",
+      progressPercent: 88,
+      detailJson: {
+        resultType: runningTask.type,
+        scopeStatus: providerStream.result.scopeStatus,
+        model: providerStream.result.model,
+        tokenUsage: providerStream.result.tokenUsage
+      }
+    });
+
+    const completed = await withRepositoryTransaction(async () => {
+      const transactionRepository = getRepository();
+      const credit = await confirmReservation(runningTask, requestId);
+      const finishedAt = new Date().toISOString();
+      const result = await transactionRepository.createAiTaskResult({
+        taskId: runningTask.id,
+        resultType: runningTask.type,
+        scopeStatus: providerStream.result.scopeStatus,
+        generatedCode: providerStream.result.generatedCode,
+        explanation: providerStream.result.explanation,
+        migrationNotes: providerStream.result.migrationNotes,
+        riskWarnings: providerStream.result.riskWarnings,
+        reportJson: providerStream.result.reportJson,
+        model: providerStream.result.model,
+        tokenUsage: providerStream.result.tokenUsage,
+        createdAt: finishedAt
+      });
+      const updatedTask = await transactionRepository.updateAiTask(runningTask.id, {
+        status: "SUCCEEDED",
+        scopeStatus: providerStream.result.scopeStatus,
+        finishedAt,
+        errorCode: null,
+        errorMessage: null,
+        updatedAt: finishedAt
+      });
+
+      await createAssistantMessageForTask(updatedTask, result, finishedAt, {
+        visibleThinking: providerStream.visibleThinking,
+        finalAnswerMarkdown: providerStream.finalAnswerMarkdown,
+        parsedResult: toResultResponse(result)
+      });
+      await appendRunEvent(updatedTask, {
+        type: "create_artifact",
+        status: "completed",
+        title: "Saved final streaming result",
+        summary: "Thinking and final Markdown answer were saved separately.",
+        progressPercent: 98,
+        createdAt: finishedAt,
+        detailJson: {
+          resultType: result.resultType,
+          scopeStatus: result.scopeStatus,
+          hasGeneratedCode: Boolean(result.generatedCode),
+          hasVisibleThinking: Boolean(providerStream.visibleThinking),
+          hasFinalAnswerMarkdown: Boolean(providerStream.finalAnswerMarkdown)
+        }
+      });
+
+      return {
+        credit,
+        result,
+        task: updatedTask
+      };
+    });
+
+    logAiTaskStatus(completed.task, "SUCCEEDED", {
+      requestId,
+      model: completed.result.model
+    });
+    await recordAiTaskProgress(completed.task, {
+      phase: "completed",
+      progressPercent: 100,
+      statusMessage: "任务已完成，结果已生成。"
+    });
+    await appendRunEvent(completed.task, {
+      type: "completed",
+      status: "completed",
+      title: "Streaming task completed",
+      summary: "Final Markdown answer is available in the conversation.",
+      progressPercent: 100,
+      createdAt: completed.task.finishedAt ?? new Date().toISOString(),
+      detailJson: {
+        scopeStatus: completed.task.scopeStatus,
+        model: completed.result.model,
+        tokenUsage: completed.result.tokenUsage
+      }
+    });
+
+    const response = await buildAiTaskResponse(completed.task, {
+      result: completed.result,
+      creditAccount: completed.credit.account,
+      duplicated: false
+    });
+
+    await emit({
+      type: "done",
+      data: response,
+      visibleThinking: providerStream.visibleThinking,
+      finalAnswerMarkdown: providerStream.finalAnswerMarkdown,
+      parsedResult: toResultResponse(completed.result)
+    });
+
+    return response;
+  } catch (error) {
+    const apiError = normalizeTaskError(error);
+    const taskToFail = task;
+
+    if (!taskToFail) {
+      throw apiError;
+    }
+
+    const latestBeforeFail = await repository.findAiTaskById(taskToFail.id);
+
+    if (latestBeforeFail?.status === "CANCELLED") {
+      return buildAiTaskResponse(latestBeforeFail, {
+        duplicated: true
+      });
+    }
+
+    logAiTaskStatus(taskToFail, "FAILED", {
+      requestId,
+      errorCode: apiError.code,
+      message: apiError.message
+    });
+    await recordAiTaskProgress(taskToFail, {
+      phase: "failed",
+      progressPercent: 96,
+      failureStage: apiError.code === "AI_PROVIDER_BAD_RESPONSE" ? "validating" : "processing",
+      statusMessage: apiError.message
+    });
+
+    const latestTask = await withRepositoryTransaction(async () => {
+      const transactionRepository = getRepository();
+      const failedAt = new Date().toISOString();
+      await releaseReservation(taskToFail.id);
+
+      const failedTask = await transactionRepository.updateAiTask(taskToFail.id, {
+        status: "FAILED",
+        errorCode: apiError.code,
+        errorMessage: apiError.message,
+        finishedAt: failedAt,
+        updatedAt: failedAt
+      });
+
+      await createAssistantErrorMessageForTask(failedTask, apiError, failedAt);
+      await appendRunEvent(failedTask, {
+        type: "failed",
+        status: "failed",
+        title: "Streaming task failed",
+        summary: apiError.message,
+        progressPercent: 96,
+        createdAt: failedAt,
+        detailJson: {
+          errorCode: apiError.code
+        }
+      });
+
+      return failedTask;
+    });
+
+    await refundConfirmedAiTaskCost(latestTask, requestId);
+    throw apiError;
+  }
 }
 
 export async function getAiTaskForUser(userId: string, taskId: string) {
@@ -1244,18 +1552,18 @@ async function appendInputFileRunEvents(task: AiTask, inputFileName: string | nu
   await appendRunEvent(task, {
     type: "upload_received",
     status: "completed",
-    title: "收到输入附件",
+    title: "已接收附件",
     summary: fileSummary,
-    progressPercent: 4,
+    progressPercent: 5,
     createdAt,
     detailJson: buildFileEventDetail(file, kind)
   });
   await appendRunEvent(task, {
     type: "read_attachment",
     status: "completed",
-    title: "读取附件元信息",
+    title: "附件已读取",
     summary: `${file.originalName} 已完成解析和安全扫描，状态：${file.scanStatus}。`,
-    progressPercent: 6,
+    progressPercent: 8,
     createdAt,
     detailJson: buildFileEventDetail(file, kind)
   });
@@ -1266,11 +1574,11 @@ async function appendInputFileRunEvents(task: AiTask, inputFileName: string | nu
     await appendRunEvent(task, {
       type: "parse_image",
       status: supportsVision ? "completed" : "skipped",
-      title: supportsVision ? "准备图片视觉输入" : "图片视觉理解已跳过",
+      title: supportsVision ? "输入已解析" : "图片视觉理解已跳过",
       summary: supportsVision
         ? `${file.originalName} 已准备为 vision 输入。`
         : `${file.originalName} 已作为附件保留；当前模型未配置 vision 能力，本次仅使用文字上下文。`,
-      progressPercent: supportsVision ? 10 : 8,
+      progressPercent: supportsVision ? 12 : 8,
       createdAt,
       detailJson: {
         ...buildFileEventDetail(file, kind),
@@ -1283,14 +1591,13 @@ async function appendInputFileRunEvents(task: AiTask, inputFileName: string | nu
   await appendRunEvent(task, {
     type: "parse_text",
     status: "completed",
-    title: "解析文本输入",
+    title: "输入已解析",
     summary: `${file.originalName} 已抽取文本内容并合并到本次任务输入。`,
-    progressPercent: 10,
+    progressPercent: 12,
     createdAt,
     detailJson: {
       ...buildFileEventDetail(file, kind),
-      contentChars: file.contentText?.length ?? 0,
-      contentPreview: normalizePreview(file.contentText, 180)
+      contentChars: file.contentText?.length ?? 0
     }
   });
 }
@@ -1344,7 +1651,7 @@ function progressToRunEvent(task: AiTask, progress: AiTaskProgressSnapshot) {
 
   if (progress.phase === "processing") {
     return {
-      type: task.type === "strategy_generation" ? "call_model" : "analyze_code",
+      type: "call_model",
       status: "running" as const,
       title: progress.phaseLabel || "处理任务输入",
       summary: progress.statusMessage,
@@ -1355,7 +1662,7 @@ function progressToRunEvent(task: AiTask, progress: AiTaskProgressSnapshot) {
 
   if (progress.phase === "merging") {
     return {
-      type: "generate_plan",
+      type: "stream_output",
       status: "running" as const,
       title: task.type === "code_analysis" ? "汇总解析报告" : progress.phaseLabel || "合并结果",
       summary: progress.statusMessage,
@@ -1651,22 +1958,37 @@ function getUserMessageContent(type: AiTaskType, input: {
   return input.prompt || (input.inputFileName ? `已上传文件：${input.inputFileName}` : "已上传文件输入");
 }
 
-async function createAssistantMessageForTask(task: AiTask, result: AiTaskResult, createdAt: string) {
+async function createAssistantMessageForTask(
+  task: AiTask,
+  result: AiTaskResult,
+  createdAt: string,
+  streamContent?: {
+    visibleThinking?: string;
+    finalAnswerMarkdown?: string;
+    parsedResult?: ReturnType<typeof toResultResponse>;
+  }
+) {
   if (!task.conversationId) {
     return;
   }
 
   const repository = getRepository();
+  const finalAnswerMarkdown = streamContent?.finalAnswerMarkdown?.trim() || null;
+  const visibleThinking = streamContent?.visibleThinking?.trim() || null;
+  const parsedResult = streamContent?.parsedResult ?? toResultResponse(result);
 
   await repository.createAiMessage({
     conversationId: task.conversationId,
     userId: task.userId,
     role: "assistant",
     taskId: task.id,
-    content: getAssistantMessageContent(result),
+    content: finalAnswerMarkdown ?? getAssistantMessageContent(result),
     contentJson: {
       task: toTaskResponse(task),
-      result: toResultResponse(result),
+      result: parsedResult,
+      visibleThinking,
+      finalAnswerMarkdown,
+      parsedResult,
       visibleSteps: buildVisibleStepsForTask(task, "succeeded")
     },
     createdAt
@@ -1775,11 +2097,9 @@ function assertInputWithinLimit(
   const totalInputChars = getTotalInputChars(input);
 
   if (totalInputChars > config.maxTotalInputChars) {
-    const current = totalInputChars.toLocaleString("zh-CN");
-    const limit = config.maxTotalInputChars.toLocaleString("zh-CN");
     const message = input.inputFileId
-      ? `附件已解析但内容过长。当前任务不支持这么长的输入（当前 ${current} 字符，上限 ${limit} 字符），建议拆分文件后重试。`
-      : `当前任务不支持这么长的输入（当前 ${current} 字符，上限 ${limit} 字符），请拆分代码或减少补充要求后重试。`;
+      ? "附件已解析但内容过长。当前任务不支持这么长的输入，建议拆分文件后重试。"
+      : "当前任务不支持这么长的输入，请拆分代码或减少补充要求后重试。";
 
     throw new ApiError(
       "INPUT_TOO_LARGE",

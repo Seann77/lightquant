@@ -5,6 +5,21 @@ import type { AiTaskProgressUpdate } from "@/server/ai/ai-task-progress";
 
 export type AiProviderResult = Omit<AiTaskResult, "taskId" | "resultType" | "createdAt">;
 
+export type AiProviderStreamDelta = {
+  type: "thinking_delta" | "final_delta";
+  delta: string;
+};
+
+export type AiProviderStreamCallbacks = {
+  onDelta?: (delta: AiProviderStreamDelta) => void | Promise<void>;
+};
+
+export type AiProviderStreamResult = {
+  result: AiProviderResult;
+  visibleThinking: string;
+  finalAnswerMarkdown: string;
+};
+
 export type AiProviderAttachment = {
   fileId: string;
   kind: "image";

@@ -186,13 +186,10 @@ export function getCodeAnalysisTabContent(activeTab: string, report: Record<stri
 function AnalysisCompletionMeta({ task }: { task: AiTaskData["task"] }) {
   const parts = ["已完成"];
   const duration = formatTaskDuration(task.startedAt, task.finishedAt);
-  const mode = task.progress?.processingMode === "chunked" ? "分段处理" : "单次处理";
 
   if (duration) {
     parts.push(`用时 ${duration}`);
   }
-
-  parts.push(mode);
 
   return (
     <div className="lq-analysis-completion">

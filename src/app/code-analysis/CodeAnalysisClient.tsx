@@ -13,25 +13,33 @@ import {
 import { getFileUploadFriendlyError, uploadCodeFile, type UploadedCodeFile } from "@/lib/file-upload";
 import { codeAnalysisPlatforms, codeAnalysisTabs } from "@/lib/mock-data";
 import { PlatformDropdown } from "@/components/ui/PlatformDropdown";
-import { AiTaskProgressPanel } from "@/components/ai/AiTaskProgressPanel";
+import { AssistantThinkingMessage, type AssistantThinkingStatus } from "@/components/ai/AssistantThinkingMessage";
 import { WorkbenchFileUploadStatus } from "@/components/ai/AttachmentPreviewCard";
 import { WorkbenchShell } from "@/components/ai/WorkbenchShell";
-import { CodeAnalysisResultView } from "@/components/ai/WorkbenchResultViews";
 import {
   createRestoredUploadedFile,
-  createWorkbenchAiTask,
   createWorkbenchClientRequestId,
+  formatAiTaskResultAsMarkdown,
   formatRestoredInputText,
+  getAiTaskStreamingContent,
   getConversationActiveTab,
   getFriendlyAiError as getFriendlyError,
   persistConversationActiveTab,
   replaceWorkbenchConversationUrl,
-  waitForAiTaskResult
+  streamWorkbenchAiTask
 } from "@/lib/ai/workbench-client";
 import { useWorkbenchConversationRestore } from "@/lib/ai/use-workbench-conversation";
 import type { AiTaskData } from "@/lib/ai/workbench-types";
 
 type AnalysisInputSource = "manual" | "attachment" | "restored";
+
+type ThinkingMessageState = {
+  status: AssistantThinkingStatus;
+  visibleThinking: string;
+  finalAnswerMarkdown: string;
+  error?: string | null;
+  taskId?: string | null;
+};
 
 export function CodeAnalysisClient() {
   const router = useRouter();
@@ -40,6 +48,7 @@ export function CodeAnalysisClient() {
   const [inputCode, setInputCode] = useState("");
   const [inputSource, setInputSource] = useState<AnalysisInputSource>("manual");
   const [data, setData] = useState<AiTaskData | null>(null);
+  const [streamState, setStreamState] = useState<ThinkingMessageState>(() => createEmptyThinkingState());
   const [activeTab, setActiveTab] = useState(codeAnalysisTabs[0]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -79,6 +88,7 @@ export function CodeAnalysisClient() {
       setInputSource("restored");
       setUploadedFile(createRestoredUploadedFile(restored));
       setData(restored.taskData);
+      setStreamState(createThinkingStateFromTaskData(restored.taskData));
       setActiveTab(getConversationActiveTab(conversationData.conversation, codeAnalysisTabs, codeAnalysisTabs[0]));
     },
     onError: (historyError) => {
@@ -107,6 +117,7 @@ export function CodeAnalysisClient() {
 
       setUploadedFile(nextFile);
       setData(null);
+      setStreamState(createEmptyThinkingState());
       setError("");
 
       if (!nextInputCode.trim()) {
@@ -122,6 +133,7 @@ export function CodeAnalysisClient() {
       setUploadedFile(null);
       setInputCode("");
       setInputSource("manual");
+      setStreamState(createEmptyThinkingState());
       setUploadError(getFileUploadFriendlyError(uploadErrorValue));
     } finally {
       setUploading(false);
@@ -140,36 +152,73 @@ export function CodeAnalysisClient() {
 
     setLoading(true);
     setError("");
+    setStreamState({
+      status: "thinking",
+      visibleThinking: "",
+      finalAnswerMarkdown: ""
+    });
 
     try {
       const currentConversationId = data?.conversation?.id ?? conversationIdFromUrl ?? undefined;
-      const payload = await createWorkbenchAiTask({
+      const completed = await streamWorkbenchAiTask({
         type: "code_analysis",
         conversationId: currentConversationId,
         sourcePlatform: platform,
         inputCode: finalInputText,
         inputFileId: uploadedFile?.contentText ? uploadedFile.fileId : undefined,
         clientRequestId: createWorkbenchClientRequestId("analysis")
+      }, {
+        onTask: (payload) => {
+          setData(payload);
+          setStreamState((current) => ({
+            ...current,
+            status: current.finalAnswerMarkdown ? "answering" : "thinking",
+            taskId: payload.task.id
+          }));
+          replaceWorkbenchConversationUrl(router, { type: "analysis" }, conversationIdFromUrl, payload.conversation?.id ?? payload.task.conversationId ?? null);
+          window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
+        },
+        onThinkingDelta: (delta) => {
+          setStreamState((current) => ({
+            ...current,
+            status: current.finalAnswerMarkdown ? "answering" : "thinking",
+            visibleThinking: `${current.visibleThinking}${delta}`
+          }));
+        },
+        onFinalDelta: (delta) => {
+          setStreamState((current) => ({
+            ...current,
+            status: "answering",
+            finalAnswerMarkdown: `${current.finalAnswerMarkdown}${delta}`
+          }));
+        },
+        onDone: (payload) => {
+          setData(payload);
+          setStreamState(createThinkingStateFromTaskData(payload));
+        }
       });
 
-      setData(payload);
-      replaceWorkbenchConversationUrl(router, { type: "analysis" }, conversationIdFromUrl, payload.conversation?.id ?? payload.task.conversationId ?? null);
-      window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
-      const completed = await waitForAiTaskResult(payload, setData);
       setData(completed);
+      setStreamState(createThinkingStateFromTaskData(completed));
       replaceWorkbenchConversationUrl(router, { type: "analysis" }, conversationIdFromUrl, completed.conversation?.id ?? completed.task.conversationId ?? null);
       window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
       window.dispatchEvent(new Event("lightquant:credits-updated"));
     } catch (submitError) {
       window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
-      setError(getFriendlyError(submitError));
+      const friendly = getFriendlyError(submitError);
+      setError(friendly);
+      setStreamState((current) => ({
+        ...current,
+        status: "failed",
+        error: friendly
+      }));
     } finally {
       setLoading(false);
     }
   }
 
-  const report = data?.result?.reportJson;
-  const shouldShowTaskProgress = !data?.result && (loading || Boolean(data && data.task.status !== "SUCCEEDED"));
+  const finalAnswerMarkdown = streamState.finalAnswerMarkdown || (data?.result ? formatAiTaskResultAsMarkdown(data.result, "code_analysis") : "");
+  const shouldShowThinkingResult = Boolean(streamState.visibleThinking || finalAnswerMarkdown || loading || data?.result);
   const finalInputText = getFinalInputText(inputCode, inputSource);
   const analysisInputChars = finalInputText.length;
   const canSubmit = Boolean(finalInputText) && !loading && uploadedFile?.scanStatus !== "BLOCKED";
@@ -191,7 +240,7 @@ export function CodeAnalysisClient() {
           <input accept=".py,.txt,.log,.md,.png,.jpg,.jpeg,.webp" className="hidden" onChange={handleFileChange} ref={fileInputRef} type="file" />
         </div>
 
-        <WorkbenchFileUploadStatus className="mx-[18px]" file={uploadedFile} message={uploadError} showPreview={false} />
+        <WorkbenchFileUploadStatus className="mx-[18px]" file={uploadedFile} message={uploadError} />
 
         <div className="lq-analysis-editor">
           <div className="lq-line-numbers">
@@ -218,6 +267,7 @@ export function CodeAnalysisClient() {
                 setInputCode("");
                 setInputSource("manual");
                 setData(null);
+                setStreamState(createEmptyThinkingState());
                 setError("");
                 setUploadedFile(null);
                 setUploadError("");
@@ -256,23 +306,13 @@ export function CodeAnalysisClient() {
           ))}
         </div>
 
-        {data?.result ? (
-          <CodeAnalysisResultView activeTab={activeTab} costPoints={data.task.costPoints} report={report} result={data.result} task={data.task} />
-        ) : shouldShowTaskProgress ? (
-          <div className="lq-empty-result is-progress">
-            <AiTaskProgressPanel
-              events={data?.events ?? data?.task.events}
-              elapsedSeconds={elapsedSeconds}
-              errorCode={data?.task.errorCode}
-              inputChars={analysisInputChars}
-              progress={data?.task.progress}
-              showEta={false}
-              showInputChars={false}
-              status={data?.task.status ?? (loading ? "RUNNING" : "PENDING")}
-              taskId={data?.task.id}
-              taskType="code_analysis"
-            />
-          </div>
+        {shouldShowThinkingResult ? (
+          <AssistantThinkingMessage
+            error={streamState.error}
+            finalAnswerMarkdown={finalAnswerMarkdown}
+            status={streamState.status}
+            thinking={streamState.visibleThinking}
+          />
         ) : (
           <div className="lq-empty-result">
             <div className="lq-empty-icon">
@@ -289,6 +329,49 @@ export function CodeAnalysisClient() {
 
 function ErrorPanel({ message }: { message: string }) {
   return <div className="lq-error-panel">{message}</div>;
+}
+
+function createEmptyThinkingState(): ThinkingMessageState {
+  return {
+    status: "idle",
+    visibleThinking: "",
+    finalAnswerMarkdown: ""
+  };
+}
+
+function createThinkingStateFromTaskData(data: AiTaskData | null | undefined): ThinkingMessageState {
+  if (!data) {
+    return createEmptyThinkingState();
+  }
+
+  const streamContent = getAiTaskStreamingContent(data, data.task.id);
+  const finalAnswerMarkdown = streamContent.finalAnswerMarkdown || (data.result ? formatAiTaskResultAsMarkdown(data.result, "code_analysis") : "");
+
+  if (data.task.status === "FAILED" || data.task.status === "CANCELLED") {
+    return {
+      status: "failed",
+      visibleThinking: streamContent.visibleThinking,
+      finalAnswerMarkdown,
+      error: data.task.errorMessage ?? null,
+      taskId: data.task.id
+    };
+  }
+
+  if (data.task.status === "SUCCEEDED" || data.result || finalAnswerMarkdown) {
+    return {
+      status: "completed",
+      visibleThinking: streamContent.visibleThinking,
+      finalAnswerMarkdown,
+      taskId: data.task.id
+    };
+  }
+
+  return {
+    status: "thinking",
+    visibleThinking: streamContent.visibleThinking,
+    finalAnswerMarkdown,
+    taskId: data.task.id
+  };
 }
 
 function getFinalInputText(inputCode: string, inputSource: AnalysisInputSource) {

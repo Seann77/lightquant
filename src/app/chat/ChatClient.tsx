@@ -5,8 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
   Bot,
-  ChevronDown,
-  ChevronRight,
   Code2,
   DollarSign,
   FileUp,
@@ -20,13 +18,11 @@ import {
 import { getFileUploadFriendlyError, uploadCodeFile, type UploadedCodeFile } from "@/lib/file-upload";
 import { chatPlatformOptions, convertPlatforms } from "@/lib/mock-data";
 import { PlatformDropdown } from "@/components/ui/PlatformDropdown";
-import { AiTaskCompletionSummary, AiTaskProgressPanel, RunEventTimeline } from "@/components/ai/AiTaskProgressPanel";
+import { AssistantThinkingMessage, type AssistantThinkingStatus } from "@/components/ai/AssistantThinkingMessage";
 import { MessageAttachmentList, WorkbenchFileUploadStatus } from "@/components/ai/AttachmentPreviewCard";
 import { WorkbenchShell } from "@/components/ai/WorkbenchShell";
 import {
-  CodeConversionResultView,
   CopyCodeButton,
-  StrategyResultView,
   getCodeConversionTabContent,
   isCodeConversionCodeTab
 } from "@/components/ai/WorkbenchResultViews";
@@ -39,17 +35,21 @@ import {
   formatRestoredInputText,
   getConversationActiveTab,
   getFriendlyAiError as getFriendlyError,
+  getAiTaskStreamingContent,
+  formatAiTaskResultAsMarkdown,
   getMessageAttachments,
   persistConversationActiveTab,
   readRecord,
+  readNullableString,
   readStringArray,
   replaceWorkbenchConversationUrl,
   retryAiTask,
+  streamWorkbenchAiTask,
   uploadedFileToMessageAttachment,
   waitForAiTaskResult
 } from "@/lib/ai/workbench-client";
 import { useWorkbenchConversationRestore } from "@/lib/ai/use-workbench-conversation";
-import type { AiConversationData, AiMessageData, AiRunEventData, AiTaskData } from "@/lib/ai/workbench-types";
+import type { AiConversationData, AiMessageData, AiRunEventData, AiTaskData, WorkbenchTaskType } from "@/lib/ai/workbench-types";
 
 type StrategyChatMessage = AiMessageData & {
   localStatus?: "pending" | "error";
@@ -84,6 +84,8 @@ type StrategyJob = {
   status: JobStatus;
   partialResult?: string;
   finalResult?: string;
+  visibleThinking?: string;
+  finalAnswerMarkdown?: string;
   error?: string;
   createdAt: string;
   startedAt?: string;
@@ -92,6 +94,14 @@ type StrategyJob = {
   result?: AiTaskData["result"];
   request?: StrategyJobRequest;
   events?: AiRunEventData[];
+};
+
+type ThinkingMessageState = {
+  status: AssistantThinkingStatus;
+  visibleThinking: string;
+  finalAnswerMarkdown: string;
+  error?: string | null;
+  taskId?: string | null;
 };
 
 const conversionTabs = ["目标平台代码", "迁移说明", "风险提醒"] as const;
@@ -134,6 +144,7 @@ function StrategyModeContent() {
   const activeConversationKeyRef = useRef(currentConversationKey);
   const pollingJobsRef = useRef(new Set<string>());
   const canceledLocalJobIdsRef = useRef(new Set<string>());
+  const streamAbortControllersRef = useRef(new Map<string, AbortController>());
   const activeJobId = activeJobByConversationId[currentConversationKey];
   const activeJob = activeJobId ? jobsById[activeJobId] ?? null : null;
   const activeJobRunning = Boolean(activeJob && isJobActive(activeJob));
@@ -400,8 +411,12 @@ function StrategyModeContent() {
     setUploadError("");
     forceStrategyThreadToBottom();
 
+    const streamController = new AbortController();
+    let streamJobId = localJob.id;
+    streamAbortControllersRef.current.set(streamJobId, streamController);
+
     try {
-      const data = await createWorkbenchAiTask({
+      const completed = await streamWorkbenchAiTask({
         type: "strategy_generation",
         conversationId: currentConversationId,
         messageContent: optimisticUserContent,
@@ -409,41 +424,53 @@ function StrategyModeContent() {
         prompt: optimisticUserContent,
         inputFileId: uploadedFile?.fileId,
         clientRequestId
-      });
-      setUploadedFile(null);
+      }, {
+        signal: streamController.signal,
+        onTask: (data) => {
+          if (streamJobId !== data.task.id) {
+            const controller = streamAbortControllersRef.current.get(streamJobId);
+            streamAbortControllersRef.current.delete(streamJobId);
+            if (controller) {
+              streamAbortControllersRef.current.set(data.task.id, controller);
+            }
+            streamJobId = data.task.id;
+          }
 
-      if (canceledLocalJobIdsRef.current.has(localJob.id)) {
-        canceledLocalJobIdsRef.current.delete(localJob.id);
-
-        try {
-          const canceledData = await cancelAiTask(data.task.id);
-          applyConversationPayload(canceledData, {
-            localJobId: localJob.id,
-            sourceConversationKey: conversationKeyAtSubmit,
-            request
-          });
-        } catch (cancelError) {
           applyConversationPayload(data, {
             localJobId: localJob.id,
             sourceConversationKey: conversationKeyAtSubmit,
             request
           });
-          startPollingJob(data.task.id, data.conversation?.id ?? data.task.conversationId ?? conversationKeyAtSubmit);
-          setError(getFriendlyError(cancelError));
+          window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
+        },
+        onThinkingDelta: (delta) => {
+          appendStrategyJobStreamDelta(streamJobId, "thinking", delta);
+        },
+        onFinalDelta: (delta) => {
+          appendStrategyJobStreamDelta(streamJobId, "final", delta);
+        },
+        onDone: (data) => {
+          applyConversationPayload(data, {
+            localJobId: localJob.id,
+            sourceConversationKey: conversationKeyAtSubmit,
+            request
+          });
         }
+      });
 
-        window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
-        return;
-      }
-
-      applyConversationPayload(data, {
+      setUploadedFile(null);
+      applyConversationPayload(completed, {
         localJobId: localJob.id,
         sourceConversationKey: conversationKeyAtSubmit,
         request
       });
-      startPollingJob(data.task.id, data.conversation?.id ?? data.task.conversationId ?? conversationKeyAtSubmit);
+      window.dispatchEvent(new Event("lightquant:credits-updated"));
       window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
     } catch (submitError) {
+      if (streamController.signal.aborted) {
+        return;
+      }
+
       canceledLocalJobIdsRef.current.delete(localJob.id);
       window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
       const friendly = getFriendlyError(submitError);
@@ -457,6 +484,9 @@ function StrategyModeContent() {
           finishedAt: new Date().toISOString()
         }
       }));
+    } finally {
+      streamAbortControllersRef.current.delete(streamJobId);
+      streamAbortControllersRef.current.delete(localJob.id);
     }
   }
 
@@ -470,12 +500,15 @@ function StrategyModeContent() {
   ) {
     const responseConversationId = data.conversation?.id ?? data.task.conversationId ?? options.sourceConversationKey;
     const previousJob = jobsById[data.task.id] ?? (options.localJobId ? jobsById[options.localJobId] : undefined);
+    const streamContent = getAiTaskStreamingContent(data, data.task.id);
     const nextJob = createStrategyJobFromTask(data.task, {
       conversationId: responseConversationId,
       result: data.result,
       events: data.events,
       previous: previousJob,
-      request: options.request ?? previousJob?.request
+      request: options.request ?? previousJob?.request,
+      visibleThinking: streamContent.visibleThinking,
+      finalAnswerMarkdown: streamContent.finalAnswerMarkdown
     });
     const shouldUpdateVisibleConversation = isSameConversationKey(activeConversationKeyRef.current, options.sourceConversationKey, responseConversationId);
 
@@ -553,6 +586,26 @@ function StrategyModeContent() {
     }
   }
 
+  function appendStrategyJobStreamDelta(jobId: string, channel: "thinking" | "final", delta: string) {
+    setJobsById((current) => {
+      const job = current[jobId];
+
+      if (!job) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [jobId]: {
+          ...job,
+          status: channel === "final" ? "streaming" : job.status === "pending" || job.status === "queued" ? "running" : job.status,
+          visibleThinking: channel === "thinking" ? `${job.visibleThinking ?? ""}${delta}` : job.visibleThinking,
+          finalAnswerMarkdown: channel === "final" ? `${job.finalAnswerMarkdown ?? ""}${delta}` : job.finalAnswerMarkdown
+        }
+      };
+    });
+  }
+
   function startPollingJob(jobId: string, sourceConversationKey: string) {
     if (pollingJobsRef.current.has(jobId)) {
       return;
@@ -628,6 +681,8 @@ function StrategyModeContent() {
     if (!isJobActive(job)) {
       return;
     }
+
+    streamAbortControllersRef.current.get(job.id)?.abort();
 
     if (!job.task) {
       canceledLocalJobIdsRef.current.add(job.id);
@@ -865,6 +920,7 @@ function ConvertModeContent() {
   const [inputCode, setInputCode] = useState("");
   const [prompt, setPrompt] = useState("");
   const [taskData, setTaskData] = useState<AiTaskData | null>(null);
+  const [streamState, setStreamState] = useState<ThinkingMessageState>(() => createEmptyThinkingState());
   const [activeTab, setActiveTab] = useState<(typeof conversionTabs)[number]>(conversionTabs[0]);
   const [loading, setLoading] = useState(false);
   const [canceling, setCanceling] = useState(false);
@@ -876,6 +932,7 @@ function ConvertModeContent() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cancelRequestedRef = useRef(false);
   const pollingConversionTaskIdRef = useRef<string | null>(null);
+  const streamingConversionTaskIdRef = useRef<string | null>(null);
   const conversationIdFromUrl = searchParams.get("conversationId");
   const activeConversionTaskStatus = taskData?.task.status ?? null;
   const activeConversionTaskRunning = activeConversionTaskStatus === "PENDING" || activeConversionTaskStatus === "RUNNING";
@@ -920,6 +977,7 @@ function ConvertModeContent() {
       setInputSource("restored");
       setUploadedFile(createRestoredUploadedFile(restored));
       setTaskData(restored.taskData);
+      setStreamState(createThinkingStateFromTaskData(restored.taskData, "code_conversion"));
       setActiveTab(getConversationActiveTab(conversationData.conversation, conversionTabs, conversionTabs[0]));
     },
     onError: (historyError) => {
@@ -947,6 +1005,10 @@ function ConvertModeContent() {
       return;
     }
 
+    if (streamingConversionTaskIdRef.current === currentTask.id) {
+      return;
+    }
+
     if (pollingConversionTaskIdRef.current === currentTask.id) {
       return;
     }
@@ -963,6 +1025,7 @@ function ConvertModeContent() {
           }
 
           setTaskData(nextData);
+          setStreamState(createThinkingStateFromTaskData(nextData, "code_conversion"));
         });
 
         if (disposed || cancelRequestedRef.current) {
@@ -970,6 +1033,7 @@ function ConvertModeContent() {
         }
 
         setTaskData(completed);
+        setStreamState(createThinkingStateFromTaskData(completed, "code_conversion"));
         replaceWorkbenchConversationUrl(router, { type: "chat", mode: "convert" }, conversationIdFromUrl, completed.conversation?.id ?? completed.task.conversationId ?? null);
         window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
 
@@ -1008,12 +1072,14 @@ function ConvertModeContent() {
     setInputSource("manual");
     setPrompt("");
     setTaskData(null);
+    setStreamState(createEmptyThinkingState());
     setError("");
     setUploadedFile(null);
     setUploadError("");
     setLoading(false);
     setCanceling(false);
     pollingConversionTaskIdRef.current = null;
+    streamingConversionTaskIdRef.current = null;
     cancelRequestedRef.current = false;
     setActiveTab(conversionTabs[0]);
   }
@@ -1063,10 +1129,15 @@ function ConvertModeContent() {
     setCanceling(false);
     cancelRequestedRef.current = false;
     setError("");
+    setStreamState({
+      status: "thinking",
+      visibleThinking: "",
+      finalAnswerMarkdown: ""
+    });
 
     try {
       const currentConversationId = taskData?.conversation?.id ?? conversationIdFromUrl ?? undefined;
-      const data = await createWorkbenchAiTask({
+      const completed = await streamWorkbenchAiTask({
         type: "code_conversion",
         conversationId: currentConversationId,
         sourcePlatform,
@@ -1075,20 +1146,59 @@ function ConvertModeContent() {
         prompt: finalPrompt,
         inputFileId: uploadedFile?.fileId,
         clientRequestId: createWorkbenchClientRequestId("convert")
+      }, {
+        onTask: (data) => {
+          streamingConversionTaskIdRef.current = data.task.id;
+          setTaskData(data);
+          setStreamState((current) => ({
+            ...current,
+            status: current.finalAnswerMarkdown ? "answering" : "thinking",
+            taskId: data.task.id
+          }));
+          replaceWorkbenchConversationUrl(router, { type: "chat", mode: "convert" }, conversationIdFromUrl, data.conversation?.id ?? data.task.conversationId ?? null);
+          window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
+        },
+        onThinkingDelta: (delta) => {
+          setStreamState((current) => ({
+            ...current,
+            status: current.finalAnswerMarkdown ? "answering" : "thinking",
+            visibleThinking: `${current.visibleThinking}${delta}`
+          }));
+        },
+        onFinalDelta: (delta) => {
+          setStreamState((current) => ({
+            ...current,
+            status: "answering",
+            finalAnswerMarkdown: `${current.finalAnswerMarkdown}${delta}`
+          }));
+        },
+        onDone: (data) => {
+          setTaskData(data);
+          setStreamState(createThinkingStateFromTaskData(data, "code_conversion"));
+        }
       });
 
-      setTaskData(data);
+      setTaskData(completed);
+      setStreamState(createThinkingStateFromTaskData(completed, "code_conversion"));
       setActiveTab(conversionTabs[0]);
-      replaceWorkbenchConversationUrl(router, { type: "chat", mode: "convert" }, conversationIdFromUrl, data.conversation?.id ?? data.task.conversationId ?? null);
+      replaceWorkbenchConversationUrl(router, { type: "chat", mode: "convert" }, conversationIdFromUrl, completed.conversation?.id ?? completed.task.conversationId ?? null);
+      window.dispatchEvent(new Event("lightquant:credits-updated"));
       window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
     } catch (submitError) {
       window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
       if (!cancelRequestedRef.current) {
-        setError(getFriendlyError(submitError));
+        const friendly = getFriendlyError(submitError);
+        setError(friendly);
+        setStreamState((current) => ({
+          ...current,
+          status: "failed",
+          error: friendly
+        }));
       }
     } finally {
       setLoading(false);
       setCanceling(false);
+      streamingConversionTaskIdRef.current = null;
     }
   }
 
@@ -1106,6 +1216,11 @@ function ConvertModeContent() {
     try {
       const data = await cancelAiTask(taskId);
       setTaskData(data);
+      setStreamState((current) => ({
+        ...current,
+        status: "failed",
+        error: "任务已取消"
+      }));
       setLoading(false);
       window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
     } catch (cancelError) {
@@ -1117,7 +1232,8 @@ function ConvertModeContent() {
   }
 
   const result = taskData?.result;
-  const conversionPanelContent = getCodeConversionTabContent(activeTab, result);
+  const streamFinalAnswerMarkdown = streamState.finalAnswerMarkdown || (result ? formatAiTaskResultAsMarkdown(result, "code_conversion") : "");
+  const conversionPanelContent = streamFinalAnswerMarkdown || getCodeConversionTabContent(activeTab, result);
   const conversionLineCount = Math.max(10, conversionPanelContent ? conversionPanelContent.split(/\r\n|\r|\n/).length : 10);
   const canCopyConversionCode = Boolean(result?.generatedCode?.trim() && isCodeConversionCodeTab(activeTab));
   const finalInputText = getFinalConversionInputText(inputCode);
@@ -1127,7 +1243,7 @@ function ConvertModeContent() {
     ? getConversionInputTooLargeMessage(finalTotalInputChars, inputSource === "attachment" && Boolean(uploadedFile))
     : "";
   const shownError = error || inputTooLargeMessage;
-  const shouldShowTaskProgress = !result && (conversionLoading || Boolean(taskData && taskData.task.status !== "SUCCEEDED"));
+  const shouldShowThinkingResult = Boolean(streamState.visibleThinking || streamFinalAnswerMarkdown || conversionLoading || result);
   const taskStatus = taskData?.task.status ?? (conversionLoading ? "RUNNING" : null);
   const canCancelTask = Boolean(taskData?.task.id && (taskStatus === "PENDING" || taskStatus === "RUNNING"));
 
@@ -1163,7 +1279,7 @@ function ConvertModeContent() {
                 </button>
                 <input accept=".py,.txt,.log,.md,.png,.jpg,.jpeg,.webp" className="hidden" onChange={handleFileChange} ref={fileInputRef} type="file" />
               </div>
-              <WorkbenchFileUploadStatus file={uploadedFile} message={uploadError} showPreview={false} />
+              <WorkbenchFileUploadStatus file={uploadedFile} message={uploadError} />
               <textarea
                 className="lq-textarea lq-code-input"
                 onChange={(event) => {
@@ -1208,21 +1324,12 @@ function ConvertModeContent() {
               </div>
               <div className="lq-code-preview app-scrollbar">
                 <div className="lq-code-lines">{Array.from({ length: conversionLineCount }, (_, index) => <div key={index}>{index + 1}</div>)}</div>
-                {result ? (
-                  <CodeConversionResultView activeTab={activeTab} result={result} />
-                ) : shouldShowTaskProgress ? (
-                  <AiTaskProgressPanel
-                    events={taskData?.events ?? taskData?.task.events}
-                    elapsedSeconds={elapsedSeconds}
-                    errorCode={taskData?.task.errorCode}
-                    canceling={canceling}
-                    onCancel={canCancelTask ? handleCancelConversionTask : undefined}
-                    progress={taskData?.task.progress}
-                    showEta={false}
-                    showInputChars={false}
-                    status={taskData?.task.status ?? (conversionLoading ? "RUNNING" : "PENDING")}
-                    taskId={taskData?.task.id}
-                    taskType="code_conversion"
+                {shouldShowThinkingResult ? (
+                  <AssistantThinkingMessage
+                    error={streamState.error}
+                    finalAnswerMarkdown={streamFinalAnswerMarkdown}
+                    status={streamState.status}
+                    thinking={streamState.visibleThinking}
                     tone="dark"
                   />
                 ) : (
@@ -1233,7 +1340,6 @@ function ConvertModeContent() {
                 )}
               </div>
             </div>
-            {result && taskData?.task ? <AiTaskCompletionSummary events={taskData.events ?? taskData.task.events} progress={taskData.task.progress} task={taskData.task} /> : null}
             {shownError ? <ErrorPanel message={shownError} /> : null}
           </div>
         </div>
@@ -1324,13 +1430,20 @@ function StrategyMessageBubble({ elapsedSeconds, message }: { elapsedSeconds?: n
   const task = getMessageTask(message);
   const error = getMessageError(message);
   const status = message.localStatus === "pending" ? "running" : message.localStatus === "error" || error ? "failed" : result ? "succeeded" : "idle";
+  const streamContent = getMessageStreamingContent(message, result, "strategy_generation");
+  const thinkingStatus: AssistantThinkingStatus = status === "failed" ? "failed" : status === "succeeded" ? "completed" : message.localStatus === "pending" ? "thinking" : "idle";
 
   return (
     <div className="lq-assistant-row">
       <div className={`lq-assistant-message ${status === "failed" ? "is-error" : ""}`}>
-        {status !== "idle" ? <AgentWorkLog elapsedSeconds={elapsedSeconds} status={status} task={task} /> : null}
-        {status === "failed" ? <ErrorPanel message={error?.message ?? message.content} /> : null}
-        {result ? <StrategyResultView result={result} task={task} /> : null}
+        {streamContent.finalAnswerMarkdown || streamContent.visibleThinking || result || status === "failed" ? (
+          <AssistantThinkingMessage
+            error={status === "failed" ? error?.message ?? message.content : null}
+            finalAnswerMarkdown={streamContent.finalAnswerMarkdown}
+            status={thinkingStatus}
+            thinking={streamContent.visibleThinking}
+          />
+        ) : null}
         {!result && status === "idle" ? (
           <div className="lq-chat-bubble is-plain">
             <span className="lq-ai-mark">
@@ -1355,82 +1468,30 @@ function StrategyJobBubble({
   onCancel: () => void;
   onRetry: () => void;
 }) {
-  const [expanded, setExpanded] = useState(isJobActive(job));
-  const running = isJobActive(job);
   const failed = job.status === "failed";
   const canceled = job.status === "canceled";
   const completed = job.status === "completed";
-  const summary = getStrategyJobSummary(job, elapsedSeconds);
-  const timelineStatus = job.task?.status ?? (running ? "RUNNING" : completed ? "SUCCEEDED" : canceled ? "CANCELLED" : failed ? "FAILED" : null);
-  const emptyProcessMessage = running ? "LightQuant 正在接收任务..." : "暂无处理过程事件";
-
-  useEffect(() => {
-    if (running) {
-      setExpanded(true);
-    }
-  }, [running, job.id]);
+  const finalAnswerMarkdown = job.finalAnswerMarkdown || (job.result ? formatAiTaskResultAsMarkdown(job.result, "strategy_generation") : "");
+  const thinkingStatus: AssistantThinkingStatus = failed || canceled ? "failed" : completed ? "completed" : job.status === "streaming" ? "answering" : "thinking";
 
   return (
     <div className="lq-assistant-row">
       <div className={`lq-assistant-message ${failed || canceled ? "is-error" : ""}`}>
-        <div className={`lq-agent-log ${running ? "is-running" : ""}`}>
-          <div className="lq-agent-log-head">
-            <button className="lq-agent-log-summary" onClick={() => setExpanded((value) => !value)} type="button">
-              {expanded ? <ChevronDown aria-hidden="true" size={16} /> : <ChevronRight aria-hidden="true" size={16} />}
-              <span>{summary}</span>
+        <AssistantThinkingMessage
+          error={failed || canceled ? job.error ?? null : null}
+          finalAnswerMarkdown={finalAnswerMarkdown}
+          status={thinkingStatus}
+          thinking={job.visibleThinking ?? ""}
+        />
+        {failed || canceled ? (
+          <div className="lq-job-actions">
+            <button className="lq-job-action is-primary" onClick={onRetry} type="button">
+              <ArrowRight aria-hidden="true" size={15} />
+              重试
             </button>
-            {running ? (
-              <button className="lq-job-action lq-job-action-inline" onClick={onCancel} type="button">
-                <Trash2 aria-hidden="true" size={15} />
-                取消任务
-              </button>
-            ) : null}
           </div>
-          {expanded ? <RunEventTimeline collapsible={false} emptyMessage={emptyProcessMessage} events={job.events} status={timelineStatus} taskId={job.task?.id} /> : null}
-          {failed || canceled ? (
-            <div className="lq-job-actions">
-              <button className="lq-job-action is-primary" onClick={onRetry} type="button">
-                <ArrowRight aria-hidden="true" size={15} />
-                重试
-              </button>
-            </div>
-          ) : null}
-        </div>
-
-        {job.error ? <ErrorPanel message={job.error} /> : null}
-        {completed && job.result ? <StrategyResultView result={job.result} task={job.task ?? null} /> : null}
+        ) : null}
       </div>
-    </div>
-  );
-}
-
-function AgentWorkLog({
-  elapsedSeconds,
-  status,
-  task
-}: {
-  elapsedSeconds?: number;
-  status: "running" | "succeeded" | "failed" | "idle";
-  task: AiTaskData["task"] | null;
-}) {
-  const [expanded, setExpanded] = useState(status === "running");
-  const runningElapsed = Math.max(1, elapsedSeconds ?? 0);
-  const duration = status === "running" ? formatElapsed(runningElapsed) : formatTaskDuration(task, elapsedSeconds);
-  const summary = status === "running"
-    ? `LightQuant 正在处理 · ${duration}`
-    : status === "failed"
-      ? `处理失败 · 用时 ${duration}`
-      : `已完成 · 用时 ${duration} · 查看处理过程`;
-  const timelineStatus = task?.status ?? (status === "running" ? "RUNNING" : status === "failed" ? "FAILED" : status === "succeeded" ? "SUCCEEDED" : null);
-  const emptyProcessMessage = status === "running" ? "LightQuant 正在接收任务..." : "暂无处理过程事件";
-
-  return (
-    <div className={`lq-agent-log ${status === "running" ? "is-running" : ""}`}>
-      <button className="lq-agent-log-summary" onClick={() => setExpanded((value) => !value)} type="button">
-        {expanded ? <ChevronDown aria-hidden="true" size={16} /> : <ChevronRight aria-hidden="true" size={16} />}
-        <span>{summary}</span>
-      </button>
-      {expanded ? <RunEventTimeline collapsible={false} emptyMessage={emptyProcessMessage} status={timelineStatus} taskId={task?.id} /> : null}
     </div>
   );
 }
@@ -1514,6 +1575,8 @@ function createStrategyJobFromTask(
     events?: AiRunEventData[];
     previous?: StrategyJob;
     request?: StrategyJobRequest;
+    visibleThinking?: string;
+    finalAnswerMarkdown?: string;
   }
 ): StrategyJob {
   const status = mapTaskStatusToJobStatus(task.status, input.result);
@@ -1526,6 +1589,8 @@ function createStrategyJobFromTask(
     status,
     partialResult: status === "streaming" ? resultText : input.previous?.partialResult,
     finalResult: status === "completed" ? resultText : input.previous?.finalResult,
+    visibleThinking: input.visibleThinking ?? input.previous?.visibleThinking,
+    finalAnswerMarkdown: input.finalAnswerMarkdown ?? input.previous?.finalAnswerMarkdown,
     error: status === "failed" || status === "canceled" ? task.errorMessage ?? input.previous?.error ?? "任务处理失败" : undefined,
     createdAt,
     startedAt: task.startedAt ?? input.previous?.startedAt ?? undefined,
@@ -1557,6 +1622,49 @@ function mapTaskStatusToJobStatus(status: string, result?: AiTaskData["result"])
   return "queued";
 }
 
+function createEmptyThinkingState(): ThinkingMessageState {
+  return {
+    status: "idle",
+    visibleThinking: "",
+    finalAnswerMarkdown: ""
+  };
+}
+
+function createThinkingStateFromTaskData(data: AiTaskData | null | undefined, taskType: WorkbenchTaskType): ThinkingMessageState {
+  if (!data) {
+    return createEmptyThinkingState();
+  }
+
+  const streamContent = getAiTaskStreamingContent(data, data.task.id);
+  const finalAnswerMarkdown = streamContent.finalAnswerMarkdown || (data.result ? formatAiTaskResultAsMarkdown(data.result, taskType) : "");
+
+  if (data.task.status === "FAILED" || data.task.status === "CANCELLED") {
+    return {
+      status: "failed",
+      visibleThinking: streamContent.visibleThinking,
+      finalAnswerMarkdown,
+      error: data.task.errorMessage ?? null,
+      taskId: data.task.id
+    };
+  }
+
+  if (data.task.status === "SUCCEEDED" || data.result || finalAnswerMarkdown) {
+    return {
+      status: "completed",
+      visibleThinking: streamContent.visibleThinking,
+      finalAnswerMarkdown,
+      taskId: data.task.id
+    };
+  }
+
+  return {
+    status: "thinking",
+    visibleThinking: streamContent.visibleThinking,
+    finalAnswerMarkdown,
+    taskId: data.task.id
+  };
+}
+
 function getFinalConversionInputText(inputCode: string) {
   return inputCode.trim();
 }
@@ -1566,14 +1674,11 @@ function getConversionTotalInputChars(inputCode: string, prompt: string, sourceP
 }
 
 function getConversionInputTooLargeMessage(totalInputChars: number, fromAttachment: boolean) {
-  const current = totalInputChars.toLocaleString("zh-CN");
-  const limit = CODE_CONVERSION_MAX_TOTAL_INPUT_CHARS.toLocaleString("zh-CN");
-
   if (fromAttachment) {
-    return `附件已解析但内容过长。当前任务不支持这么长的输入（当前 ${current} 字符，上限 ${limit} 字符），建议拆分文件后重试。`;
+    return "附件已解析但内容过长。当前任务不支持这么长的输入，建议拆分文件后重试。";
   }
 
-  return `当前任务不支持这么长的输入（当前 ${current} 字符，上限 ${limit} 字符），请拆分代码或减少补充要求后重试。`;
+  return "当前任务不支持这么长的输入，请拆分代码或减少补充要求后重试。";
 }
 
 function isJobActive(job: StrategyJob) {
@@ -1600,26 +1705,6 @@ function isSameConversationKey(current: string, source: string, response: string
   return current === source || current === response || (current === DRAFT_CONVERSATION_KEY && source === DRAFT_CONVERSATION_KEY);
 }
 
-function getStrategyJobSummary(job: StrategyJob, elapsedSeconds: number) {
-  if (job.status === "completed") {
-    return `已完成 · 用时 ${formatTaskDuration(job.task ?? null, elapsedSeconds)} · 查看处理过程`;
-  }
-
-  if (job.status === "failed") {
-    return `处理失败 · 用时 ${formatTaskDuration(job.task ?? null, elapsedSeconds)}`;
-  }
-
-  if (job.status === "canceled") {
-    return `已取消 · 用时 ${formatTaskDuration(job.task ?? null, elapsedSeconds)}`;
-  }
-
-  if (job.status === "queued" || job.status === "pending") {
-    return `任务排队中 · ${formatElapsed(elapsedSeconds)}`;
-  }
-
-  return `LightQuant 正在处理 · ${formatElapsed(elapsedSeconds)}`;
-}
-
 function toStrategyMessage(message: AiMessageData): StrategyChatMessage {
   return {
     ...message
@@ -1628,6 +1713,7 @@ function toStrategyMessage(message: AiMessageData): StrategyChatMessage {
 
 function getMessageTask(message: StrategyChatMessage): AiTaskData["task"] | null {
   const task = readRecord(message.contentJson?.task);
+  const progress = readRecord(task?.progress);
 
   if (!task || typeof task.id !== "string") {
     return null;
@@ -1645,7 +1731,11 @@ function getMessageTask(message: StrategyChatMessage): AiTaskData["task"] | null
     errorCode: typeof task.errorCode === "string" ? task.errorCode : null,
     errorMessage: typeof task.errorMessage === "string" ? task.errorMessage : null,
     startedAt: typeof task.startedAt === "string" ? task.startedAt : null,
-    finishedAt: typeof task.finishedAt === "string" ? task.finishedAt : null
+    finishedAt: typeof task.finishedAt === "string" ? task.finishedAt : null,
+    createdAt: typeof task.createdAt === "string" ? task.createdAt : null,
+    updatedAt: typeof task.updatedAt === "string" ? task.updatedAt : null,
+    progress,
+    events: Array.isArray(task.events) ? task.events as AiRunEventData[] : null
   };
 }
 
@@ -1666,6 +1756,18 @@ function getMessageResult(message: StrategyChatMessage): AiTaskData["result"] | 
   };
 }
 
+function getMessageStreamingContent(message: AiMessageData, result: AiTaskData["result"] | null, taskType: WorkbenchTaskType) {
+  const contentJson = readRecord(message.contentJson);
+  const visibleThinking = readNullableString(contentJson?.visibleThinking) ?? "";
+  const finalAnswerMarkdown = readNullableString(contentJson?.finalAnswerMarkdown)
+    ?? (result ? formatAiTaskResultAsMarkdown(result, taskType) : message.content.includes("## ") ? message.content : "");
+
+  return {
+    visibleThinking,
+    finalAnswerMarkdown
+  };
+}
+
 function getMessageError(message: StrategyChatMessage) {
   const error = readRecord(message.contentJson?.error);
 
@@ -1677,26 +1779,6 @@ function getMessageError(message: StrategyChatMessage) {
     code: typeof error.code === "string" ? error.code : "AI_TASK_FAILED",
     message: typeof error.message === "string" ? error.message : message.content
   };
-}
-
-function formatElapsed(totalSeconds: number) {
-  const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
-  const seconds = Math.max(0, totalSeconds % 60).toString().padStart(2, "0");
-
-  return `${minutes}:${seconds}`;
-}
-
-function formatTaskDuration(task: AiTaskData["task"] | null, fallbackSeconds?: number) {
-  if (task?.startedAt && task.finishedAt) {
-    const startedAt = new Date(task.startedAt).getTime();
-    const finishedAt = new Date(task.finishedAt).getTime();
-
-    if (Number.isFinite(startedAt) && Number.isFinite(finishedAt) && finishedAt >= startedAt) {
-      return `${Math.max(1, Math.round((finishedAt - startedAt) / 1000))} 秒`;
-    }
-  }
-
-  return `${Math.max(1, Math.round(fallbackSeconds ?? 1))} 秒`;
 }
 
 function delay(ms: number) {

@@ -80,7 +80,7 @@ export function getAiTaskProgress(task: AiTask, result?: AiTaskResult | null) {
   if (task.status === "RUNNING") {
     return normalizeProgress(task, {
       phase: task.type === "code_analysis" || task.type === "code_conversion" ? "scanning" : "processing",
-      progressPercent: 8
+      progressPercent: task.type === "code_analysis" || task.type === "code_conversion" ? 18 : 40
     });
   }
 
@@ -251,27 +251,27 @@ function estimatePercent(
   }
 
   if (phase === "scanning") {
-    return 8;
+    return 18;
   }
 
   if (phase === "chunking") {
-    return 16;
+    return 25;
   }
 
   if (phase === "processing") {
     if (processingMode === "chunked" && chunkCount) {
-      return 20 + Math.round((Math.min(completedChunks, chunkCount) / chunkCount) * 58);
+      return 42 + Math.round((Math.min(completedChunks, chunkCount) / chunkCount) * 30);
     }
 
     return 42;
   }
 
   if (phase === "merging") {
-    return 82;
+    return 86;
   }
 
   if (phase === "validating") {
-    return 92;
+    return 94;
   }
 
   if (phase === "completed") {

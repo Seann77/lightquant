@@ -5,9 +5,9 @@ import { getAiSkill } from "@/server/ai/skills";
 import { ApiError } from "@/server/http/api-response";
 import { runChunkedCodeProcessing, shouldUseChunkedCodeProcessing } from "@/server/ai/code-chunking";
 import { runDeepSeekProvider } from "@/server/ai/providers/deepseek-provider";
-import { runMockAiProvider } from "@/server/ai/providers/mock-provider";
-import { runOpenAiCompatibleProvider } from "@/server/ai/providers/openai-compatible-provider";
-import type { AiProviderAttachment, AiProviderInput, AiProviderResult } from "@/server/ai/providers/types";
+import { runMockAiProvider, runMockAiProviderStream } from "@/server/ai/providers/mock-provider";
+import { runOpenAiCompatibleProvider, runOpenAiCompatibleProviderStream } from "@/server/ai/providers/openai-compatible-provider";
+import type { AiProviderAttachment, AiProviderInput, AiProviderResult, AiProviderStreamCallbacks, AiProviderStreamResult } from "@/server/ai/providers/types";
 
 export async function runAiProvider(
   task: AiTask,
@@ -30,6 +30,36 @@ export async function runAiProvider(
   }
 
   return runSingleAiProvider(provider, input);
+}
+
+export async function runAiProviderStream(
+  task: AiTask,
+  conversationContext?: string,
+  callbacks?: AiProviderStreamCallbacks,
+  attachments?: AiProviderAttachment[]
+): Promise<AiProviderStreamResult> {
+  const provider = readProviderMode();
+  const input = {
+    task,
+    skill: getAiSkill(task.type),
+    config: getAiTaskConfig(task.type),
+    conversationContext,
+    attachments
+  };
+
+  if (provider === "mock") {
+    return runMockAiProviderStream(input, callbacks);
+  }
+
+  if (provider === "deepseek") {
+    return runOpenAiCompatibleProviderStream(input, {
+      provider: "deepseek"
+    }, callbacks);
+  }
+
+  return runOpenAiCompatibleProviderStream(input, {
+    provider
+  }, callbacks);
 }
 
 function runSingleAiProvider(provider: ReturnType<typeof readProviderMode>, input: AiProviderInput) {
