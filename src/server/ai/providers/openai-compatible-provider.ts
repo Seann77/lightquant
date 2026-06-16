@@ -49,11 +49,11 @@ export async function runOpenAiCompatibleProvider(input: AiProviderInput, option
   const providerConfig = readProviderConfig(options.provider);
   const payload = buildChatCompletionPayload(input, providerConfig);
   let completion = await requestChatCompletion(providerConfig, payload);
-  let parsed = parseCompletionContent(completion);
+  let parsed = parseCompletionContent(completion, input);
 
   if (parsed.scopeStatus === "out_of_scope" && hasTaskRelevantSignal(input)) {
     completion = await requestChatCompletion(providerConfig, buildChatCompletionPayload(input, providerConfig, true));
-    parsed = parseCompletionContent(completion);
+    parsed = parseCompletionContent(completion, input);
   }
 
   return applyVisionFallback(normalizeProviderResult(input, parsed, {
@@ -279,7 +279,7 @@ function apiErrorForProviderStatus(status: number) {
   }
 
   if (status === 408 || status === 504) {
-    return new ApiError("AI_PROVIDER_TIMEOUT", "AI 服务响应超时，请稍后重试或减少代码量", 504);
+    return new ApiError("AI_PROVIDER_TIMEOUT", "AI 服务响应超时，请稍后重试", 504);
   }
 
   if (status === 409 || status === 429 || status >= 500) {
@@ -289,14 +289,27 @@ function apiErrorForProviderStatus(status: number) {
   return new ApiError("AI_PROVIDER_BAD_RESPONSE", "AI 服务返回异常，请稍后重试", 502);
 }
 
-function parseCompletionContent(completion: ChatCompletionResponse) {
+function parseCompletionContent(completion: ChatCompletionResponse, input: AiProviderInput) {
   const content = completion.choices?.[0]?.message?.content;
 
   if (!content) {
+    logModelContentProblem(input, completion, "empty_content", "");
     throw new ApiError("AI_PROVIDER_BAD_RESPONSE", "AI 服务返回内容为空，请稍后重试", 502);
   }
 
-  return parseModelJson(content);
+  try {
+    return parseModelJson(content);
+  } catch (error) {
+    logModelContentProblem(input, completion, "invalid_json", content);
+
+    const fallback = buildCodeAnalysisTextFallback(input, content);
+
+    if (fallback) {
+      return fallback;
+    }
+
+    throw error;
+  }
 }
 
 async function parseProviderJson(response: Response) {
@@ -325,7 +338,7 @@ function normalizeProviderError(error: unknown) {
   }
 
   if (error instanceof Error && error.name === "AbortError") {
-    return new ApiError("AI_PROVIDER_TIMEOUT", "AI 服务响应超时，请稍后重试或减少代码量", 504);
+    return new ApiError("AI_PROVIDER_TIMEOUT", "AI 服务响应超时，请稍后重试", 504);
   }
 
   return new ApiError("AI_TASK_FAILED", "AI 服务暂时不可用，请稍后再试", 502);
@@ -349,6 +362,98 @@ function parseModelJson(content: string) {
   return repaired;
 }
 
+function buildCodeAnalysisTextFallback(input: AiProviderInput, content: string): Record<string, unknown> | null {
+  if (input.task.type !== "code_analysis") {
+    return null;
+  }
+
+  const readableText = normalizeReadableFallbackText(content, input.config.maxResultChars);
+
+  if (!readableText) {
+    return null;
+  }
+
+  return {
+    scopeStatus: "in_scope",
+    generatedCode: null,
+    explanation: readableText,
+    migrationNotes: null,
+    riskWarnings: [
+      "AI 返回了非标准 JSON，本次已按可读内容生成解析报告；请重点复核结构化字段。"
+    ],
+    reportJson: {
+      overview: readableText,
+      codeStructure: [],
+      tradingLogic: [],
+      parameters: [],
+      platformDependencies: [],
+      riskWarnings: [
+        "AI 返回了非标准 JSON，本次报告由可读文本兜底生成。"
+      ],
+      optimizationSuggestions: [
+        "如需更完整的结构化报告，可重新提交或补充具体解析重点。"
+      ],
+      providerFallback: {
+        reason: "non_json_model_output"
+      }
+    }
+  };
+}
+
+function normalizeReadableFallbackText(content: string, maxLength: number) {
+  const withoutFence = content
+    .replace(/^```(?:json|markdown|text)?/i, "")
+    .replace(/```$/i, "")
+    .trim();
+  const compact = withoutFence.replace(/\s+/g, " ").trim();
+
+  if (compact.length < 30 || !/[\u4e00-\u9fa5A-Za-z]/.test(compact)) {
+    return "";
+  }
+
+  return withoutFence.length > maxLength ? `${withoutFence.slice(0, maxLength)}...` : withoutFence;
+}
+
+function logModelContentProblem(input: AiProviderInput, completion: ChatCompletionResponse, reason: string, content: string) {
+  console.warn("[ai-provider] model content parse issue", {
+    taskId: input.task.id,
+    taskType: input.task.type,
+    reason,
+    finishReason: completion.choices?.[0]?.finish_reason ?? null,
+    contentLength: content.length,
+    contentKind: classifyModelContent(content),
+    contentPreview: truncateLogText(content, 600)
+  });
+}
+
+function classifyModelContent(content: string) {
+  const trimmed = content.trim();
+
+  if (!trimmed) {
+    return "empty";
+  }
+
+  if (/^```/.test(trimmed)) {
+    return "markdown_fenced";
+  }
+
+  if (trimmed.startsWith("{") && !trimmed.endsWith("}")) {
+    return "possibly_truncated_json";
+  }
+
+  if (trimmed.startsWith("{")) {
+    return "invalid_json";
+  }
+
+  return "non_json_text";
+}
+
+function truncateLogText(value: string, maxLength: number) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+
+  return normalized.length > maxLength ? `${normalized.slice(0, maxLength)}...` : normalized;
+}
+
 function safeJsonParse(value: string): Record<string, unknown> | null {
   try {
     const parsed = JSON.parse(value);
@@ -368,15 +473,23 @@ function normalizeProviderResult(
   }
 ): AiProviderResult {
   const scopeStatus = parsed.scopeStatus === "out_of_scope" ? "out_of_scope" : "in_scope";
+  const explanation = normalizeNullableString(parsed.explanation, input.config.maxResultChars);
+  const migrationNotes = normalizeNullableString(parsed.migrationNotes, input.config.maxResultChars);
+  const riskWarnings = normalizeStringArray(parsed.riskWarnings, ["请在回测和模拟盘中验证结果，不构成投资建议。"]);
 
   if (scopeStatus === "out_of_scope") {
+    const outOfScopeRiskWarnings = normalizeStringArray(parsed.riskWarnings, ["本次请求超出当前模块范围。"]);
+
     return {
       scopeStatus,
       generatedCode: null,
       explanation: input.skill.outOfScopeResponse,
       migrationNotes: null,
-      riskWarnings: normalizeStringArray(parsed.riskWarnings, ["本次请求超出当前模块范围。"]),
-      reportJson: buildReportJson(input, scopeStatus, parsed.reportJson),
+      riskWarnings: outOfScopeRiskWarnings,
+      reportJson: buildReportJson(input, scopeStatus, parsed.reportJson, {
+        explanation: input.skill.outOfScopeResponse,
+        riskWarnings: outOfScopeRiskWarnings
+      }),
       model: meta.model,
       tokenUsage: meta.tokenUsage
     };
@@ -385,10 +498,13 @@ function normalizeProviderResult(
   return {
     scopeStatus,
     generatedCode: normalizeNullableString(parsed.generatedCode, input.config.maxResultChars),
-    explanation: normalizeNullableString(parsed.explanation, input.config.maxResultChars),
-    migrationNotes: normalizeNullableString(parsed.migrationNotes, input.config.maxResultChars),
-    riskWarnings: normalizeStringArray(parsed.riskWarnings, ["请在回测和模拟盘中验证结果，不构成投资建议。"]),
-    reportJson: buildReportJson(input, scopeStatus, parsed.reportJson),
+    explanation,
+    migrationNotes,
+    riskWarnings,
+    reportJson: buildReportJson(input, scopeStatus, parsed.reportJson, {
+      explanation,
+      riskWarnings
+    }),
     model: meta.model,
     tokenUsage: meta.tokenUsage
   };
@@ -422,10 +538,17 @@ function applyVisionFallback(result: AiProviderResult, input: AiProviderInput, s
   };
 }
 
-function buildReportJson(input: AiProviderInput, scopeStatus: AiTaskScopeStatus, value: unknown) {
+function buildReportJson(
+  input: AiProviderInput,
+  scopeStatus: AiTaskScopeStatus,
+  value: unknown,
+  fallback: {
+    explanation?: string | null;
+    riskWarnings?: string[];
+  }
+) {
   const report = isObject(value) ? value : {};
-
-  return {
+  const baseReport = {
     ...report,
     processingMode: typeof report.processingMode === "string" ? report.processingMode : "single",
     scopeStatus,
@@ -433,6 +556,36 @@ function buildReportJson(input: AiProviderInput, scopeStatus: AiTaskScopeStatus,
     skillVersion: input.skill.version,
     displayName: input.config.displayName,
     costPoints: input.config.costPoints
+  };
+
+  if (input.task.type !== "code_analysis") {
+    return baseReport;
+  }
+
+  return normalizeCodeAnalysisReportJson(baseReport, fallback);
+}
+
+function normalizeCodeAnalysisReportJson(
+  report: Record<string, unknown>,
+  fallback: {
+    explanation?: string | null;
+    riskWarnings?: string[];
+  }
+) {
+  const riskWarnings = normalizeDisplayStringArray(report.riskWarnings);
+  const overview = normalizeDisplayString(report.overview)
+    || fallback.explanation
+    || "已生成代码解析报告。";
+
+  return {
+    ...report,
+    overview,
+    codeStructure: normalizeDisplayStringArray(report.codeStructure),
+    tradingLogic: normalizeDisplayStringArray(report.tradingLogic),
+    parameters: normalizeDisplayStringArray(report.parameters),
+    platformDependencies: normalizeDisplayStringArray(report.platformDependencies),
+    riskWarnings: riskWarnings.length ? riskWarnings : fallback.riskWarnings ?? [],
+    optimizationSuggestions: normalizeDisplayStringArray(report.optimizationSuggestions)
   };
 }
 
@@ -451,16 +604,74 @@ function normalizeNullableString(value: unknown, maxLength: number) {
 }
 
 function normalizeStringArray(value: unknown, fallback: string[]) {
-  if (!Array.isArray(value)) {
-    return fallback;
-  }
-
-  const items = value
-    .map((item) => String(item).trim())
-    .filter(Boolean)
+  const items = normalizeDisplayStringArray(value)
     .slice(0, 12);
 
   return items.length ? items : fallback;
+}
+
+function normalizeDisplayStringArray(value: unknown): string[] {
+  if (value === null || typeof value === "undefined") {
+    return [];
+  }
+
+  if (typeof value === "string") {
+    return value.trim() ? [value.trim()] : [];
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return [String(value)];
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => normalizeDisplayStringArray(item)).filter(Boolean);
+  }
+
+  if (isObject(value)) {
+    const text = Object.entries(value)
+      .map(([key, item]) => {
+        const itemText = normalizeDisplayString(item);
+
+        return itemText ? `${key}：${itemText}` : "";
+      })
+      .filter(Boolean)
+      .join("；");
+
+    return text ? [text] : [];
+  }
+
+  return [];
+}
+
+function normalizeDisplayString(value: unknown): string {
+  if (value === null || typeof value === "undefined") {
+    return "";
+  }
+
+  if (typeof value === "string") {
+    return value.trim();
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeDisplayString(item)).filter(Boolean).join("、");
+  }
+
+  if (isObject(value)) {
+    return Object.entries(value)
+      .map(([key, item]) => {
+        const itemText = normalizeDisplayString(item);
+
+        return itemText ? `${key}：${itemText}` : "";
+      })
+      .filter(Boolean)
+      .join("；");
+  }
+
+  return "";
 }
 
 function numberOrZero(value: unknown) {

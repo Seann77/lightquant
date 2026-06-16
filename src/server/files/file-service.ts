@@ -16,6 +16,7 @@ export type UploadedFileResponse = {
   sizeBytes: number;
   sha256: string;
   contentPreview: string;
+  contentText: string | null;
   scanStatus: UploadedFileScanStatus;
   riskFlags: string[];
   hasThumbnail: boolean;
@@ -110,6 +111,7 @@ export function toUploadedFileResponse(file: UploadedFile): UploadedFileResponse
     sizeBytes: file.sizeBytes,
     sha256: file.sha256,
     contentPreview: createPreview(file),
+    contentText: isImage ? null : file.contentText ?? "",
     scanStatus: file.scanStatus,
     riskFlags: file.riskFlags,
     hasThumbnail: isImage && Boolean(file.thumbnailKey ?? file.storageKey),

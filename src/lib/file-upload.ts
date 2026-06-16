@@ -11,6 +11,7 @@ export type UploadedCodeFile = {
   sizeBytes: number;
   sha256: string;
   contentPreview: string;
+  contentText?: string | null;
   scanStatus: "PASSED" | "BLOCKED" | "WARNING";
   riskFlags: string[];
   hasThumbnail?: boolean;

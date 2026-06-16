@@ -22,22 +22,11 @@ requireSnippet(servicePath, service, "stale database RUNNING detection", 'task.s
 requireSnippet(servicePath, service, "fresh RUNNING task no-op", 'task.status === "RUNNING" && !shouldRestartRunningTask');
 requireSnippet(servicePath, service, "stale task helper", "function isStaleRunningTask(task: AiTask)");
 requireSnippet(servicePath, service, "database stale timeout", "Math.max(getAiTaskTimeoutMs() * 2, 2 * 60 * 1000)");
-requireSnippet(servicePath, service, "latest status reload", "const latestTask = await repository.findAiTaskById(task.id);");
-requireSnippet(servicePath, service, "latest status succeeded guard", 'latestTask.status === "SUCCEEDED"');
-requireSnippet(servicePath, service, "latest status failed guard", 'latestTask.status === "FAILED"');
-requireSnippet(servicePath, service, "latest status cancelled guard", 'latestTask.status === "CANCELLED"');
-requireSnippet(servicePath, service, "confirmed result lookup", "await getAiTaskResultResponse(latestTask.id)");
+requireSnippet(servicePath, service, "default result lookup", "const result = options.result === undefined ? await getRepository().findAiTaskResult(task.id) : options.result;");
 
 requireRouteSchedulingGuard(taskRoutePath, taskRoute, "create task route");
 requireRouteSchedulingGuard(resultRoutePath, resultRoute, "result polling route");
-
-const providerResultIndex = service.indexOf("const providerResult = await runAiProvider(task);");
-const latestTaskIndex = service.indexOf("const latestTask = await repository.findAiTaskById(task.id);", providerResultIndex);
-const confirmIndex = service.indexOf("confirmReservation(task as AiTask, requestId)", providerResultIndex);
-
-if (providerResultIndex === -1 || latestTaskIndex === -1 || confirmIndex === -1 || !(providerResultIndex < latestTaskIndex && latestTaskIndex < confirmIndex)) {
-  failures.push(`${servicePath} must reload and check latest task status after provider return and before confirming credits`);
-}
+requireProviderReturnGuard(servicePath, service);
 
 if (failures.length > 0) {
   console.error("AI runner guard check failed:");
@@ -69,5 +58,44 @@ function requireRouteSchedulingGuard(path, content, name) {
 
   if (resultIndex === -1 || guardIndex === -1 || scheduleIndex === -1 || okIndex === -1 || !(resultIndex < guardIndex && guardIndex < scheduleIndex && scheduleIndex < okIndex)) {
     failures.push(`${path} must schedule pending/running AI tasks after loading data and before returning the API response`);
+  }
+}
+
+function requireProviderReturnGuard(path, content) {
+  const providerResultMatch = /const\s+providerResult\s*=\s*await\s+runAiProvider\s*\(/.exec(content);
+
+  if (!providerResultMatch) {
+    failures.push(`${path} missing provider result assignment before credit confirmation`);
+    return;
+  }
+
+  const providerResultIndex = providerResultMatch.index;
+  const confirmIndex = content.indexOf("confirmReservation(", providerResultIndex);
+
+  if (confirmIndex === -1) {
+    failures.push(`${path} missing credit confirmation after provider return`);
+    return;
+  }
+
+  const afterProviderBeforeConfirm = content.slice(providerResultIndex, confirmIndex);
+  const reloadMatch = /const\s+(\w+)\s*=\s*await\s+repository\.findAiTaskById\((?:task|runningTask|runningProviderTask)\.id\);/.exec(afterProviderBeforeConfirm);
+
+  if (!reloadMatch) {
+    failures.push(`${path} must reload latest task status after provider return and before confirming credits`);
+    return;
+  }
+
+  const latestTaskVariable = reloadMatch[1];
+  const reloadIndex = reloadMatch.index;
+  const afterReloadBeforeConfirm = afterProviderBeforeConfirm.slice(reloadIndex);
+
+  for (const status of ["SUCCEEDED", "FAILED", "CANCELLED"]) {
+    if (!afterReloadBeforeConfirm.includes(`${latestTaskVariable}.status === "${status}"`)) {
+      failures.push(`${path} must guard ${status} latest task status after provider return and before confirming credits`);
+    }
+  }
+
+  if (!afterReloadBeforeConfirm.includes(`buildAiTaskResponse(${latestTaskVariable}`)) {
+    failures.push(`${path} must return the latest task response when another runner already completed or stopped the task`);
   }
 }

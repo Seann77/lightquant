@@ -31,11 +31,14 @@ import {
 import { useWorkbenchConversationRestore } from "@/lib/ai/use-workbench-conversation";
 import type { AiTaskData } from "@/lib/ai/workbench-types";
 
+type AnalysisInputSource = "manual" | "attachment" | "restored";
+
 export function CodeAnalysisClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [platform, setPlatform] = useState(codeAnalysisPlatforms[0]);
   const [inputCode, setInputCode] = useState("");
+  const [inputSource, setInputSource] = useState<AnalysisInputSource>("manual");
   const [data, setData] = useState<AiTaskData | null>(null);
   const [activeTab, setActiveTab] = useState(codeAnalysisTabs[0]);
   const [loading, setLoading] = useState(false);
@@ -73,6 +76,7 @@ export function CodeAnalysisClient() {
       }
 
       setInputCode(formatRestoredInputText(restored.inputCodePreview, restored.inputFileName));
+      setInputSource("restored");
       setUploadedFile(createRestoredUploadedFile(restored));
       setData(restored.taskData);
       setActiveTab(getConversationActiveTab(conversationData.conversation, codeAnalysisTabs, codeAnalysisTabs[0]));
@@ -98,9 +102,26 @@ export function CodeAnalysisClient() {
     setUploadError("");
 
     try {
-      setUploadedFile(await uploadCodeFile(file));
+      const nextFile = await uploadCodeFile(file);
+      const nextInputCode = nextFile.contentText ?? "";
+
+      setUploadedFile(nextFile);
+      setData(null);
+      setError("");
+
+      if (!nextInputCode.trim()) {
+        setInputCode("");
+        setInputSource("manual");
+        setUploadError("附件已上传，但没有解析出可分析文本，请重新上传文本文件。");
+        return;
+      }
+
+      setInputCode(nextInputCode);
+      setInputSource("attachment");
     } catch (uploadErrorValue) {
       setUploadedFile(null);
+      setInputCode("");
+      setInputSource("manual");
       setUploadError(getFileUploadFriendlyError(uploadErrorValue));
     } finally {
       setUploading(false);
@@ -108,6 +129,15 @@ export function CodeAnalysisClient() {
   }
 
   async function handleSubmit() {
+    const finalInputText = getFinalInputText(inputCode, inputSource);
+
+    if (!finalInputText) {
+      setError(inputSource === "restored"
+        ? "历史输入仅为摘要，请粘贴完整代码或重新上传附件后再解析。"
+        : "请粘贴需要解析的策略代码，或上传可解析的文本文件。");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
@@ -117,8 +147,8 @@ export function CodeAnalysisClient() {
         type: "code_analysis",
         conversationId: currentConversationId,
         sourcePlatform: platform,
-        inputCode,
-        inputFileId: uploadedFile?.fileId,
+        inputCode: finalInputText,
+        inputFileId: uploadedFile?.contentText ? uploadedFile.fileId : undefined,
         clientRequestId: createWorkbenchClientRequestId("analysis")
       });
 
@@ -140,7 +170,9 @@ export function CodeAnalysisClient() {
 
   const report = data?.result?.reportJson;
   const shouldShowTaskProgress = !data?.result && (loading || Boolean(data && data.task.status !== "SUCCEEDED"));
-  const analysisInputChars = inputCode.length;
+  const finalInputText = getFinalInputText(inputCode, inputSource);
+  const analysisInputChars = finalInputText.length;
+  const canSubmit = Boolean(finalInputText) && !loading && uploadedFile?.scanStatus !== "BLOCKED";
 
   return (
     <WorkbenchShell className="lq-analysis-page min-h-full">
@@ -159,7 +191,7 @@ export function CodeAnalysisClient() {
           <input accept=".py,.txt,.log,.md,.png,.jpg,.jpeg,.webp" className="hidden" onChange={handleFileChange} ref={fileInputRef} type="file" />
         </div>
 
-        <WorkbenchFileUploadStatus className="mx-[18px]" file={uploadedFile} message={uploadError} />
+        <WorkbenchFileUploadStatus className="mx-[18px]" file={uploadedFile} message={uploadError} showPreview={false} />
 
         <div className="lq-analysis-editor">
           <div className="lq-line-numbers">
@@ -169,7 +201,10 @@ export function CodeAnalysisClient() {
           </div>
           <textarea
             className="lq-textarea lq-analysis-textarea"
-            onChange={(event) => setInputCode(event.target.value)}
+            onChange={(event) => {
+              setInputCode(event.target.value);
+              setInputSource("manual");
+            }}
             placeholder="请粘贴需要解析的策略代码..."
             value={inputCode}
           />
@@ -181,10 +216,12 @@ export function CodeAnalysisClient() {
               className="lq-secondary-btn"
               onClick={() => {
                 setInputCode("");
+                setInputSource("manual");
                 setData(null);
                 setError("");
                 setUploadedFile(null);
                 setUploadError("");
+                setLoading(false);
               }}
               type="button"
             >
@@ -193,7 +230,7 @@ export function CodeAnalysisClient() {
             </button>
             <button
               className="lq-primary-btn"
-              disabled={loading || (!inputCode.trim() && !uploadedFile) || uploadedFile?.scanStatus === "BLOCKED"}
+              disabled={!canSubmit}
               onClick={handleSubmit}
               type="button"
             >
@@ -220,7 +257,7 @@ export function CodeAnalysisClient() {
         </div>
 
         {data?.result ? (
-          <CodeAnalysisResultView activeTab={activeTab} costPoints={data.task.costPoints} events={data.events} report={report} result={data.result} task={data.task} />
+          <CodeAnalysisResultView activeTab={activeTab} costPoints={data.task.costPoints} report={report} result={data.result} task={data.task} />
         ) : shouldShowTaskProgress ? (
           <div className="lq-empty-result is-progress">
             <AiTaskProgressPanel
@@ -229,6 +266,8 @@ export function CodeAnalysisClient() {
               errorCode={data?.task.errorCode}
               inputChars={analysisInputChars}
               progress={data?.task.progress}
+              showEta={false}
+              showInputChars={false}
               status={data?.task.status ?? (loading ? "RUNNING" : "PENDING")}
               taskId={data?.task.id}
               taskType="code_analysis"
@@ -250,6 +289,14 @@ export function CodeAnalysisClient() {
 
 function ErrorPanel({ message }: { message: string }) {
   return <div className="lq-error-panel">{message}</div>;
+}
+
+function getFinalInputText(inputCode: string, inputSource: AnalysisInputSource) {
+  if (inputSource === "restored") {
+    return "";
+  }
+
+  return inputCode.trim() ? inputCode : "";
 }
 
 function useElapsedSeconds(active: boolean) {

@@ -495,7 +495,7 @@ export function getFriendlyAiError(error: unknown) {
   }
 
   if (message.startsWith("AI_PROVIDER_TIMEOUT:")) {
-    return "AI 服务响应超时，请稍后重试或减少代码量。";
+    return "AI 服务响应超时，请稍后重试。";
   }
 
   if (message.startsWith("AI_PROVIDER_CONFIG_ERROR:")) {
@@ -503,11 +503,11 @@ export function getFriendlyAiError(error: unknown) {
   }
 
   if (message.startsWith("AI_PROVIDER_BAD_RESPONSE:")) {
-    return "AI 服务返回内容格式异常，请稍后重试；如果代码较长，请减少代码量后再试。";
+    return "AI 返回内容格式异常，请重试。若多次失败，可尝试减少非必要注释或拆分复杂策略。";
   }
 
   if (message.startsWith("AI_TASK_FAILED:")) {
-    return "AI 任务执行失败，请稍后重试或减少代码量。";
+    return "AI 任务执行失败，请稍后重试。若多次失败，可尝试补充平台信息或拆分复杂策略。";
   }
 
   return message.includes(":") ? message.split(":").slice(1).join(":") : message;

@@ -12,11 +12,13 @@ import type { MessageAttachmentData } from "@/lib/ai/workbench-types";
 export function WorkbenchFileUploadStatus({
   className = "",
   file,
-  message
+  message,
+  showPreview = true
 }: {
   className?: string;
   file: UploadedCodeFile | null;
   message: string;
+  showPreview?: boolean;
 }) {
   if (!file && !message) {
     return null;
@@ -33,7 +35,6 @@ export function WorkbenchFileUploadStatus({
   const blocked = file.scanStatus === "BLOCKED";
   const isImage = isImageFile(file);
   const StatusIcon: LucideIcon = blocked ? Ban : file.scanStatus === "WARNING" ? AlertTriangle : isImage ? ImageIcon : CheckCircle2;
-
   return (
     <div className={`lq-file-status ${blocked ? "is-blocked" : ""} ${className}`.trim()}>
       {isImage && file.thumbnailUrl ? (
@@ -42,9 +43,10 @@ export function WorkbenchFileUploadStatus({
       <div className="flex flex-wrap items-center gap-2">
         <StatusIcon aria-hidden="true" size={16} />
         <span>{file.originalName}</span>
+        <span>{formatFileSize(file.sizeBytes)}</span>
         <span>{getScanStatusText(file)}</span>
       </div>
-      {file.contentPreview ? <div className="mt-1 line-clamp-2 break-words text-xs">{file.contentPreview}</div> : null}
+      {showPreview && file.contentPreview ? <div className="mt-1 line-clamp-2 break-words text-xs">{file.contentPreview}</div> : null}
       {file.riskFlags.length > 0 ? <div className="mt-1 break-words">风险标记：{file.riskFlags.join("、")}</div> : null}
     </div>
   );

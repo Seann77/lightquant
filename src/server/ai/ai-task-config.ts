@@ -32,14 +32,14 @@ export const AI_TASK_CONFIGS: Record<AiTaskType, AiTaskConfig> = {
     taskType: "code_analysis",
     costPoints: 100,
     maxTotalInputChars: 150000,
-    maxSingleCallInputChars: 40000,
+    maxSingleCallInputChars: 22000,
     displayName: "代码翻译/解析",
     scopeDescription: "PTrade、聚宽 JoinQuant、QMT 策略代码的自然语言翻译、结构解析、指标识别、买卖逻辑识别、参数解释、风险点与优化建议。",
     outOfScopeResponse:
       "当前模块仅支持 PTrade、聚宽 JoinQuant、QMT 的量化策略代码翻译与解析。请粘贴策略代码，或补充需要分析的交易逻辑、指标和风控规则。",
-    maxOutputTokens: 2200,
+    maxOutputTokens: 6000,
     maxResultChars: 24000,
-    skillVersion: "code-analysis-v2"
+    skillVersion: "code-analysis-v3"
   },
   code_conversion: {
     taskType: "code_conversion",
@@ -50,7 +50,7 @@ export const AI_TASK_CONFIGS: Record<AiTaskType, AiTaskConfig> = {
     scopeDescription: "PTrade、聚宽 JoinQuant、QMT 之间任意方向的策略代码转换、API 差异说明、迁移说明与兼容性风险提示。",
     outOfScopeResponse:
       "当前模块仅支持 PTrade、聚宽 JoinQuant、QMT 之间的量化策略平台代码转换。请选择源平台和目标平台，并提交需要转换的策略代码。",
-    maxOutputTokens: 2600,
+    maxOutputTokens: 6000,
     maxResultChars: 30000,
     skillVersion: "code-conversion-v2"
   }

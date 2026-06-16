@@ -148,7 +148,9 @@ export async function runChunkedCodeProcessing(input: AiProviderInput, runSingle
     phase: "scanning",
     processingMode: "chunked",
     progressPercent: 8,
-    statusMessage: "正在识别代码结构、入口函数、调度函数、数据接口和下单接口。"
+    statusMessage: input.task.type === "code_analysis"
+      ? "正在识别策略结构、平台依赖和关键函数。"
+      : "正在识别代码结构、入口函数、调度函数、数据接口和下单接口。"
   });
   const scan = scanCodeStructure(input.task);
   await input.progressReporter?.({
@@ -156,7 +158,9 @@ export async function runChunkedCodeProcessing(input: AiProviderInput, runSingle
     processingMode: "chunked",
     inputChars: scan.inputChars,
     progressPercent: 14,
-    statusMessage: "正在按函数边界拆分长代码。"
+    statusMessage: input.task.type === "code_analysis"
+      ? "正在梳理策略结构，准备解析交易逻辑。"
+      : "正在按函数边界拆分长代码。"
   });
   const chunks = buildCodeChunks(input.task, input.config.maxSingleCallInputChars);
 
@@ -171,7 +175,9 @@ export async function runChunkedCodeProcessing(input: AiProviderInput, runSingle
     chunkCount: chunks.length,
     completedChunks: 0,
     progressPercent: 18,
-    statusMessage: `已拆分为 ${chunks.length} 段，准备逐段处理。`
+    statusMessage: input.task.type === "code_analysis"
+      ? "策略结构已识别，正在准备解析。"
+      : `已拆分为 ${chunks.length} 段，准备逐段处理。`
   });
 
   const chunkResults: ChunkResult[] = [];
@@ -185,7 +191,9 @@ export async function runChunkedCodeProcessing(input: AiProviderInput, runSingle
         chunkCount: chunks.length,
         completedChunks: chunkResults.length,
         currentChunk: chunk.index + 1,
-        statusMessage: `正在${input.task.type === "code_conversion" ? "转换" : "解析"}第 ${chunk.index + 1} / ${chunks.length} 段。`
+        statusMessage: input.task.type === "code_analysis"
+          ? "正在解析策略结构、交易逻辑和关键参数。"
+          : `正在转换第 ${chunk.index + 1} / ${chunks.length} 段。`
       });
       const chunkInput = buildChunkProviderInput(input, scan, chunk, chunks.length);
       const result = await runSingleProvider(chunkInput);
@@ -201,7 +209,9 @@ export async function runChunkedCodeProcessing(input: AiProviderInput, runSingle
         chunkCount: chunks.length,
         completedChunks: chunkResults.length,
         currentChunk: Math.min(chunk.index + 2, chunks.length),
-        statusMessage: `已完成 ${chunkResults.length} / ${chunks.length} 段。`
+        statusMessage: input.task.type === "code_analysis"
+          ? "正在解析策略结构、交易逻辑和关键参数。"
+          : `已完成 ${chunkResults.length} / ${chunks.length} 段。`
       });
     } catch (error) {
       throw chunkProcessingError(error, input.task.type, chunk, chunks.length);
@@ -215,7 +225,7 @@ export async function runChunkedCodeProcessing(input: AiProviderInput, runSingle
     chunkCount: chunks.length,
     completedChunks: chunkResults.length,
     currentChunk: null,
-    statusMessage: input.task.type === "code_conversion" ? "正在合并转换代码、迁移说明和人工复核项。" : "正在汇总分段解析并生成报告。"
+    statusMessage: input.task.type === "code_conversion" ? "正在合并转换代码、迁移说明和人工复核项。" : "正在汇总解析报告。"
   });
   return mergeChunkResults(input, scan, chunks, chunkResults);
 }
@@ -413,7 +423,9 @@ async function mergeChunkResults(
     chunkCount: chunks.length,
     completedChunks: chunkResults.length,
     currentChunk: null,
-    statusMessage: "正在检查 JSON 结构、空结果、明显截断和重复片段。"
+    statusMessage: taskType === "code_analysis"
+      ? "正在检查潜在风险和输出完整性。"
+      : "正在检查 JSON 结构、空结果、明显截断和重复片段。"
   });
   const validation = validateMergedResult(taskType, generatedCode, explanation, chunkResults);
 
@@ -456,8 +468,8 @@ function buildMergedExplanation(type: CodeProcessingTaskType, scan: CodeStructur
     .filter((value): value is string => Boolean(value))
     .map((value, index) => `${index + 1}. ${value}`);
   const scanOverview = [
-    `处理模式：分段${type === "code_conversion" ? "转换" : "解析"}。`,
-    `服务端先完成结构扫描，共 ${scan.inputLines} 行、${scan.inputChars.toLocaleString("zh-CN")} 字符。`,
+    type === "code_conversion" ? "处理模式：分段转换。" : "已完成策略结构与交易逻辑解析。",
+    type === "code_conversion" ? `服务端先完成结构扫描，共 ${scan.inputLines} 行、${scan.inputChars.toLocaleString("zh-CN")} 字符。` : "",
     `识别平台：${scan.detectedPlatform}（置信度 ${scan.platformConfidence}）。`,
     scan.entryFunctions.length ? `入口函数：${scan.entryFunctions.join(", ")}。` : "",
     scan.schedulerFunctions.length ? `调度信号：${scan.schedulerFunctions.join(", ")}。` : "",
@@ -500,7 +512,11 @@ function validateMergedResult(
     .map((item) => item.chunk.id);
 
   if (truncatedChunks.length > 0) {
-    throw new ApiError("AI_TASK_FAILED", `分段处理失败（validate）：第 ${truncatedChunks.join(", ")} 段结果疑似被截断，请减少代码量后重试。`, 502);
+    if (type === "code_analysis") {
+      throw new ApiError("AI_TASK_FAILED", "解析结果疑似被截断，请重试。若多次失败，可尝试减少非必要注释或拆分复杂策略。", 502);
+    }
+
+    throw new ApiError("AI_TASK_FAILED", `分段处理失败（validate）：第 ${truncatedChunks.join(", ")} 段结果疑似被截断，请重试。若多次失败，可尝试减少非必要注释或拆分复杂策略。`, 502);
   }
 
   if (type === "code_conversion" && !generatedCode?.trim()) {
@@ -508,7 +524,7 @@ function validateMergedResult(
   }
 
   if (type === "code_analysis" && !explanation?.trim()) {
-    throw new ApiError("AI_TASK_FAILED", "分段处理失败（validate）：解析说明为空。", 502);
+    throw new ApiError("AI_TASK_FAILED", "解析说明为空，请重试。若多次失败，可尝试补充平台信息或拆分复杂策略。", 502);
   }
 
   return {
@@ -529,6 +545,10 @@ function buildMergedReportJson(
     validation: Record<string, unknown>;
   }
 ) {
+  const analysisReport = input.task.type === "code_analysis"
+    ? buildMergedAnalysisReportFields(scan, chunks, chunkResults, extra)
+    : {};
+
   return {
     processingMode: "chunked",
     phase: "completed",
@@ -556,6 +576,7 @@ function buildMergedReportJson(
       riskWarnings: item.result.riskWarnings.slice(0, 6),
       manualReviewItems: readStringArray(item.result.reportJson?.manualReviewItems).slice(0, 8)
     })),
+    ...analysisReport,
     manualReviewItems: extra.manualReviewItems,
     dependencies: extra.dependencies,
     validation: extra.validation,
@@ -564,6 +585,67 @@ function buildMergedReportJson(
     displayName: input.config.displayName,
     costPoints: input.config.costPoints
   };
+}
+
+function buildMergedAnalysisReportFields(
+  scan: CodeStructureScan,
+  chunks: CodeChunk[],
+  chunkResults: ChunkResult[],
+  extra: {
+    manualReviewItems: string[];
+    dependencies: string[];
+    validation: Record<string, unknown>;
+  }
+) {
+  const codeStructure = unique([
+    scan.entryFunctions.length ? `入口函数：${scan.entryFunctions.join("、")}` : "",
+    scan.schedulerFunctions.length ? `调度逻辑：${scan.schedulerFunctions.join("、")}` : "",
+    scan.dataApis.length ? `数据接口：${scan.dataApis.join("、")}` : "",
+    scan.orderApis.length ? `下单接口：${scan.orderApis.join("、")}` : "",
+    scan.businessFunctions.length ? `主要业务函数：${scan.businessFunctions.slice(0, 18).join("、")}${scan.businessFunctions.length > 18 ? " 等" : ""}` : "",
+    ...collectChunkReportField(chunkResults, "codeStructure")
+  ].filter(Boolean)).slice(0, 40);
+  const tradingLogic = collectChunkReportField(chunkResults, "tradingLogic").slice(0, 50);
+  const parameters = collectChunkReportField(chunkResults, "parameters").slice(0, 40);
+  const platformDependencies = unique([
+    ...extra.dependencies,
+    ...collectChunkReportField(chunkResults, "platformDependencies")
+  ]).slice(0, 40);
+  const riskWarnings = unique([
+    ...scan.riskFlags,
+    ...chunkResults.flatMap((item) => item.result.riskWarnings),
+    ...collectChunkReportField(chunkResults, "riskWarnings")
+  ]).slice(0, 20);
+  const optimizationSuggestions = unique([
+    ...collectChunkReportField(chunkResults, "optimizationSuggestions"),
+    ...extra.manualReviewItems.map((item) => `复核：${item}`)
+  ]).slice(0, 30);
+
+  return {
+    overview: buildMergedAnalysisOverview(scan),
+    codeStructure,
+    tradingLogic,
+    parameters,
+    platformDependencies,
+    riskWarnings,
+    optimizationSuggestions,
+    validation: extra.validation
+  };
+}
+
+function buildMergedAnalysisOverview(scan: CodeStructureScan) {
+  return [
+    "已完成策略结构、交易逻辑、关键参数和风险点解析。",
+    `识别平台：${scan.detectedPlatform}（置信度 ${scan.platformConfidence}）。`,
+    scan.entryFunctions.length ? `策略入口包括 ${scan.entryFunctions.join("、")}。` : "",
+    scan.schedulerFunctions.length ? `检测到调度或周期处理逻辑：${scan.schedulerFunctions.join("、")}。` : "",
+    scan.dataApis.length ? `行情/数据依赖包括 ${scan.dataApis.join("、")}。` : "",
+    scan.orderApis.length ? `下单相关接口包括 ${scan.orderApis.join("、")}。` : ""
+  ].filter(Boolean).join("\n");
+}
+
+function collectChunkReportField(chunkResults: ChunkResult[], field: string) {
+  return unique(chunkResults.flatMap((item) => readStringArray(item.result.reportJson?.[field])));
 }
 
 function buildCodeRanges(lines: string[], symbols: CodeSymbol[]) {
@@ -857,10 +939,26 @@ function chunkProcessingError(error: unknown, type: CodeProcessingTaskType, chun
   const action = type === "code_conversion" ? "convert" : "analyze";
 
   if (error instanceof ApiError) {
+    if (type === "code_analysis") {
+      return new ApiError(
+        error.code,
+        `解析任务处理失败：${sanitizeAnalysisChunkErrorMessage(error.message)}`,
+        error.status
+      );
+    }
+
     return new ApiError(
       error.code,
       `分段处理失败（${action} 第 ${chunk.index + 1}/${chunkCount} 段，行 ${chunk.startLine}-${chunk.endLine}）：${error.message}`,
       error.status
+    );
+  }
+
+  if (type === "code_analysis") {
+    return new ApiError(
+      "AI_TASK_FAILED",
+      "解析任务处理失败，请稍后重试。",
+      500
     );
   }
 
@@ -869,6 +967,15 @@ function chunkProcessingError(error: unknown, type: CodeProcessingTaskType, chun
     `分段处理失败（${action} 第 ${chunk.index + 1}/${chunkCount} 段，行 ${chunk.startLine}-${chunk.endLine}）：AI 任务执行失败，请稍后再试。`,
     500
   );
+}
+
+function sanitizeAnalysisChunkErrorMessage(message: string) {
+  return message
+    .replace(/分段处理失败（[^）]+）：/g, "")
+    .replace(/第\s*\d+\s*\/\s*\d+\s*段[，,]?\s*/g, "")
+    .replace(/行\s*\d+\s*-\s*\d+[：:，,]?\s*/g, "")
+    .replace(/chunk/gi, "处理")
+    .trim() || "请稍后重试。";
 }
 
 function getChunkCharBudget(type: AiTaskType, singleCallLimit: number) {
@@ -905,8 +1012,37 @@ function unique<T>(items: T[]) {
   return [...new Set(items)];
 }
 
-function readStringArray(value: unknown) {
-  return Array.isArray(value) ? value.map((item) => String(item).trim()).filter(Boolean) : [];
+function readStringArray(value: unknown): string[] {
+  if (value === null || typeof value === "undefined") {
+    return [];
+  }
+
+  if (typeof value === "string") {
+    return value.trim() ? [value.trim()] : [];
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return [String(value)];
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => readStringArray(item)).filter(Boolean);
+  }
+
+  if (typeof value === "object") {
+    const text: string = Object.entries(value as Record<string, unknown>)
+      .map(([key, item]) => {
+        const itemText: string = readStringArray(item).join("、");
+
+        return itemText ? `${key}：${itemText}` : "";
+      })
+      .filter(Boolean)
+      .join("；");
+
+    return text ? [text] : [];
+  }
+
+  return [];
 }
 
 function sumTokenUsage(items: AiProviderResult["tokenUsage"][]): AiProviderResult["tokenUsage"] {

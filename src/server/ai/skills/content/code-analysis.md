@@ -15,14 +15,45 @@
 
 # Output Schema
 
-返回 JSON，重点字段包括：
+必须只返回合法 JSON 对象，不要使用 Markdown 代码块包裹，不要输出 JSON 之外的解释文字。字段必须稳定，缺少信息时用空数组、空字符串或 null，不要省略字段。
 
-- scopeStatus: "in_scope" 或 "out_of_scope"
-- generatedCode: 通常为 null，除非需要给出少量修正片段
-- explanation: 代码整体解释
-- migrationNotes: 如涉及平台依赖或迁移注意事项，可填写；否则为 null
-- riskWarnings: 风险提示数组
-- reportJson: 结构化报告，建议包含 overview、codeStructure、indicators、tradingLogic、parameters、platformDependencies、riskWarnings、optimizationSuggestions、skillId、skillVersion
+顶层字段：
+
+- scopeStatus: 字符串，只能是 "in_scope" 或 "out_of_scope"。
+- generatedCode: 代码解析场景通常为 null；只有用户明确要求少量修正片段时才返回字符串。
+- explanation: 字符串，代码整体解释；必须可独立阅读。
+- migrationNotes: 字符串或 null，平台依赖、兼容性、迁移注意事项；没有则为 null。
+- riskWarnings: 字符串数组，风险提示；没有明显风险时返回 []。
+- reportJson: 对象，必须包含下列字段。
+
+reportJson 必填字段：
+
+- overview: 字符串，策略整体概览。
+- codeStructure: 字符串数组，入口函数、调度函数、主要业务函数、数据流和下单流。
+- tradingLogic: 字符串数组，买入、卖出、调仓、持仓、止盈止损、风控逻辑。
+- parameters: 字符串数组，关键参数、阈值、窗口、周期、仓位限制及其含义。
+- platformDependencies: 字符串数组，平台 API、数据字段、生命周期、证券代码格式、下单接口等依赖。
+- riskWarnings: 字符串数组，与顶层 riskWarnings 保持一致或更细。
+- optimizationSuggestions: 字符串数组，回测、风控、异常行情、可维护性和兼容性建议。
+
+输出示例结构：
+
+{
+  "scopeStatus": "in_scope",
+  "generatedCode": null,
+  "explanation": "这段策略主要...",
+  "migrationNotes": null,
+  "riskWarnings": ["需要复核停牌和涨跌停过滤。"],
+  "reportJson": {
+    "overview": "策略概览...",
+    "codeStructure": ["initialize 初始化参数...", "handle_data 计算信号..."],
+    "tradingLogic": ["买入条件为...", "卖出条件为..."],
+    "parameters": ["ma_window：均线窗口..."],
+    "platformDependencies": ["JoinQuant get_price 行情接口..."],
+    "riskWarnings": ["需要复核未来函数风险。"],
+    "optimizationSuggestions": ["建议补充交易成本和滑点回测。"]
+  }
+}
 
 # Out Of Scope Response
 

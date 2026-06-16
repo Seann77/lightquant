@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  AlertTriangle,
   ArrowRight,
   Bot,
   ChevronDown,
@@ -26,8 +25,10 @@ import { MessageAttachmentList, WorkbenchFileUploadStatus } from "@/components/a
 import { WorkbenchShell } from "@/components/ai/WorkbenchShell";
 import {
   CodeConversionResultView,
+  CopyCodeButton,
   StrategyResultView,
-  getCodeConversionTabContent
+  getCodeConversionTabContent,
+  isCodeConversionCodeTab
 } from "@/components/ai/WorkbenchResultViews";
 import {
   createRestoredUploadedFile,
@@ -48,11 +49,10 @@ import {
   waitForAiTaskResult
 } from "@/lib/ai/workbench-client";
 import { useWorkbenchConversationRestore } from "@/lib/ai/use-workbench-conversation";
-import type { AiConversationData, AiMessageData, AiRunEventData, AiTaskData, AiTaskProgress } from "@/lib/ai/workbench-types";
+import type { AiConversationData, AiMessageData, AiRunEventData, AiTaskData } from "@/lib/ai/workbench-types";
 
 type StrategyChatMessage = AiMessageData & {
   localStatus?: "pending" | "error";
-  visibleSteps?: string[];
   startedAt?: number;
 };
 
@@ -69,14 +69,6 @@ type JobStatus =
   | "failed"
   | "canceled";
 
-type StrategyJobStep = {
-  id: string;
-  title: string;
-  status: "pending" | "running" | "completed" | "failed";
-  detail?: string;
-  updatedAt?: string;
-};
-
 type StrategyJobRequest = {
   conversationKey: string;
   prompt: string;
@@ -90,7 +82,6 @@ type StrategyJob = {
   id: string;
   conversationId: string;
   status: JobStatus;
-  steps: StrategyJobStep[];
   partialResult?: string;
   finalResult?: string;
   error?: string;
@@ -107,6 +98,8 @@ const conversionTabs = ["目标平台代码", "迁移说明", "风险提醒"] as
 const AI_TASK_POLL_INTERVAL_MS = 3000;
 const AI_TASK_POLL_TIMEOUT_MS = 5 * 60 * 1000;
 const DRAFT_CONVERSATION_KEY = "__draft_strategy_conversation__";
+const STRATEGY_THREAD_BOTTOM_THRESHOLD_PX = 100;
+const CODE_CONVERSION_MAX_TOTAL_INPUT_CHARS = 150000;
 
 export function ChatClient({ mode }: ChatClientProps) {
   if (mode === "convert") {
@@ -132,7 +125,10 @@ function StrategyModeContent() {
   const [uploadError, setUploadError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const compositionRef = useRef(false);
+  const strategyThreadRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const shouldStickToBottomRef = useRef(true);
+  const forceScrollToBottomRef = useRef(false);
   const conversationIdFromUrl = searchParams.get("conversationId");
   const currentConversationKey = conversation?.id ?? conversationIdFromUrl ?? DRAFT_CONVERSATION_KEY;
   const activeConversationKeyRef = useRef(currentConversationKey);
@@ -193,10 +189,85 @@ function StrategyModeContent() {
   }, [restoreState.loading]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({
-      block: "end"
+    const handleWindowScroll = () => {
+      if (!getStrategyThreadScrollContainer()) {
+        shouldStickToBottomRef.current = isStrategyThreadNearBottom();
+      }
+    };
+
+    window.addEventListener("scroll", handleWindowScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", handleWindowScroll);
+    };
+  }, []);
+
+  useEffect(() => {
+    const shouldForceScroll = forceScrollToBottomRef.current;
+
+    if (!shouldForceScroll && !shouldStickToBottomRef.current) {
+      return;
+    }
+
+    forceScrollToBottomRef.current = false;
+    const frameId = window.requestAnimationFrame(() => {
+      if (shouldForceScroll || shouldStickToBottomRef.current || isStrategyThreadNearBottom()) {
+        scrollStrategyThreadToBottom();
+      }
     });
-  }, [messages.length, activeJob?.id, activeJob?.status, activeJob?.partialResult, activeJobRunning, elapsedSeconds]);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [messages.length, activeJob?.id, activeJob?.status, activeJob?.partialResult, activeJob?.events?.length, activeJobRunning, elapsedSeconds, error]);
+
+  function getStrategyThreadScrollContainer() {
+    const thread = strategyThreadRef.current;
+
+    if (!thread || thread.scrollHeight <= thread.clientHeight + 1) {
+      return null;
+    }
+
+    return thread;
+  }
+
+  function isStrategyThreadNearBottom() {
+    const container = getStrategyThreadScrollContainer();
+
+    if (container) {
+      return container.scrollHeight - container.scrollTop - container.clientHeight <= STRATEGY_THREAD_BOTTOM_THRESHOLD_PX;
+    }
+
+    const scrollingElement = document.scrollingElement ?? document.documentElement;
+    return scrollingElement.scrollHeight - window.scrollY - window.innerHeight <= STRATEGY_THREAD_BOTTOM_THRESHOLD_PX;
+  }
+
+  function scrollStrategyThreadToBottom() {
+    const container = getStrategyThreadScrollContainer();
+
+    if (container) {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: "auto"
+      });
+    } else {
+      bottomRef.current?.scrollIntoView({
+        block: "end",
+        behavior: "auto"
+      });
+    }
+
+    shouldStickToBottomRef.current = true;
+  }
+
+  function forceStrategyThreadToBottom() {
+    forceScrollToBottomRef.current = true;
+    shouldStickToBottomRef.current = true;
+  }
+
+  function handleStrategyThreadScroll() {
+    shouldStickToBottomRef.current = isStrategyThreadNearBottom();
+  }
 
   function hydrateConversationJobs(conversationId: string, tasks: AiTaskData["task"][], nextMessages: AiMessageData[]) {
     if (tasks.length === 0) {
@@ -218,8 +289,7 @@ function StrategyModeContent() {
         merged[job.id] = {
           ...merged[job.id],
           ...job,
-          request: merged[job.id]?.request,
-          steps: mergeJobSteps(merged[job.id]?.steps, job.steps)
+          request: merged[job.id]?.request
         };
       }
 
@@ -328,6 +398,7 @@ function StrategyModeContent() {
     ]);
     setPrompt("");
     setUploadError("");
+    forceStrategyThreadToBottom();
 
     try {
       const data = await createWorkbenchAiTask({
@@ -383,8 +454,7 @@ function StrategyModeContent() {
           ...localJob,
           status: "failed",
           error: friendly,
-          finishedAt: new Date().toISOString(),
-          steps: markJobSteps(localJob.steps, "failed")
+          finishedAt: new Date().toISOString()
         }
       }));
     }
@@ -420,8 +490,7 @@ function StrategyModeContent() {
       next[data.task.id] = {
         ...existing,
         ...nextJob,
-        request: options.request ?? existing?.request,
-        steps: mergeJobSteps(existing?.steps, nextJob.steps)
+        request: options.request ?? existing?.request
       };
 
       return next;
@@ -476,12 +545,7 @@ function StrategyModeContent() {
             content: result.explanation || "已完成策略生成。",
             contentJson: {
               task: data.task,
-              result,
-              visibleSteps: buildClientVisibleSteps({
-                targetPlatform: data.task.targetPlatform ?? targetPlatform,
-                hasConversation: Boolean(data.task.conversationId),
-                hasFile: Boolean(data.task.inputFileId)
-              })
+              result
             },
             createdAt: data.task.finishedAt ?? new Date().toISOString()
           })
@@ -532,8 +596,7 @@ function StrategyModeContent() {
               ...job,
               status: "failed",
               error: "任务仍在服务端处理或状态暂时不可达，请稍后查看历史记录，或确认无结果后重试。",
-              finishedAt: new Date().toISOString(),
-              steps: markJobSteps(job.steps, "failed")
+              finishedAt: new Date().toISOString()
             }
           };
         });
@@ -551,8 +614,7 @@ function StrategyModeContent() {
               ...job,
               status: "failed",
               error: "任务连接中断，未确认完成。请稍后查看历史记录，或点击重试。",
-              finishedAt: new Date().toISOString(),
-              steps: markJobSteps(job.steps, "failed")
+              finishedAt: new Date().toISOString()
             }
           };
         });
@@ -575,8 +637,7 @@ function StrategyModeContent() {
           ...job,
           status: "canceled",
           error: "任务已取消",
-          finishedAt: new Date().toISOString(),
-          steps: markJobSteps(job.steps, "canceled")
+          finishedAt: new Date().toISOString()
         }
       }));
       return;
@@ -623,6 +684,7 @@ function StrategyModeContent() {
       ...current,
       [sourceConversationKey]: localJob.id
     }));
+    forceStrategyThreadToBottom();
 
     try {
       const data = job.task
@@ -678,8 +740,7 @@ function StrategyModeContent() {
           ...localJob,
           status: "failed",
           error: friendly,
-          finishedAt: new Date().toISOString(),
-          steps: markJobSteps(localJob.steps, "failed")
+          finishedAt: new Date().toISOString()
         }
       }));
     }
@@ -725,7 +786,7 @@ function StrategyModeContent() {
       <section className="lq-workspace">
         <SignalRibbon />
 
-        <div className="lq-strategy-thread">
+        <div className="lq-strategy-thread" onScroll={handleStrategyThreadScroll} ref={strategyThreadRef}>
           <div className="lq-message-stack">
             {!conversation && messages.length === 0 ? (
               <ChatBubble role="assistant" text={historyLoading ? "正在载入会话..." : "请输入策略需求，我会保留上下文，后续可继续追问或修改上一轮策略。"} />
@@ -806,13 +867,20 @@ function ConvertModeContent() {
   const [taskData, setTaskData] = useState<AiTaskData | null>(null);
   const [activeTab, setActiveTab] = useState<(typeof conversionTabs)[number]>(conversionTabs[0]);
   const [loading, setLoading] = useState(false);
+  const [canceling, setCanceling] = useState(false);
   const [error, setError] = useState("");
   const [uploadedFile, setUploadedFile] = useState<UploadedCodeFile | null>(null);
+  const [inputSource, setInputSource] = useState<"manual" | "attachment" | "restored">("manual");
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cancelRequestedRef = useRef(false);
+  const pollingConversionTaskIdRef = useRef<string | null>(null);
   const conversationIdFromUrl = searchParams.get("conversationId");
-  const elapsedSeconds = useElapsedSeconds(loading);
+  const activeConversionTaskStatus = taskData?.task.status ?? null;
+  const activeConversionTaskRunning = activeConversionTaskStatus === "PENDING" || activeConversionTaskStatus === "RUNNING";
+  const conversionLoading = loading || activeConversionTaskRunning;
+  const elapsedSeconds = useElapsedSeconds(conversionLoading, taskData?.task.startedAt ?? taskData?.task.createdAt ?? undefined);
 
   const activeConversionConversationId = taskData?.conversation?.id ?? taskData?.task.conversationId ?? conversationIdFromUrl;
 
@@ -849,6 +917,7 @@ function ConvertModeContent() {
 
       setPrompt(restored.prompt ?? "");
       setInputCode(formatRestoredInputText(restored.inputCodePreview, restored.inputFileName));
+      setInputSource("restored");
       setUploadedFile(createRestoredUploadedFile(restored));
       setTaskData(restored.taskData);
       setActiveTab(getConversationActiveTab(conversationData.conversation, conversionTabs, conversionTabs[0]));
@@ -862,6 +931,93 @@ function ConvertModeContent() {
     persistConversationActiveTab(activeConversionConversationId, activeTab, "convert");
   }, [activeConversionConversationId, activeTab]);
 
+  useEffect(() => {
+    if (conversationIdFromUrl) {
+      return;
+    }
+
+    resetConversionLocalState();
+  }, [conversationIdFromUrl]);
+
+  useEffect(() => {
+    const currentTaskData = taskData;
+    const currentTask = currentTaskData?.task;
+
+    if (!currentTask || (currentTask.status !== "PENDING" && currentTask.status !== "RUNNING") || cancelRequestedRef.current) {
+      return;
+    }
+
+    if (pollingConversionTaskIdRef.current === currentTask.id) {
+      return;
+    }
+
+    let disposed = false;
+    pollingConversionTaskIdRef.current = currentTask.id;
+    setLoading(true);
+
+    void (async () => {
+      try {
+        const completed = await waitForAiTaskResult(currentTaskData, (nextData) => {
+          if (disposed || cancelRequestedRef.current) {
+            return;
+          }
+
+          setTaskData(nextData);
+        });
+
+        if (disposed || cancelRequestedRef.current) {
+          return;
+        }
+
+        setTaskData(completed);
+        replaceWorkbenchConversationUrl(router, { type: "chat", mode: "convert" }, conversationIdFromUrl, completed.conversation?.id ?? completed.task.conversationId ?? null);
+        window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
+
+        if (completed.result || completed.task.status === "SUCCEEDED") {
+          window.dispatchEvent(new Event("lightquant:credits-updated"));
+        }
+      } catch (pollError) {
+        window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
+
+        if (!disposed && !cancelRequestedRef.current) {
+          setError(getFriendlyError(pollError));
+        }
+      } finally {
+        if (pollingConversionTaskIdRef.current === currentTask.id) {
+          pollingConversionTaskIdRef.current = null;
+        }
+
+        if (!disposed) {
+          setLoading(false);
+          setCanceling(false);
+        }
+      }
+    })();
+
+    return () => {
+      disposed = true;
+
+      if (pollingConversionTaskIdRef.current === currentTask.id) {
+        pollingConversionTaskIdRef.current = null;
+      }
+    };
+  }, [taskData?.task.id]);
+
+  function resetConversionLocalState() {
+    setInputCode("");
+    setInputSource("manual");
+    setPrompt("");
+    setTaskData(null);
+    setError("");
+    setUploadedFile(null);
+    setUploadError("");
+    setLoading(false);
+    setCanceling(false);
+    pollingConversionTaskIdRef.current = null;
+    cancelRequestedRef.current = false;
+    setActiveTab(conversionTabs[0]);
+  }
+
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -874,9 +1030,19 @@ function ConvertModeContent() {
     setUploadError("");
 
     try {
-      setUploadedFile(await uploadCodeFile(file));
+      const nextFile = await uploadCodeFile(file);
+      const nextInputText = nextFile.contentText ?? "";
+      setUploadedFile(nextFile);
+      setInputCode(nextInputText);
+      setInputSource("attachment");
+
+      if (!nextInputText && !nextFile.mimeType.startsWith("image/")) {
+        setUploadError("附件已上传，但没有解析出可转换文本，请重新上传文本文件。");
+      }
     } catch (uploadErrorValue) {
       setUploadedFile(null);
+      setInputCode("");
+      setInputSource("manual");
       setUploadError(getFileUploadFriendlyError(uploadErrorValue));
     } finally {
       setUploading(false);
@@ -884,7 +1050,18 @@ function ConvertModeContent() {
   }
 
   async function handleSubmit() {
+    const finalInputText = getFinalConversionInputText(inputCode);
+    const finalPrompt = prompt.trim();
+    const finalTotalInputChars = getConversionTotalInputChars(finalInputText, finalPrompt, sourcePlatform, targetPlatform);
+
+    if (finalTotalInputChars > CODE_CONVERSION_MAX_TOTAL_INPUT_CHARS) {
+      setError(getConversionInputTooLargeMessage(finalTotalInputChars, inputSource === "attachment" && Boolean(uploadedFile)));
+      return;
+    }
+
     setLoading(true);
+    setCanceling(false);
+    cancelRequestedRef.current = false;
     setError("");
 
     try {
@@ -894,8 +1071,8 @@ function ConvertModeContent() {
         conversationId: currentConversationId,
         sourcePlatform,
         targetPlatform,
-        inputCode,
-        prompt,
+        inputCode: finalInputText,
+        prompt: finalPrompt,
         inputFileId: uploadedFile?.fileId,
         clientRequestId: createWorkbenchClientRequestId("convert")
       });
@@ -904,23 +1081,55 @@ function ConvertModeContent() {
       setActiveTab(conversionTabs[0]);
       replaceWorkbenchConversationUrl(router, { type: "chat", mode: "convert" }, conversationIdFromUrl, data.conversation?.id ?? data.task.conversationId ?? null);
       window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
-      const completed = await waitForAiTaskResult(data, setTaskData);
-      setTaskData(completed);
-      replaceWorkbenchConversationUrl(router, { type: "chat", mode: "convert" }, conversationIdFromUrl, completed.conversation?.id ?? completed.task.conversationId ?? null);
-      window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
-      window.dispatchEvent(new Event("lightquant:credits-updated"));
     } catch (submitError) {
       window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
-      setError(getFriendlyError(submitError));
+      if (!cancelRequestedRef.current) {
+        setError(getFriendlyError(submitError));
+      }
     } finally {
       setLoading(false);
+      setCanceling(false);
+    }
+  }
+
+  async function handleCancelConversionTask() {
+    const taskId = taskData?.task.id;
+
+    if (!taskId || canceling) {
+      return;
+    }
+
+    cancelRequestedRef.current = true;
+    setCanceling(true);
+    setError("");
+
+    try {
+      const data = await cancelAiTask(taskId);
+      setTaskData(data);
+      setLoading(false);
+      window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
+    } catch (cancelError) {
+      cancelRequestedRef.current = false;
+      setError(getFriendlyError(cancelError));
+    } finally {
+      setCanceling(false);
     }
   }
 
   const result = taskData?.result;
-  const panelContent = getCodeConversionTabContent(activeTab, result);
-  const shouldShowTaskProgress = !panelContent && (loading || Boolean(taskData && taskData.task.status !== "SUCCEEDED"));
-  const conversionInputChars = inputCode.length + prompt.length;
+  const conversionPanelContent = getCodeConversionTabContent(activeTab, result);
+  const conversionLineCount = Math.max(10, conversionPanelContent ? conversionPanelContent.split(/\r\n|\r|\n/).length : 10);
+  const canCopyConversionCode = Boolean(result?.generatedCode?.trim() && isCodeConversionCodeTab(activeTab));
+  const finalInputText = getFinalConversionInputText(inputCode);
+  const finalPrompt = prompt.trim();
+  const finalTotalInputChars = getConversionTotalInputChars(finalInputText, finalPrompt, sourcePlatform, targetPlatform);
+  const inputTooLargeMessage = finalTotalInputChars > CODE_CONVERSION_MAX_TOTAL_INPUT_CHARS
+    ? getConversionInputTooLargeMessage(finalTotalInputChars, inputSource === "attachment" && Boolean(uploadedFile))
+    : "";
+  const shownError = error || inputTooLargeMessage;
+  const shouldShowTaskProgress = !result && (conversionLoading || Boolean(taskData && taskData.task.status !== "SUCCEEDED"));
+  const taskStatus = taskData?.task.status ?? (conversionLoading ? "RUNNING" : null);
+  const canCancelTask = Boolean(taskData?.task.id && (taskStatus === "PENDING" || taskStatus === "RUNNING"));
 
   return (
     <WorkbenchShell className="min-h-full">
@@ -929,7 +1138,7 @@ function ConvertModeContent() {
         <p>将不同量化平台的策略代码转换为目标平台可读、可改、可验证的版本</p>
       </section>
 
-      <section className="lq-workbench is-compact">
+      <section className="lq-workbench is-compact is-conversion">
         <div className="lq-platform-select-row">
           <div className="lq-platform-select-group">
             <PlatformSelectCard label="源平台" onChange={setSourcePlatform} options={convertPlatforms.source} value={sourcePlatform} />
@@ -954,10 +1163,13 @@ function ConvertModeContent() {
                 </button>
                 <input accept=".py,.txt,.log,.md,.png,.jpg,.jpeg,.webp" className="hidden" onChange={handleFileChange} ref={fileInputRef} type="file" />
               </div>
-              <WorkbenchFileUploadStatus file={uploadedFile} message={uploadError} />
+              <WorkbenchFileUploadStatus file={uploadedFile} message={uploadError} showPreview={false} />
               <textarea
                 className="lq-textarea lq-code-input"
-                onChange={(event) => setInputCode(event.target.value)}
+                onChange={(event) => {
+                  setInputCode(event.target.value);
+                  setInputSource("manual");
+                }}
                 placeholder="请粘贴需要转换的策略代码..."
                 value={inputCode}
               />
@@ -980,25 +1192,35 @@ function ConvertModeContent() {
 
           <div className="lq-column">
             <div className="lq-result-panel">
-              <div className="lq-tabs">
-                {conversionTabs.map((tab) => (
-                  <button className={`lq-tab ${tab === activeTab ? "is-active" : ""}`} key={tab} onClick={() => setActiveTab(tab)} type="button">
-                    {tab}
-                  </button>
-                ))}
+              <div className="lq-result-tabs-row">
+                <div className="lq-tabs">
+                  {conversionTabs.map((tab) => (
+                    <button className={`lq-tab ${tab === activeTab ? "is-active" : ""}`} key={tab} onClick={() => setActiveTab(tab)} type="button">
+                      {tab}
+                    </button>
+                  ))}
+                </div>
+                {canCopyConversionCode && result?.generatedCode ? (
+                  <div className="lq-result-copy-slot">
+                    <CopyCodeButton className="lq-result-copy-btn" code={result.generatedCode} failedLabel="复制失败，请手动选择代码" />
+                  </div>
+                ) : null}
               </div>
               <div className="lq-code-preview app-scrollbar">
-                <div className="lq-code-lines">{Array.from({ length: 10 }, (_, index) => <div key={index}>{index + 1}</div>)}</div>
-                {panelContent ? (
+                <div className="lq-code-lines">{Array.from({ length: conversionLineCount }, (_, index) => <div key={index}>{index + 1}</div>)}</div>
+                {result ? (
                   <CodeConversionResultView activeTab={activeTab} result={result} />
                 ) : shouldShowTaskProgress ? (
                   <AiTaskProgressPanel
                     events={taskData?.events ?? taskData?.task.events}
                     elapsedSeconds={elapsedSeconds}
                     errorCode={taskData?.task.errorCode}
-                    inputChars={conversionInputChars}
+                    canceling={canceling}
+                    onCancel={canCancelTask ? handleCancelConversionTask : undefined}
                     progress={taskData?.task.progress}
-                    status={taskData?.task.status ?? (loading ? "RUNNING" : "PENDING")}
+                    showEta={false}
+                    showInputChars={false}
+                    status={taskData?.task.status ?? (conversionLoading ? "RUNNING" : "PENDING")}
                     taskId={taskData?.task.id}
                     taskType="code_conversion"
                     tone="dark"
@@ -1006,14 +1228,13 @@ function ConvertModeContent() {
                 ) : (
                   <div className="lq-result-placeholder">
                     <BotIcon />
-                    <span>{loading ? getAiWaitMessage("正在转换策略代码", elapsedSeconds) : "转换结果将在这里显示"}</span>
+                    <span>{conversionLoading ? getAiWaitMessage("正在转换策略代码", elapsedSeconds) : "转换结果将在这里显示"}</span>
                   </div>
                 )}
               </div>
             </div>
             {result && taskData?.task ? <AiTaskCompletionSummary events={taskData.events ?? taskData.task.events} progress={taskData.task.progress} task={taskData.task} /> : null}
-            {result ? <ResultNotes migrationNotes={result.migrationNotes} riskWarnings={result.riskWarnings} /> : null}
-            {error ? <ErrorPanel message={error} /> : null}
+            {shownError ? <ErrorPanel message={shownError} /> : null}
           </div>
         </div>
 
@@ -1021,24 +1242,16 @@ function ConvertModeContent() {
           <div className="lq-actions-left">
             <button
               className="lq-primary-btn"
-              disabled={loading || (!inputCode.trim() && !uploadedFile) || uploadedFile?.scanStatus === "BLOCKED"}
+              disabled={conversionLoading || Boolean(inputTooLargeMessage) || !finalInputText || uploadedFile?.scanStatus === "BLOCKED"}
               onClick={handleSubmit}
               type="button"
             >
-              {loading ? <LoaderCircle aria-hidden="true" className="animate-spin" size={18} /> : <Sparkles aria-hidden="true" size={18} />}
-              {loading ? `转换中 ${elapsedSeconds}s` : "开始转换"}
+              {conversionLoading ? <LoaderCircle aria-hidden="true" className="animate-spin" size={18} /> : <Sparkles aria-hidden="true" size={18} />}
+              {conversionLoading ? `转换中 ${elapsedSeconds}s` : "开始转换"}
             </button>
             <button
               className="lq-secondary-btn"
-              onClick={() => {
-                setInputCode("");
-                setPrompt("");
-                setTaskData(null);
-                setError("");
-                setUploadedFile(null);
-                setUploadError("");
-                setActiveTab(conversionTabs[0]);
-              }}
+              onClick={resetConversionLocalState}
               type="button"
             >
               <Trash2 aria-hidden="true" size={17} />
@@ -1072,8 +1285,10 @@ function ChatBubble({ loading = false, role, text }: { loading?: boolean; role: 
   if (role === "user") {
     return (
       <div className="lq-user-row">
-        <div className="lq-user-bubble">
-          <p>{text}</p>
+        <div className="lq-user-message-shell">
+          <div className="lq-user-bubble">
+            <p>{text}</p>
+          </div>
         </div>
       </div>
     );
@@ -1095,7 +1310,7 @@ function StrategyMessageBubble({ elapsedSeconds, message }: { elapsedSeconds?: n
   if (message.role === "user") {
     return (
       <div className="lq-user-row">
-        <div>
+        <div className="lq-user-message-shell">
           <div className="lq-user-bubble">
             <p>{message.content}</p>
           </div>
@@ -1108,13 +1323,12 @@ function StrategyMessageBubble({ elapsedSeconds, message }: { elapsedSeconds?: n
   const result = getMessageResult(message);
   const task = getMessageTask(message);
   const error = getMessageError(message);
-  const visibleSteps = getMessageVisibleSteps(message, task);
   const status = message.localStatus === "pending" ? "running" : message.localStatus === "error" || error ? "failed" : result ? "succeeded" : "idle";
 
   return (
     <div className="lq-assistant-row">
       <div className={`lq-assistant-message ${status === "failed" ? "is-error" : ""}`}>
-        {status !== "idle" ? <AgentWorkLog elapsedSeconds={elapsedSeconds} status={status} steps={visibleSteps} task={task} /> : null}
+        {status !== "idle" ? <AgentWorkLog elapsedSeconds={elapsedSeconds} status={status} task={task} /> : null}
         {status === "failed" ? <ErrorPanel message={error?.message ?? message.content} /> : null}
         {result ? <StrategyResultView result={result} task={task} /> : null}
         {!result && status === "idle" ? (
@@ -1147,6 +1361,8 @@ function StrategyJobBubble({
   const canceled = job.status === "canceled";
   const completed = job.status === "completed";
   const summary = getStrategyJobSummary(job, elapsedSeconds);
+  const timelineStatus = job.task?.status ?? (running ? "RUNNING" : completed ? "SUCCEEDED" : canceled ? "CANCELLED" : failed ? "FAILED" : null);
+  const emptyProcessMessage = running ? "LightQuant 正在接收任务..." : "暂无处理过程事件";
 
   useEffect(() => {
     if (running) {
@@ -1158,35 +1374,27 @@ function StrategyJobBubble({
     <div className="lq-assistant-row">
       <div className={`lq-assistant-message ${failed || canceled ? "is-error" : ""}`}>
         <div className={`lq-agent-log ${running ? "is-running" : ""}`}>
-          <button className="lq-agent-log-summary" onClick={() => setExpanded((value) => !value)} type="button">
-            {expanded ? <ChevronDown aria-hidden="true" size={16} /> : <ChevronRight aria-hidden="true" size={16} />}
-            <span>{summary}</span>
-          </button>
-          {expanded ? (
-            <ol className="lq-agent-steps">
-              {job.steps.map((step, index) => (
-                <li className={step.status === "running" ? "is-active" : step.status === "failed" ? "is-failed" : ""} key={step.id}>
-                  <span>{index + 1}</span>
-                  <p>{step.title}{step.detail ? ` · ${step.detail}` : ""}</p>
-                </li>
-              ))}
-            </ol>
-          ) : null}
-          <RunEventTimeline events={job.events} status={job.task?.status ?? (running ? "RUNNING" : completed ? "SUCCEEDED" : failed || canceled ? "FAILED" : null)} taskId={job.task?.id} />
-          <div className="lq-job-actions">
+          <div className="lq-agent-log-head">
+            <button className="lq-agent-log-summary" onClick={() => setExpanded((value) => !value)} type="button">
+              {expanded ? <ChevronDown aria-hidden="true" size={16} /> : <ChevronRight aria-hidden="true" size={16} />}
+              <span>{summary}</span>
+            </button>
             {running ? (
-              <button className="lq-job-action" onClick={onCancel} type="button">
+              <button className="lq-job-action lq-job-action-inline" onClick={onCancel} type="button">
                 <Trash2 aria-hidden="true" size={15} />
                 取消任务
               </button>
             ) : null}
-            {failed || canceled ? (
+          </div>
+          {expanded ? <RunEventTimeline collapsible={false} emptyMessage={emptyProcessMessage} events={job.events} status={timelineStatus} taskId={job.task?.id} /> : null}
+          {failed || canceled ? (
+            <div className="lq-job-actions">
               <button className="lq-job-action is-primary" onClick={onRetry} type="button">
                 <ArrowRight aria-hidden="true" size={15} />
                 重试
               </button>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </div>
 
         {job.error ? <ErrorPanel message={job.error} /> : null}
@@ -1199,23 +1407,22 @@ function StrategyJobBubble({
 function AgentWorkLog({
   elapsedSeconds,
   status,
-  steps,
   task
 }: {
   elapsedSeconds?: number;
   status: "running" | "succeeded" | "failed" | "idle";
-  steps: string[];
   task: AiTaskData["task"] | null;
 }) {
   const [expanded, setExpanded] = useState(status === "running");
   const runningElapsed = Math.max(1, elapsedSeconds ?? 0);
-  const displaySteps = status === "running" ? steps.slice(0, Math.min(steps.length, Math.max(1, Math.floor(runningElapsed / 2) + 1))) : steps;
   const duration = status === "running" ? formatElapsed(runningElapsed) : formatTaskDuration(task, elapsedSeconds);
   const summary = status === "running"
     ? `LightQuant 正在处理 · ${duration}`
     : status === "failed"
       ? `处理失败 · 用时 ${duration}`
       : `已完成 · 用时 ${duration} · 查看处理过程`;
+  const timelineStatus = task?.status ?? (status === "running" ? "RUNNING" : status === "failed" ? "FAILED" : status === "succeeded" ? "SUCCEEDED" : null);
+  const emptyProcessMessage = status === "running" ? "LightQuant 正在接收任务..." : "暂无处理过程事件";
 
   return (
     <div className={`lq-agent-log ${status === "running" ? "is-running" : ""}`}>
@@ -1223,39 +1430,7 @@ function AgentWorkLog({
         {expanded ? <ChevronDown aria-hidden="true" size={16} /> : <ChevronRight aria-hidden="true" size={16} />}
         <span>{summary}</span>
       </button>
-      {expanded ? (
-        <ol className="lq-agent-steps">
-          {displaySteps.map((step, index) => (
-            <li className={index === displaySteps.length - 1 && status === "running" ? "is-active" : ""} key={`${step}-${index}`}>
-              <span>{index + 1}</span>
-              <p>{step}</p>
-            </li>
-          ))}
-        </ol>
-      ) : null}
-      <RunEventTimeline status={task?.status ?? (status === "running" ? "RUNNING" : status === "failed" ? "FAILED" : status === "succeeded" ? "SUCCEEDED" : null)} taskId={task?.id} />
-    </div>
-  );
-}
-
-function ResultNotes({ migrationNotes, riskWarnings }: { migrationNotes?: string | null; riskWarnings: string[] }) {
-  if (!migrationNotes && riskWarnings.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="lq-notes-card">
-      {migrationNotes ? <p className="mb-2 mt-0 text-[#111827]">{migrationNotes}</p> : null}
-      {riskWarnings.length > 0 ? (
-        <ul className="m-0 grid gap-2 p-0">
-          {riskWarnings.map((warning) => (
-            <li className="flex gap-2" key={warning}>
-              <AlertTriangle aria-hidden="true" className="mt-[2px] flex-shrink-0 text-[#d92d20]" size={16} />
-              <span>{warning}</span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      {expanded ? <RunEventTimeline collapsible={false} emptyMessage={emptyProcessMessage} status={timelineStatus} taskId={task?.id} /> : null}
     </div>
   );
 }
@@ -1326,13 +1501,6 @@ function createLocalStrategyJob(input: {
     id: input.id,
     conversationId: input.conversationId,
     status: "pending",
-    steps: createStrategyJobSteps({
-      hasConversation: input.conversationId !== DRAFT_CONVERSATION_KEY,
-      hasFile: Boolean(input.request.inputFileId),
-      targetPlatform: input.request.targetPlatform,
-      status: "pending",
-      updatedAt: input.createdAt
-    }),
     createdAt: input.createdAt,
     request: input.request
   };
@@ -1356,15 +1524,6 @@ function createStrategyJobFromTask(
     id: task.id,
     conversationId: input.conversationId,
     status,
-    steps: createStrategyJobSteps({
-      hasConversation: Boolean(task.conversationId),
-      hasFile: Boolean(task.inputFileId),
-      targetPlatform: task.targetPlatform ?? input.request?.targetPlatform ?? "",
-      status,
-      progress: task.progress,
-      error: task.errorMessage ?? undefined,
-      updatedAt: task.updatedAt ?? new Date().toISOString()
-    }),
     partialResult: status === "streaming" ? resultText : input.previous?.partialResult,
     finalResult: status === "completed" ? resultText : input.previous?.finalResult,
     error: status === "failed" || status === "canceled" ? task.errorMessage ?? input.previous?.error ?? "任务处理失败" : undefined,
@@ -1376,92 +1535,6 @@ function createStrategyJobFromTask(
     request: input.request ?? input.previous?.request,
     events: input.events ?? task.events ?? input.previous?.events
   };
-}
-
-function createStrategyJobSteps(input: {
-  hasConversation: boolean;
-  hasFile: boolean;
-  targetPlatform: string;
-  status: JobStatus;
-  progress?: AiTaskProgress | null;
-  error?: string;
-  updatedAt?: string;
-}) {
-  const steps: Array<Omit<StrategyJobStep, "status">> = [
-    {
-      id: "read_input",
-      title: input.hasFile ? "读取上传策略文件" : "读取本轮策略需求"
-    },
-    ...(input.hasConversation
-      ? [{
-          id: "load_context",
-          title: "载入当前会话上下文"
-        }]
-      : []),
-    {
-      id: "detect_platform",
-      title: input.targetPlatform ? `识别目标平台：${input.targetPlatform}` : "识别目标平台"
-    },
-    ...(input.hasFile
-      ? [{
-          id: "check_code",
-          title: "检查上传代码与错误信息"
-        }]
-      : []),
-    {
-      id: "match_rules",
-      title: "匹配平台兼容规则"
-    },
-    {
-      id: "generate_plan",
-      title: "生成策略修改方案"
-    },
-    {
-      id: "finalize",
-      title: "整理最终结果"
-    }
-  ];
-  const activeIndex = getStrategyJobActiveStepIndex(input.status, input.progress, steps.length);
-
-  return steps.map((step, index) => ({
-    ...step,
-    detail: input.status === "failed" && index === activeIndex ? input.error : undefined,
-    status: getStrategyStepStatus(index, activeIndex, input.status),
-    updatedAt: input.updatedAt
-  }));
-}
-
-function getStrategyJobActiveStepIndex(status: JobStatus, progress: AiTaskProgress | null | undefined, stepCount: number) {
-  if (status === "completed") {
-    return stepCount;
-  }
-
-  if (status === "failed" || status === "canceled") {
-    return Math.min(stepCount - 1, Math.max(0, Math.floor(((progress?.progressPercent ?? 55) / 100) * stepCount)));
-  }
-
-  if (status === "pending" || status === "queued") {
-    return 0;
-  }
-
-  const percent = progress?.progressPercent ?? 42;
-  return Math.min(stepCount - 1, Math.max(1, Math.floor((percent / 100) * stepCount)));
-}
-
-function getStrategyStepStatus(index: number, activeIndex: number, jobStatus: JobStatus): StrategyJobStep["status"] {
-  if (jobStatus === "completed" || index < activeIndex) {
-    return "completed";
-  }
-
-  if ((jobStatus === "failed" || jobStatus === "canceled") && index === activeIndex) {
-    return "failed";
-  }
-
-  if ((jobStatus === "pending" || jobStatus === "queued" || jobStatus === "running" || jobStatus === "streaming") && index === activeIndex) {
-    return "running";
-  }
-
-  return "pending";
 }
 
 function mapTaskStatusToJobStatus(status: string, result?: AiTaskData["result"]): JobStatus {
@@ -1484,40 +1557,23 @@ function mapTaskStatusToJobStatus(status: string, result?: AiTaskData["result"])
   return "queued";
 }
 
-function mergeJobSteps(previous: StrategyJobStep[] | undefined, next: StrategyJobStep[]) {
-  if (!previous?.length) {
-    return next;
-  }
-
-  return next.map((step) => {
-    const oldStep = previous.find((item) => item.id === step.id);
-
-    if (!oldStep) {
-      return step;
-    }
-
-    if (oldStep.status === "completed" && step.status === "pending") {
-      return {
-        ...step,
-        status: "completed" as const,
-        updatedAt: oldStep.updatedAt
-      };
-    }
-
-    return step;
-  });
+function getFinalConversionInputText(inputCode: string) {
+  return inputCode.trim();
 }
 
-function markJobSteps(steps: StrategyJobStep[], status: "failed" | "canceled") {
-  const activeIndex = Math.max(0, steps.findIndex((step) => step.status === "running"));
-  const failedIndex = activeIndex >= 0 ? activeIndex : 0;
+function getConversionTotalInputChars(inputCode: string, prompt: string, sourcePlatform: string, targetPlatform: string) {
+  return inputCode.length + prompt.length + sourcePlatform.length + targetPlatform.length;
+}
 
-  return steps.map((step, index) => ({
-    ...step,
-    status: index < failedIndex ? "completed" as const : index === failedIndex ? "failed" as const : "pending" as const,
-    detail: index === failedIndex ? (status === "canceled" ? "任务已取消" : step.detail) : step.detail,
-    updatedAt: new Date().toISOString()
-  }));
+function getConversionInputTooLargeMessage(totalInputChars: number, fromAttachment: boolean) {
+  const current = totalInputChars.toLocaleString("zh-CN");
+  const limit = CODE_CONVERSION_MAX_TOTAL_INPUT_CHARS.toLocaleString("zh-CN");
+
+  if (fromAttachment) {
+    return `附件已解析但内容过长。当前任务不支持这么长的输入（当前 ${current} 字符，上限 ${limit} 字符），建议拆分文件后重试。`;
+  }
+
+  return `当前任务不支持这么长的输入（当前 ${current} 字符，上限 ${limit} 字符），请拆分代码或减少补充要求后重试。`;
 }
 
 function isJobActive(job: StrategyJob) {
@@ -1621,36 +1677,6 @@ function getMessageError(message: StrategyChatMessage) {
     code: typeof error.code === "string" ? error.code : "AI_TASK_FAILED",
     message: typeof error.message === "string" ? error.message : message.content
   };
-}
-
-function getMessageVisibleSteps(message: StrategyChatMessage, task: AiTaskData["task"] | null) {
-  const fromMessage = readStringArray(message.contentJson?.visibleSteps);
-
-  if (message.visibleSteps?.length) {
-    return message.visibleSteps;
-  }
-
-  if (fromMessage.length) {
-    return fromMessage;
-  }
-
-  return buildClientVisibleSteps({
-    targetPlatform: task?.targetPlatform ?? "",
-    hasConversation: Boolean(task?.conversationId || message.conversationId),
-    hasFile: Boolean(task?.inputFileId)
-  });
-}
-
-function buildClientVisibleSteps(input: { targetPlatform: string; hasConversation: boolean; hasFile: boolean }) {
-  return [
-    "读取本轮需求",
-    input.hasConversation ? "载入上一轮对话记忆" : "",
-    input.targetPlatform ? `识别目标平台：${input.targetPlatform}` : "识别目标平台",
-    input.hasFile ? "检查上传代码与错误信息" : "",
-    "匹配平台兼容规则",
-    "生成策略修改方案",
-    "整理最终结果"
-  ].filter(Boolean);
 }
 
 function formatElapsed(totalSeconds: number) {

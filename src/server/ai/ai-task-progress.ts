@@ -163,11 +163,11 @@ function phaseLabel(taskType: AiTaskType, phase: AiTaskProgressPhase) {
   }
 
   if (phase === "scanning") {
-    return "结构扫描";
+    return taskType === "code_analysis" ? "结构识别" : "结构扫描";
   }
 
   if (phase === "chunking") {
-    return "代码拆分";
+    return taskType === "code_analysis" ? "结构识别" : "代码拆分";
   }
 
   if (phase === "processing") {
@@ -202,15 +202,23 @@ function statusMessage(
   }
 
   if (phase === "scanning") {
-    return "正在识别入口函数、调度函数、数据接口、下单接口、全局变量和主要业务函数。";
+    return taskType === "code_analysis"
+      ? "正在识别策略结构、平台依赖和关键函数。"
+      : "正在识别入口函数、调度函数、数据接口、下单接口、全局变量和主要业务函数。";
   }
 
   if (phase === "chunking") {
-    return "正在按函数边界拆分长代码，过长函数会继续按安全行数切分。";
+    return taskType === "code_analysis"
+      ? "正在梳理策略结构，准备解析交易逻辑。"
+      : "正在按函数边界拆分长代码，过长函数会继续按安全行数切分。";
   }
 
   if (phase === "processing") {
     if (processingMode === "chunked" && chunkCount) {
+      if (taskType === "code_analysis") {
+        return "正在解析策略结构、交易逻辑和关键参数。";
+      }
+
       return `正在${taskType === "code_conversion" ? "转换" : "解析"}第 ${currentChunk ?? Math.min(completedChunks + 1, chunkCount)} / ${chunkCount} 段。`;
     }
 
@@ -218,11 +226,11 @@ function statusMessage(
   }
 
   if (phase === "merging") {
-    return taskType === "code_analysis" ? "正在汇总分段摘要并生成解析报告。" : "正在合并分段代码、迁移说明和人工复核项。";
+    return taskType === "code_analysis" ? "正在汇总解析报告。" : "正在合并分段代码、迁移说明和人工复核项。";
   }
 
   if (phase === "validating") {
-    return "正在检查输出完整性、空结果、明显截断和重复片段。";
+    return taskType === "code_analysis" ? "正在检查潜在风险和输出完整性。" : "正在检查输出完整性、空结果、明显截断和重复片段。";
   }
 
   if (phase === "completed") {
@@ -270,7 +278,7 @@ function estimatePercent(
     return 100;
   }
 
-  return 100;
+  return 96;
 }
 
 function estimateSeconds(
@@ -324,7 +332,7 @@ function inferFailureStage(errorCode: string | null) {
 
 function buildFailureStatusMessage(errorCode: string | null) {
   if (errorCode === "AI_PROVIDER_TIMEOUT") {
-    return "比预计更久，AI 服务响应超时；请稍后重试或减少代码量。";
+    return "AI 服务响应超时，请稍后重试。";
   }
 
   if (errorCode === "AI_PROVIDER_BAD_RESPONSE") {

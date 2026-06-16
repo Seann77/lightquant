@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy } from "lucide-react";
-import { AiTaskCompletionSummary, type AiRunEventData } from "@/components/ai/AiTaskProgressPanel";
+import { Check, CheckCircle2, Copy } from "lucide-react";
 import type { AiTaskData } from "@/lib/ai/workbench-types";
 
 export function StrategyResultView({
@@ -58,13 +57,18 @@ export function CodeConversionResultView({
   result: AiTaskData["result"] | undefined;
 }) {
   const content = getCodeConversionTabContent(activeTab, result);
+  const isCodeTab = isCodeConversionCodeTab(activeTab);
 
   if (!content) {
-    return null;
+    return (
+      <div className="lq-conversion-empty">
+        {getCodeConversionEmptyMessage(activeTab)}
+      </div>
+    );
   }
 
   return (
-    <pre className="m-0 whitespace-pre-wrap text-[#c8d5ea]">
+    <pre className={`lq-conversion-pre ${isCodeTab ? "is-code" : "is-text"}`}>
       <code>{content}</code>
     </pre>
   );
@@ -75,28 +79,58 @@ export function getCodeConversionTabContent(tab: string, result: AiTaskData["res
     return "";
   }
 
-  if (tab === "迁移说明" || tab.includes("迁移")) {
-    return result.migrationNotes ?? result.explanation ?? "";
+  if (isCodeConversionMigrationTab(tab)) {
+    return result.migrationNotes?.trim() ?? "";
   }
 
-  if (tab === "风险提醒" || tab.includes("风险")) {
+  if (isCodeConversionRiskTab(tab)) {
     return result.riskWarnings.length > 0 ? result.riskWarnings.map((warning) => `- ${warning}`).join("\n") : "暂未识别到明显风险。";
   }
 
-  return result.generatedCode ?? result.explanation ?? "";
+  if (isCodeConversionCodeTab(tab)) {
+    return result.generatedCode?.trim() ?? "";
+  }
+
+  return "";
+}
+
+export function isCodeConversionCodeTab(tab: string) {
+  return tab === "目标平台代码" || tab.includes("代码");
+}
+
+function isCodeConversionMigrationTab(tab: string) {
+  return tab === "迁移说明" || tab.includes("迁移");
+}
+
+function isCodeConversionRiskTab(tab: string) {
+  return tab === "风险提醒" || tab.includes("风险");
+}
+
+function getCodeConversionEmptyMessage(tab: string) {
+  if (isCodeConversionCodeTab(tab)) {
+    return "暂无目标平台代码。";
+  }
+
+  if (isCodeConversionMigrationTab(tab)) {
+    return "暂无迁移说明。";
+  }
+
+  if (isCodeConversionRiskTab(tab)) {
+    return "暂无风险提醒。";
+  }
+
+  return "暂无内容。";
 }
 
 export function CodeAnalysisResultView({
   activeTab,
   costPoints,
-  events,
   report,
   result,
   task
 }: {
   activeTab: string;
   costPoints: number;
-  events?: AiRunEventData[] | null;
   report: Record<string, unknown> | null | undefined;
   result: NonNullable<AiTaskData["result"]>;
   task: AiTaskData["task"];
@@ -105,14 +139,16 @@ export function CodeAnalysisResultView({
 
   return (
     <div className="lq-analysis-output">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="m-0 text-lg font-extrabold text-[#111827]">{activeTab}</h2>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="m-0 text-lg font-extrabold text-[#111827]">{activeTab}</h2>
+          <AnalysisCompletionMeta task={task} />
+        </div>
         <span className="lq-cost-tag">已扣除 {costPoints} 积分</span>
       </div>
-      <AiTaskCompletionSummary events={events ?? task.events} progress={task.progress} task={task} />
       <div className="grid gap-3">
-        {content.map((item) => (
-          <p className="m-0" key={item}>{item}</p>
+        {content.map((item, index) => (
+          <p className="m-0" key={`${activeTab}-${index}`}>{item}</p>
         ))}
       </div>
     </div>
@@ -120,23 +156,147 @@ export function CodeAnalysisResultView({
 }
 
 export function getCodeAnalysisTabContent(activeTab: string, report: Record<string, unknown> | null | undefined, result: NonNullable<AiTaskData["result"]>) {
+  const reportRiskWarnings = toDisplayLines(report?.riskWarnings);
+  const riskWarnings = [...reportRiskWarnings, ...result.riskWarnings].filter(Boolean);
+
   if (activeTab === "风险提醒" || activeTab.includes("风险")) {
-    return result.riskWarnings.length > 0 ? result.riskWarnings : ["暂未识别到明显风险。"];
+    return riskWarnings.length > 0 ? uniqueContentLines(riskWarnings) : ["暂未识别到明显风险。"];
   }
 
   if (activeTab === "交易逻辑" || activeTab.includes("交易")) {
-    return toStringArray(report?.tradingLogic) ?? ["读取行情、计算信号并执行调仓。"];
+    return withContentFallback(toDisplayLines(report?.tradingLogic), "暂未识别到明确交易逻辑。");
   }
 
   if (activeTab === "关键参数" || activeTab.includes("参数")) {
-    return toStringArray(report?.parameters) ?? ["未识别到明确参数。"];
+    return withContentFallback(toDisplayLines(report?.parameters), "暂未识别到明确参数。");
   }
 
   if (activeTab === "优化建议" || activeTab.includes("优化")) {
-    return toStringArray(report?.optimizationSuggestions) ?? ["建议补充回测、风控和异常行情处理。"];
+    return withContentFallback(toDisplayLines(report?.optimizationSuggestions), "暂无额外优化建议。");
   }
 
-  return [String(report?.overview ?? result.explanation ?? "已生成代码解析报告。")];
+  return withContentFallback([
+    ...toDisplayLines(report?.overview),
+    ...prefixContentLines("代码结构", report?.codeStructure),
+    ...prefixContentLines("平台依赖", report?.platformDependencies),
+    ...toDisplayLines(result.explanation)
+  ], "已生成代码解析报告。");
+}
+
+function AnalysisCompletionMeta({ task }: { task: AiTaskData["task"] }) {
+  const parts = ["已完成"];
+  const duration = formatTaskDuration(task.startedAt, task.finishedAt);
+  const mode = task.progress?.processingMode === "chunked" ? "分段处理" : "单次处理";
+
+  if (duration) {
+    parts.push(`用时 ${duration}`);
+  }
+
+  parts.push(mode);
+
+  return (
+    <div className="lq-analysis-completion">
+      <CheckCircle2 aria-hidden="true" size={15} />
+      <span>{parts.join(" · ")}</span>
+    </div>
+  );
+}
+
+function formatTaskDuration(startedAt: string | null | undefined, finishedAt: string | null | undefined) {
+  if (!startedAt || !finishedAt) {
+    return "";
+  }
+
+  const started = Date.parse(startedAt);
+  const finished = Date.parse(finishedAt);
+
+  if (!Number.isFinite(started) || !Number.isFinite(finished) || finished <= started) {
+    return "";
+  }
+
+  const totalSeconds = Math.max(1, Math.round((finished - started) / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  if (minutes <= 0) {
+    return `${seconds} 秒`;
+  }
+
+  return seconds > 0 ? `${minutes} 分 ${seconds} 秒` : `${minutes} 分钟`;
+}
+
+function withContentFallback(lines: string[], fallback: string) {
+  const normalized = uniqueContentLines(lines.map((line) => line.trim()).filter(Boolean));
+
+  return normalized.length > 0 ? normalized : [fallback];
+}
+
+function prefixContentLines(label: string, value: unknown) {
+  return toDisplayLines(value).map((line) => `${label}：${line}`);
+}
+
+function toDisplayLines(value: unknown): string[] {
+  if (value === null || typeof value === "undefined") {
+    return [];
+  }
+
+  if (typeof value === "string") {
+    return value.trim() ? [value.trim()] : [];
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return [String(value)];
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => toDisplayLines(item)).filter(Boolean);
+  }
+
+  if (typeof value === "object") {
+    return [formatDisplayObject(value as Record<string, unknown>)].filter(Boolean);
+  }
+
+  return [];
+}
+
+function formatDisplayObject(value: Record<string, unknown>) {
+  const entries = Object.entries(value)
+    .map(([key, item]) => {
+      const text = formatDisplayValue(item);
+
+      return text ? `${key}：${text}` : "";
+    })
+    .filter(Boolean);
+
+  return entries.join("；");
+}
+
+function formatDisplayValue(value: unknown): string {
+  if (value === null || typeof value === "undefined") {
+    return "";
+  }
+
+  if (typeof value === "string") {
+    return value.trim();
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => formatDisplayValue(item)).filter(Boolean).join("、");
+  }
+
+  if (typeof value === "object") {
+    return formatDisplayObject(value as Record<string, unknown>);
+  }
+
+  return "";
+}
+
+function uniqueContentLines(lines: string[]) {
+  return [...new Set(lines)];
 }
 
 export function RichTextWithCodeBlocks({ content, textClassName }: { content: string; textClassName: string }) {
@@ -152,6 +312,28 @@ export function RichTextWithCodeBlocks({ content, textClassName }: { content: st
 }
 
 export function CopyableCodeBlock({ code, language }: { code: string; language?: string }) {
+  return (
+    <div className="lq-code-block-shell">
+      <div className="lq-code-block-toolbar">
+        {language ? <span className="lq-code-language">{language}</span> : null}
+        <CopyCodeButton code={code} />
+      </div>
+      <pre className="lq-code-block app-scrollbar">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
+
+export function CopyCodeButton({
+  className = "",
+  code,
+  failedLabel = "复制失败"
+}: {
+  className?: string;
+  code: string;
+  failedLabel?: string;
+}) {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
 
   async function handleCopy() {
@@ -162,18 +344,10 @@ export function CopyableCodeBlock({ code, language }: { code: string; language?:
   }
 
   return (
-    <div className="lq-code-block-shell">
-      <div className="lq-code-block-toolbar">
-        {language ? <span className="lq-code-language">{language}</span> : null}
-        <button aria-label="复制代码" className={`lq-copy-code ${copyState === "failed" ? "is-error" : ""}`} onClick={handleCopy} type="button">
-          {copyState === "copied" ? <Check aria-hidden="true" size={14} /> : <Copy aria-hidden="true" size={14} />}
-          <span>{copyState === "copied" ? "已复制" : copyState === "failed" ? "复制失败" : "复制"}</span>
-        </button>
-      </div>
-      <pre className="lq-code-block app-scrollbar">
-        <code>{code}</code>
-      </pre>
-    </div>
+    <button aria-label="复制代码" className={`lq-copy-code ${copyState === "failed" ? "is-error" : ""} ${className}`.trim()} onClick={handleCopy} type="button">
+      {copyState === "copied" ? <Check aria-hidden="true" size={14} /> : <Copy aria-hidden="true" size={14} />}
+      <span>{copyState === "copied" ? "已复制" : copyState === "failed" ? failedLabel : "复制"}</span>
+    </button>
   );
 }
 
@@ -216,10 +390,6 @@ export function parseMarkdownCodeBlocks(content: string) {
     type: "text" as const,
     text: content
   }];
-}
-
-function toStringArray(value: unknown) {
-  return Array.isArray(value) ? value.map((item) => String(item)) : null;
 }
 
 async function copyTextToClipboard(value: string) {

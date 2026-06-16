@@ -239,7 +239,7 @@ export async function runAiTask(taskId: string, requestId: string) {
       phase: runningProviderTask.type === "code_analysis" || runningProviderTask.type === "code_conversion" ? "scanning" : "processing",
       progressPercent: runningProviderTask.type === "code_analysis" || runningProviderTask.type === "code_conversion" ? 8 : 20,
       statusMessage: runningProviderTask.type === "code_analysis" || runningProviderTask.type === "code_conversion"
-        ? "正在识别代码结构和平台依赖。"
+        ? runningProviderTask.type === "code_analysis" ? "正在识别策略结构和平台依赖。" : "正在识别代码结构和平台依赖。"
         : "正在调用 AI 模型生成结果。"
     });
 
@@ -434,10 +434,10 @@ export async function runAiTask(taskId: string, requestId: string) {
     });
     await recordAiTaskProgress(taskToFail, {
       phase: "failed",
-      progressPercent: 100,
+      progressPercent: 96,
       failureStage: apiError.code === "AI_PROVIDER_BAD_RESPONSE" ? "validating" : "processing",
       statusMessage: apiError.code === "AI_PROVIDER_TIMEOUT"
-        ? "比预计更久，AI 服务响应超时；请稍后重试或减少代码量。"
+        ? "AI 服务响应超时，请稍后重试。"
         : apiError.message
     });
 
@@ -460,7 +460,7 @@ export async function runAiTask(taskId: string, requestId: string) {
         status: "failed",
         title: "任务执行失败",
         summary: apiError.message,
-        progressPercent: 100,
+        progressPercent: 96,
         createdAt: failedAt,
         detailJson: {
           errorCode: apiError.code
@@ -693,7 +693,7 @@ export async function cancelAiTaskForUser(userId: string, taskId: string, reques
 
   await recordAiTaskProgress(canceledTask, {
     phase: "failed",
-    progressPercent: 100,
+    progressPercent: 96,
     failureStage: "processing",
     statusMessage: "任务已取消。"
   });
@@ -704,7 +704,7 @@ export async function cancelAiTaskForUser(userId: string, taskId: string, reques
     status: "failed",
     title: "任务已取消",
     summary: "用户已取消本次 AI 任务，积分预留已释放。",
-    progressPercent: 100,
+    progressPercent: 96,
     createdAt: canceledAt,
     detailJson: {
       requestId
@@ -734,7 +734,7 @@ export async function retryAiTaskForUser(userId: string, taskId: string, clientR
       sourcePlatform: task.sourcePlatform ?? undefined,
       targetPlatform: task.targetPlatform ?? undefined,
       prompt: task.prompt ?? undefined,
-      inputCode: task.inputFileId ? undefined : task.inputCode ?? undefined,
+      inputCode: task.inputCode ?? undefined,
       inputFileId: task.inputFileId ?? undefined,
       clientRequestId
     },
@@ -1152,7 +1152,7 @@ async function resolveInputFile(
 
   return {
     ...input,
-    inputCode: mergeInputCode(input.inputCode, uploadedFile.contentText, uploadedFile.originalName),
+    inputCode: input.inputCode ?? mergeInputCode(null, uploadedFile.contentText, uploadedFile.originalName),
     inputFileName: uploadedFile.originalName
   };
 }
@@ -1335,7 +1335,7 @@ function progressToRunEvent(task: AiTask, progress: AiTaskProgressSnapshot) {
     return {
       type: "analyze_code",
       status: "running" as const,
-      title: "拆分长代码",
+      title: task.type === "code_analysis" ? "识别策略结构" : "拆分长代码",
       summary: progress.statusMessage,
       progressPercent: progress.progressPercent,
       detailJson
@@ -1357,7 +1357,7 @@ function progressToRunEvent(task: AiTask, progress: AiTaskProgressSnapshot) {
     return {
       type: "generate_plan",
       status: "running" as const,
-      title: progress.phaseLabel || "合并结果",
+      title: task.type === "code_analysis" ? "汇总解析报告" : progress.phaseLabel || "合并结果",
       summary: progress.statusMessage,
       progressPercent: progress.progressPercent,
       detailJson
@@ -1368,7 +1368,7 @@ function progressToRunEvent(task: AiTask, progress: AiTaskProgressSnapshot) {
     return {
       type: "validate_result",
       status: "running" as const,
-      title: progress.phaseLabel || "校验结果",
+      title: task.type === "code_analysis" ? "检查风险与完整性" : progress.phaseLabel || "校验结果",
       summary: progress.statusMessage,
       progressPercent: progress.progressPercent,
       detailJson
@@ -1775,9 +1775,15 @@ function assertInputWithinLimit(
   const totalInputChars = getTotalInputChars(input);
 
   if (totalInputChars > config.maxTotalInputChars) {
+    const current = totalInputChars.toLocaleString("zh-CN");
+    const limit = config.maxTotalInputChars.toLocaleString("zh-CN");
+    const message = input.inputFileId
+      ? `附件已解析但内容过长。当前任务不支持这么长的输入（当前 ${current} 字符，上限 ${limit} 字符），建议拆分文件后重试。`
+      : `当前任务不支持这么长的输入（当前 ${current} 字符，上限 ${limit} 字符），请拆分代码或减少补充要求后重试。`;
+
     throw new ApiError(
       "INPUT_TOO_LARGE",
-      `${config.displayName}内容过长，请拆分提交，或等待分段处理版本。当前 ${totalInputChars.toLocaleString("zh-CN")} 字符，上限 ${config.maxTotalInputChars.toLocaleString("zh-CN")} 字符。`,
+      message,
       413
     );
   }
