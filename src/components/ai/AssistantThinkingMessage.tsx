@@ -42,7 +42,13 @@ export function AssistantThinkingMessage({
   tone = "light",
   defaultThinkingExpanded
 }: AssistantThinkingMessageProps) {
+  const displayThinking = thinking.trim();
   const hasFinal = Boolean(finalAnswerMarkdown.trim());
+  const hasError = Boolean(error);
+
+  if (!displayThinking && !hasFinal && !hasError) {
+    return null;
+  }
 
   return (
     <div className={`lq-thinking-message is-${tone} is-${status} ${className}`.trim()} aria-live="polite">
@@ -50,8 +56,8 @@ export function AssistantThinkingMessage({
         {status === "thinking" || status === "answering" ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Bot aria-hidden="true" />}
       </div>
       <div className="lq-thinking-message-body">
-        <ThinkingCollapse defaultExpanded={defaultThinkingExpanded} status={status} thinking={thinking} />
-        {hasFinal || status === "answering" || status === "completed" ? (
+        {displayThinking ? <ThinkingCollapse defaultExpanded={defaultThinkingExpanded} status={status} thinking={displayThinking} /> : null}
+        {hasFinal ? (
           <FinalAnswerStream streaming={status === "answering"} text={finalAnswerMarkdown} />
         ) : null}
         {error ? <div className="lq-thinking-error">{error}</div> : null}
@@ -64,6 +70,7 @@ export function ThinkingCollapse({ thinking, status, defaultExpanded }: Thinking
   const completed = status === "completed" || status === "failed";
   const [expanded, setExpanded] = useState(defaultExpanded ?? !completed);
   const displayThinking = thinking.trim();
+  const preview = getThinkingPreview(displayThinking);
 
   useEffect(() => {
     if (defaultExpanded !== undefined) {
@@ -74,17 +81,13 @@ export function ThinkingCollapse({ thinking, status, defaultExpanded }: Thinking
     setExpanded(!completed);
   }, [completed, defaultExpanded]);
 
-  if (!displayThinking && completed) {
+  if (!displayThinking) {
     return null;
   }
 
   if (!completed) {
     return (
       <section className="lq-thinking-section">
-        <div className="lq-thinking-title">
-          <span>正在思考...</span>
-          {!displayThinking ? <em>等待模型返回 thinking</em> : null}
-        </div>
         <ThinkingStream text={displayThinking} />
       </section>
     );
@@ -97,14 +100,14 @@ export function ThinkingCollapse({ thinking, status, defaultExpanded }: Thinking
         <span>思考过程</span>
         <em>{expanded ? "收起" : "展开"}</em>
       </button>
-      {expanded ? <ThinkingStream text={displayThinking} /> : null}
+      {expanded ? <ThinkingStream text={displayThinking} /> : <p className="lq-thinking-preview">{preview}</p>}
     </section>
   );
 }
 
 export function ThinkingStream({ text }: StreamProps) {
   if (!text) {
-    return <div className="lq-thinking-placeholder">正在思考...</div>;
+    return null;
   }
 
   return <pre className="lq-thinking-stream">{text}</pre>;
@@ -149,6 +152,14 @@ export function StreamingMarkdownResult({ markdown }: { markdown: string }) {
       })}
     </div>
   );
+}
+
+function getThinkingPreview(value: string) {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean)
+    ?.slice(0, 160) ?? "";
 }
 
 function parseMarkdownBlocks(markdown: string): MarkdownBlock[] {

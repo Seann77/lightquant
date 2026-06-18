@@ -352,7 +352,9 @@ function buildChunkPrompt(input: AiProviderInput, scan: CodeStructureScan, chunk
       title: chunk.title,
       symbols: chunk.symbols
     }, null, 2),
-    "输出要求：reportJson 至少包含 processingMode='chunked'、phase='processing'、chunkId、chunkIndex、chunkCount、codeStructure、dependencies、manualReviewItems。"
+    input.task.type === "code_analysis"
+      ? "输出要求：reportJson 尽量按 overview、tradingLogic、keyParameters、risks、suggestions 五类报告字段组织；如果仍输出 codeStructure、parameters、platformDependencies、optimizationSuggestions，服务端会做兼容合并。"
+      : "输出要求：reportJson 至少包含 processingMode='chunked'、phase='processing'、chunkId、chunkIndex、chunkCount、codeStructure、dependencies、manualReviewItems。"
   ].filter(Boolean).join("\n\n");
 }
 
@@ -603,10 +605,14 @@ function buildMergedAnalysisReportFields(
     scan.dataApis.length ? `数据接口：${scan.dataApis.join("、")}` : "",
     scan.orderApis.length ? `下单接口：${scan.orderApis.join("、")}` : "",
     scan.businessFunctions.length ? `主要业务函数：${scan.businessFunctions.slice(0, 18).join("、")}${scan.businessFunctions.length > 18 ? " 等" : ""}` : "",
+    ...collectChunkReportField(chunkResults, "overview"),
     ...collectChunkReportField(chunkResults, "codeStructure")
   ].filter(Boolean)).slice(0, 40);
   const tradingLogic = collectChunkReportField(chunkResults, "tradingLogic").slice(0, 50);
-  const parameters = collectChunkReportField(chunkResults, "parameters").slice(0, 40);
+  const parameters = unique([
+    ...collectChunkReportField(chunkResults, "keyParameters"),
+    ...collectChunkReportField(chunkResults, "parameters")
+  ]).slice(0, 40);
   const platformDependencies = unique([
     ...extra.dependencies,
     ...collectChunkReportField(chunkResults, "platformDependencies")
@@ -614,19 +620,66 @@ function buildMergedAnalysisReportFields(
   const riskWarnings = unique([
     ...scan.riskFlags,
     ...chunkResults.flatMap((item) => item.result.riskWarnings),
+    ...collectChunkReportField(chunkResults, "risks"),
     ...collectChunkReportField(chunkResults, "riskWarnings")
   ]).slice(0, 20);
   const optimizationSuggestions = unique([
+    ...collectChunkReportField(chunkResults, "suggestions"),
     ...collectChunkReportField(chunkResults, "optimizationSuggestions"),
     ...extra.manualReviewItems.map((item) => `复核：${item}`)
   ]).slice(0, 30);
 
   return {
-    overview: buildMergedAnalysisOverview(scan),
-    codeStructure,
-    tradingLogic,
-    parameters,
-    platformDependencies,
+    overview: [
+      reportItem("策略名称", "代码中未明确给出"),
+      reportItem("平台识别", [`识别平台为 ${scan.detectedPlatform}。`, `识别置信度为 ${scan.platformConfidence}。`]),
+      reportItem("策略类型", "代码中未明确给出"),
+      reportItem("交易范围", scan.businessFunctions.length ? [`代码涉及 ${scan.businessFunctions.slice(0, 12).join("、")} 等业务逻辑。`] : "代码中未明确给出"),
+      reportItem("核心思路", codeStructure.length ? codeStructure.slice(0, 4) : "代码中未明确给出"),
+      reportItem("运行频率", scan.schedulerFunctions.length ? [`检测到调度或周期处理逻辑。`, scan.schedulerFunctions.join("、")] : "代码中未明确给出"),
+      reportItem("无信号处理", "代码中未明确给出")
+    ],
+    tradingLogic: [
+      reportItem("初始化", scan.entryFunctions.length ? [`策略启动时执行初始化入口。`, `检测到 ${scan.entryFunctions.join("、")}。`] : "代码中未明确给出"),
+      reportItem("盘前/记录", scan.schedulerFunctions.length ? [`代码包含调度或记录类流程。`, scan.schedulerFunctions.join("、")] : "代码中未明确给出"),
+      reportItem("调仓时间", scan.schedulerFunctions.length ? scan.schedulerFunctions.slice(0, 4) : "代码中未明确给出"),
+      reportItem("数据读取", scan.dataApis.length ? [`代码读取行情或基础数据。`, scan.dataApis.join("、")] : "代码中未明确给出"),
+      reportItem("信号生成", tradingLogic.length ? tradingLogic.slice(0, 8) : "代码中未明确给出"),
+      reportItem("目标标的形成", tradingLogic.filter((item) => /目标|候选|选股|名单|排序|rank|sort/i.test(item)).slice(0, 5)),
+      reportItem("买入逻辑", tradingLogic.filter((item) => /买入|开仓|加仓|order|passorder/.test(item)).slice(0, 5)),
+      reportItem("卖出逻辑", tradingLogic.filter((item) => /卖出|平仓|减仓|调仓|止盈|止损/.test(item)).slice(0, 6)),
+      reportItem("下单限制", scan.orderApis.length ? [`检测到下单相关动作。`, scan.orderApis.join("、")] : "代码中未明确给出")
+    ],
+    keyParameters: [
+      reportItem("观察周期", parameters.filter((item) => /周期|window|period|days|日/i.test(item)).slice(0, 5)),
+      reportItem("目标持仓数", parameters.filter((item) => /持仓|数量|stock_num|count/i.test(item)).slice(0, 5)),
+      reportItem("持仓权重", parameters.filter((item) => /等权|加权|weight|percent|仓位/i.test(item)).slice(0, 5)),
+      reportItem("最小交易金额", parameters.filter((item) => /最小|最低|金额|cash|value|min/i.test(item)).slice(0, 5)),
+      reportItem("止损线", parameters.filter((item) => /止损|stop.?loss/i.test(item)).slice(0, 5)),
+      reportItem("滑点", parameters.filter((item) => /滑点|slippage/i.test(item)).slice(0, 5)),
+      reportItem("交易费用", parameters.filter((item) => /费用|commission|tax|cost/i.test(item)).slice(0, 5)),
+      reportItem("最低佣金", parameters.filter((item) => /最低佣金|min/i.test(item)).slice(0, 5)),
+      reportItem("现金处理", parameters.filter((item) => /现金|cash|剩余|空仓/i.test(item)).slice(0, 5)),
+      reportItem("其他关键参数", parameters.length ? joinReportLines(parameters) : "代码中未明确给出")
+    ],
+    risks: [
+      reportItem("主题集中风险", riskWarnings.filter((item) => /主题|行业|板块|指数/.test(item)).slice(0, 4)),
+      reportItem("单标的集中风险", riskWarnings.filter((item) => /个股|单标的|单票|仓位|止损/.test(item)).slice(0, 4)),
+      reportItem("无信号处理风险", riskWarnings.filter((item) => /空仓|无信号|候选|目标/.test(item)).slice(0, 4)),
+      reportItem("交易可达性风险", riskWarnings.filter((item) => /停牌|涨跌停|ST|成交|流动/.test(item)).slice(0, 5)),
+      reportItem("流动性风险", riskWarnings.filter((item) => /流动性|成交|volume/i.test(item)).slice(0, 4)),
+      reportItem("参数敏感性", riskWarnings.filter((item) => /参数|阈值|窗口|周期/.test(item)).slice(0, 5)),
+      reportItem("回测与实盘差异", riskWarnings.filter((item) => /回测|实盘|成交|滑点|费用/.test(item)).slice(0, 5))
+    ],
+    suggestions: [
+      reportItem("信号计算可解释性", optimizationSuggestions.filter((item) => /信号|解释|结构|函数|可读/.test(item)).slice(0, 5)),
+      reportItem("止损独立运行", optimizationSuggestions.filter((item) => /止损|风控/.test(item)).slice(0, 4)),
+      reportItem("交易可达性检查", optimizationSuggestions.filter((item) => /停牌|涨跌停|成交|交易/.test(item)).slice(0, 5)),
+      reportItem("单票集中度控制", optimizationSuggestions.filter((item) => /单票|仓位|集中/.test(item)).slice(0, 4)),
+      reportItem("日志可读性", optimizationSuggestions.filter((item) => /日志|记录|可读/.test(item)).slice(0, 4)),
+      reportItem("参数显式化", optimizationSuggestions.filter((item) => /参数|配置/.test(item)).slice(0, 5)),
+      reportItem("回测验证", optimizationSuggestions.filter((item) => /回测|验证|滑点|费用/.test(item)).slice(0, 5))
+    ],
     riskWarnings,
     optimizationSuggestions,
     validation: extra.validation
@@ -642,6 +695,25 @@ function buildMergedAnalysisOverview(scan: CodeStructureScan) {
     scan.dataApis.length ? `行情/数据依赖包括 ${scan.dataApis.join("、")}。` : "",
     scan.orderApis.length ? `下单相关接口包括 ${scan.orderApis.join("、")}。` : ""
   ].filter(Boolean).join("\n");
+}
+
+function reportItem(title: string, value: string | string[], evidence?: string) {
+  const lines = Array.isArray(value)
+    ? unique(value.map((item) => item.trim()).filter(Boolean)).slice(0, 8)
+    : value.trim() && value.trim() !== "代码中未明确给出"
+      ? [value.trim()]
+      : [];
+
+  return {
+    title,
+    value: lines[0] || "代码中未明确给出",
+    lines,
+    ...(evidence?.trim() ? { evidence: evidence.trim() } : {})
+  };
+}
+
+function joinReportLines(items: string[]) {
+  return unique(items.map((item) => item.trim()).filter(Boolean)).slice(0, 8).join("；");
 }
 
 function collectChunkReportField(chunkResults: ChunkResult[], field: string) {

@@ -10,18 +10,16 @@ import {
   Sparkles,
   Trash2
 } from "lucide-react";
-import { getFileUploadFriendlyError, uploadCodeFile, type UploadedCodeFile } from "@/lib/file-upload";
+import { getFileUploadFriendlyError, getUploadAccept, getUploadButtonLabel, uploadCodeFile, type UploadedCodeFile } from "@/lib/file-upload";
 import { codeAnalysisPlatforms, codeAnalysisTabs } from "@/lib/mock-data";
 import { PlatformDropdown } from "@/components/ui/PlatformDropdown";
-import { AssistantThinkingMessage, type AssistantThinkingStatus } from "@/components/ai/AssistantThinkingMessage";
 import { WorkbenchFileUploadStatus } from "@/components/ai/AttachmentPreviewCard";
 import { WorkbenchShell } from "@/components/ai/WorkbenchShell";
+import { CodeAnalysisResultView } from "@/components/ai/WorkbenchResultViews";
 import {
   createRestoredUploadedFile,
   createWorkbenchClientRequestId,
-  formatAiTaskResultAsMarkdown,
   formatRestoredInputText,
-  getAiTaskStreamingContent,
   getConversationActiveTab,
   getFriendlyAiError as getFriendlyError,
   persistConversationActiveTab,
@@ -34,8 +32,7 @@ import type { AiTaskData } from "@/lib/ai/workbench-types";
 type AnalysisInputSource = "manual" | "attachment" | "restored";
 
 type ThinkingMessageState = {
-  status: AssistantThinkingStatus;
-  visibleThinking: string;
+  status: "idle" | "running" | "completed" | "failed";
   finalAnswerMarkdown: string;
   error?: string | null;
   taskId?: string | null;
@@ -112,7 +109,7 @@ export function CodeAnalysisClient() {
     setUploadError("");
 
     try {
-      const nextFile = await uploadCodeFile(file);
+      const nextFile = await uploadCodeFile(file, "code_analysis");
       const nextInputCode = nextFile.contentText ?? "";
 
       setUploadedFile(nextFile);
@@ -150,16 +147,16 @@ export function CodeAnalysisClient() {
       return;
     }
 
+    const currentConversationId = data?.conversation?.id ?? conversationIdFromUrl ?? undefined;
     setLoading(true);
     setError("");
+    setData(null);
     setStreamState({
-      status: "thinking",
-      visibleThinking: "",
+      status: "running",
       finalAnswerMarkdown: ""
     });
 
     try {
-      const currentConversationId = data?.conversation?.id ?? conversationIdFromUrl ?? undefined;
       const completed = await streamWorkbenchAiTask({
         type: "code_analysis",
         conversationId: currentConversationId,
@@ -172,34 +169,33 @@ export function CodeAnalysisClient() {
           setData(payload);
           setStreamState((current) => ({
             ...current,
-            status: current.finalAnswerMarkdown ? "answering" : "thinking",
+            status: "running",
             taskId: payload.task.id
           }));
           replaceWorkbenchConversationUrl(router, { type: "analysis" }, conversationIdFromUrl, payload.conversation?.id ?? payload.task.conversationId ?? null);
           window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
         },
-        onThinkingDelta: (delta) => {
+        onThinkingDelta: () => {
           setStreamState((current) => ({
             ...current,
-            status: current.finalAnswerMarkdown ? "answering" : "thinking",
-            visibleThinking: `${current.visibleThinking}${delta}`
+            status: current.finalAnswerMarkdown ? "completed" : "running"
           }));
         },
         onFinalDelta: (delta) => {
           setStreamState((current) => ({
             ...current,
-            status: "answering",
+            status: "running",
             finalAnswerMarkdown: `${current.finalAnswerMarkdown}${delta}`
           }));
         },
         onDone: (payload) => {
           setData(payload);
-          setStreamState(createThinkingStateFromTaskData(payload));
+          setStreamState((current) => createThinkingStateFromTaskData(payload, current));
         }
       });
 
       setData(completed);
-      setStreamState(createThinkingStateFromTaskData(completed));
+      setStreamState((current) => createThinkingStateFromTaskData(completed, current));
       replaceWorkbenchConversationUrl(router, { type: "analysis" }, conversationIdFromUrl, completed.conversation?.id ?? completed.task.conversationId ?? null);
       window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
       window.dispatchEvent(new Event("lightquant:credits-updated"));
@@ -217,8 +213,10 @@ export function CodeAnalysisClient() {
     }
   }
 
-  const finalAnswerMarkdown = streamState.finalAnswerMarkdown || (data?.result ? formatAiTaskResultAsMarkdown(data.result, "code_analysis") : "");
-  const shouldShowThinkingResult = Boolean(streamState.visibleThinking || finalAnswerMarkdown || loading || data?.result);
+  const result = data?.result ?? null;
+  const reportJson = result?.reportJson;
+  const reportRecord = reportJson && typeof reportJson === "object" && !Array.isArray(reportJson) ? reportJson as Record<string, unknown> : null;
+  const parseFailed = Boolean(reportRecord?.providerFallback || (data?.task.status === "SUCCEEDED" && !result));
   const finalInputText = getFinalInputText(inputCode, inputSource);
   const analysisInputChars = finalInputText.length;
   const canSubmit = Boolean(finalInputText) && !loading && uploadedFile?.scanStatus !== "BLOCKED";
@@ -235,9 +233,9 @@ export function CodeAnalysisClient() {
           <PlatformDropdown className="lq-analysis-platform-select" label="代码平台" onChange={setPlatform} options={codeAnalysisPlatforms} value={platform} />
           <button className="lq-upload-chip" disabled={uploading} onClick={() => fileInputRef.current?.click()} type="button">
             <FileUp aria-hidden="true" size={17} />
-            上传 .py / .txt / .log / .md / 图片
+            {getUploadButtonLabel("code_analysis")}
           </button>
-          <input accept=".py,.txt,.log,.md,.png,.jpg,.jpeg,.webp" className="hidden" onChange={handleFileChange} ref={fileInputRef} type="file" />
+          <input accept={getUploadAccept("code_analysis")} className="hidden" onChange={handleFileChange} ref={fileInputRef} type="file" />
         </div>
 
         <WorkbenchFileUploadStatus className="mx-[18px]" file={uploadedFile} message={uploadError} />
@@ -306,23 +304,32 @@ export function CodeAnalysisClient() {
           ))}
         </div>
 
-        {shouldShowThinkingResult ? (
-          <AssistantThinkingMessage
-            error={streamState.error}
-            finalAnswerMarkdown={finalAnswerMarkdown}
-            status={streamState.status}
-            thinking={streamState.visibleThinking}
-          />
+        {result && !parseFailed ? (
+          <CodeAnalysisResultView activeTab={activeTab} report={reportRecord} result={result} />
+        ) : loading ? (
+          <div className="lq-empty-result">
+            <div className="lq-empty-icon">
+              <BarChart3 aria-hidden="true" size={25} />
+            </div>
+            <h2>解析中...</h2>
+          </div>
+        ) : parseFailed ? (
+          <div className="lq-empty-result">
+            <div className="lq-empty-icon">
+              <BarChart3 aria-hidden="true" size={25} />
+            </div>
+            <h2>解析失败，请重新提交或检查代码内容。</h2>
+          </div>
         ) : (
           <div className="lq-empty-result">
             <div className="lq-empty-icon">
               <BarChart3 aria-hidden="true" size={25} />
             </div>
-            <h2>{loading ? getAiWaitMessage("正在生成解析报告", elapsedSeconds) : "解析结果将在这里显示"}</h2>
-            <p>{loading ? "真实模型调用可能需要几十秒，请不要关闭页面或重复提交。" : "粘贴您的策略代码并点击“开始解析”，系统将自动生成详细的说明报告。"}</p>
+            <h2>解析结果将在这里显示</h2>
           </div>
         )}
       </section>
+      <p className="lq-risk lq-bottom-risk lq-workbench-risk">AI 生成策略需自行回测验证，投资有风险，请谨慎使用。</p>
     </WorkbenchShell>
   );
 }
@@ -334,23 +341,20 @@ function ErrorPanel({ message }: { message: string }) {
 function createEmptyThinkingState(): ThinkingMessageState {
   return {
     status: "idle",
-    visibleThinking: "",
     finalAnswerMarkdown: ""
   };
 }
 
-function createThinkingStateFromTaskData(data: AiTaskData | null | undefined): ThinkingMessageState {
+function createThinkingStateFromTaskData(data: AiTaskData | null | undefined, previous?: ThinkingMessageState): ThinkingMessageState {
   if (!data) {
     return createEmptyThinkingState();
   }
 
-  const streamContent = getAiTaskStreamingContent(data, data.task.id);
-  const finalAnswerMarkdown = streamContent.finalAnswerMarkdown || (data.result ? formatAiTaskResultAsMarkdown(data.result, "code_analysis") : "");
+  const finalAnswerMarkdown = previous?.finalAnswerMarkdown ?? data.finalAnswerMarkdown ?? "";
 
   if (data.task.status === "FAILED" || data.task.status === "CANCELLED") {
     return {
       status: "failed",
-      visibleThinking: streamContent.visibleThinking,
       finalAnswerMarkdown,
       error: data.task.errorMessage ?? null,
       taskId: data.task.id
@@ -360,15 +364,13 @@ function createThinkingStateFromTaskData(data: AiTaskData | null | undefined): T
   if (data.task.status === "SUCCEEDED" || data.result || finalAnswerMarkdown) {
     return {
       status: "completed",
-      visibleThinking: streamContent.visibleThinking,
       finalAnswerMarkdown,
       taskId: data.task.id
     };
   }
 
   return {
-    status: "thinking",
-    visibleThinking: streamContent.visibleThinking,
+    status: "running",
     finalAnswerMarkdown,
     taskId: data.task.id
   };
@@ -401,20 +403,4 @@ function useElapsedSeconds(active: boolean) {
   }, [active]);
 
   return elapsedSeconds;
-}
-
-function getAiWaitMessage(action: string, elapsedSeconds: number) {
-  if (elapsedSeconds >= 120) {
-    return `${action}，已等待 ${elapsedSeconds} 秒。任务仍在服务端执行，请继续等待。`;
-  }
-
-  if (elapsedSeconds >= 60) {
-    return `${action}，已等待 ${elapsedSeconds} 秒。真实模型可能需要几分钟，请继续等待。`;
-  }
-
-  if (elapsedSeconds >= 15) {
-    return `${action}，已等待 ${elapsedSeconds} 秒。MiMo Pro 正在生成结果。`;
-  }
-
-  return `${action}，已等待 ${elapsedSeconds} 秒...`;
 }

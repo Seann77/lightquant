@@ -21,6 +21,7 @@ try {
 
   const formData = new FormData();
   formData.append("file", new Blob([pngBytes], { type: "image/png" }), "backtest.png");
+  formData.append("purpose", "strategy_generation");
   const upload = await request("POST", "/api/v1/files", formData);
   assertSuccess("upload-image", upload, 200);
   const file = upload.json.data;

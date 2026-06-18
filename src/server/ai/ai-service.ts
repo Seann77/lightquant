@@ -1,4 +1,5 @@
 import type { AiTask, AiConversation, AiConversationMode, AiConversationStatus, AiMessage, AiMessageAttachmentSummary, AiRunEvent, AiRunEventStatus, AiTaskResult, AiTaskStatus, AiTaskType, Pagination, UploadedFile } from "@/server/domain";
+import { getFileExtension, getFileUploadRule, isFileExtensionAllowedForPurpose, type FileUploadPurpose } from "@/lib/file-upload-rules";
 import { getCreditAccountForUser, confirmReservation, refundConfirmedAiTaskCost, releaseReservation, reserveCredits } from "@/server/credits/credit-service";
 import { ApiError } from "@/server/http/api-response";
 import { getRepository, withRepositoryTransaction } from "@/server/repositories";
@@ -89,7 +90,7 @@ export async function createAiTask(userId: string, input: CreateAiTaskRequest, r
     });
   }
 
-  const resolvedInput = await resolveInputFile(userId, normalized);
+  const resolvedInput = await resolveInputFile(userId, type, normalized);
   const conversationDraft = await prepareConversationForTask(userId, type, normalizeOptionalText(input.conversationId));
 
   assertInputWithinLimit(config, {
@@ -879,7 +880,7 @@ export async function listAiConversationsForUser(
     const lastItem = items.at(-1);
 
     return {
-      items: items.map(toConversationResponse),
+      items: await toConversationListResponses(items),
       limit,
       nextCursor: hasMore && lastItem ? encodeCursor(lastItem.id, lastItem.lastMessageAt) : null
     };
@@ -896,7 +897,7 @@ export async function listAiConversationsForUser(
   }, { mode, status });
 
   return {
-    items: page.items.map(toConversationResponse),
+    items: await toConversationListResponses(page.items),
     page: safePagination.page,
     pageSize: safePagination.pageSize,
     total: page.total ?? 0,
@@ -1144,6 +1145,23 @@ function toConversationResponse(conversation: AiConversation) {
     createdAt: conversation.createdAt,
     updatedAt: conversation.updatedAt
   };
+}
+
+async function toConversationListResponses(conversations: AiConversation[]) {
+  const repository = getRepository();
+
+  return Promise.all(conversations.map(async (conversation) => {
+    const latestTask = (await repository.listAiTasksForConversation(conversation.id, {
+      limit: 1,
+      ascending: false
+    }))[0];
+
+    return {
+      ...toConversationResponse(conversation),
+      latestTaskStatus: latestTask?.status ?? null,
+      latestTaskType: latestTask?.type ?? null
+    };
+  }));
 }
 
 function toMessageResponse(message: AiMessage, attachments: AiMessageAttachmentSummary[] = []) {
@@ -1413,6 +1431,7 @@ function normalizeConversationUiState(value: unknown) {
 
 async function resolveInputFile(
   userId: string,
+  type: AiTaskType,
   input: {
     sourcePlatform: string | null;
     targetPlatform: string | null;
@@ -1439,6 +1458,8 @@ async function resolveInputFile(
     throw new ApiError("FORBIDDEN", "无权使用该上传文件", 403);
   }
 
+  assertUploadedFileAllowedForTask(type, uploadedFile);
+
   if (uploadedFile.parseStatus !== "SUCCEEDED") {
     throw new ApiError("FILE_PARSE_FAILED", "上传文件解析失败，请重新上传", 400);
   }
@@ -1463,6 +1484,28 @@ async function resolveInputFile(
     inputCode: input.inputCode ?? mergeInputCode(null, uploadedFile.contentText, uploadedFile.originalName),
     inputFileName: uploadedFile.originalName
   };
+}
+
+function assertUploadedFileAllowedForTask(type: AiTaskType, uploadedFile: UploadedFile) {
+  const purpose = getUploadPurposeForTaskType(type);
+  const ext = getFileExtension(uploadedFile.originalName) || uploadedFile.ext.toLowerCase();
+
+  if (!isFileExtensionAllowedForPurpose(ext, purpose)) {
+    const rule = getFileUploadRule(purpose);
+    throw new ApiError("UNSUPPORTED_FILE_TYPE", `该模块仅支持 ${rule.allowedExtensions.join(" / ")} 文件`, 400);
+  }
+}
+
+function getUploadPurposeForTaskType(type: AiTaskType): FileUploadPurpose {
+  if (type === "code_conversion") {
+    return "code_conversion";
+  }
+
+  if (type === "code_analysis") {
+    return "code_analysis";
+  }
+
+  return "strategy_generation";
 }
 
 async function prepareConversationForTask(

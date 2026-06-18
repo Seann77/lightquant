@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "crypto";
 import { mkdir, readFile, rm, writeFile } from "fs/promises";
 import path from "path";
+import { getFileUploadRule, isImageUploadExtension, type FileUploadPurpose } from "@/lib/file-upload-rules";
 import { ApiError } from "@/server/http/api-response";
 import { getFileAllowedExtensions, getFileStorageRoot, getFileUploadMaxBytes, getImageUploadMaxBytes } from "@/server/env";
 import { getRepository } from "@/server/repositories";
@@ -36,14 +37,16 @@ export type StoredFilePayload = {
 const CONTENT_PREVIEW_LENGTH = 800;
 const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp"]);
 
-export async function uploadCodeFileForUser(userId: string, file: File): Promise<UploadedFileResponse> {
+export async function uploadCodeFileForUser(userId: string, file: File, purpose: FileUploadPurpose): Promise<UploadedFileResponse> {
   const originalName = normalizeOriginalName(file.name);
   const ext = getExtension(originalName);
-  const allowedExtensions = getFileAllowedExtensions();
+  const allowedExtensions = getAllowedExtensionsForPurpose(purpose);
 
   if (!allowedExtensions.includes(ext)) {
-    throw new ApiError("UNSUPPORTED_FILE_TYPE", `仅支持 ${allowedExtensions.join(" / ")} 文件`, 400);
+    throw new ApiError("UNSUPPORTED_FILE_TYPE", formatAllowedUploadMessage(allowedExtensions), 400);
   }
+
+  assertMimeCompatibleWithExtension(file.type, ext, allowedExtensions);
 
   if (file.size <= 0) {
     throw new ApiError("FILE_EMPTY", "文件内容为空，请重新上传", 400);
@@ -52,8 +55,8 @@ export async function uploadCodeFileForUser(userId: string, file: File): Promise
   const bytes = Buffer.from(await file.arrayBuffer());
 
   return isImageExtension(ext)
-    ? uploadImageFileForUser(userId, file, originalName, ext, bytes)
-    : uploadTextFileForUser(userId, file, originalName, ext, bytes);
+    ? uploadImageFileForUser(userId, file, originalName, ext, bytes, purpose)
+    : uploadTextFileForUser(userId, file, originalName, ext, bytes, purpose, allowedExtensions);
 }
 
 export async function getStoredImageForUser(userId: string, fileId: string, preferThumbnail: boolean): Promise<StoredFilePayload> {
@@ -148,14 +151,14 @@ export function inferUploadedFileKind(file: Pick<UploadedFile, "kind" | "ext" | 
   return "text";
 }
 
-async function uploadTextFileForUser(userId: string, file: File, originalName: string, ext: string, bytes: Buffer) {
+async function uploadTextFileForUser(userId: string, file: File, originalName: string, ext: string, bytes: Buffer, purpose: FileUploadPurpose, allowedExtensions: string[]) {
   const maxBytes = getFileUploadMaxBytes();
 
   if (file.size > maxBytes) {
     throw new ApiError("FILE_TOO_LARGE", `文件过大，请上传不超过 ${maxBytes} 字节的文件`, 413);
   }
 
-  const text = decodeUtf8(bytes);
+  const text = decodeUtf8(bytes, allowedExtensions);
 
   if (!text.trim()) {
     throw new ApiError("FILE_EMPTY", "文件内容为空，请重新上传", 400);
@@ -179,7 +182,9 @@ async function uploadTextFileForUser(userId: string, file: File, originalName: s
     storageKey: null,
     thumbnailKey: null,
     contentText: text,
-    contentJson: null,
+    contentJson: {
+      uploadPurpose: purpose
+    },
     parseStatus: "SUCCEEDED",
     scanStatus: scan.scanStatus,
     riskFlags: scan.riskFlags,
@@ -190,7 +195,7 @@ async function uploadTextFileForUser(userId: string, file: File, originalName: s
   return toUploadedFileResponse(uploadedFile);
 }
 
-async function uploadImageFileForUser(userId: string, file: File, originalName: string, ext: string, bytes: Buffer) {
+async function uploadImageFileForUser(userId: string, file: File, originalName: string, ext: string, bytes: Buffer, purpose: FileUploadPurpose) {
   const maxBytes = getImageUploadMaxBytes();
 
   if (file.size > maxBytes) {
@@ -231,6 +236,7 @@ async function uploadImageFileForUser(userId: string, file: File, originalName: 
       contentText: null,
       contentJson: {
         detectedMimeType: detected.mimeType,
+        uploadPurpose: purpose,
         storage: "local-private"
       },
       parseStatus: "SUCCEEDED",
@@ -249,11 +255,11 @@ async function uploadImageFileForUser(userId: string, file: File, originalName: 
   }
 }
 
-function decodeUtf8(bytes: Buffer) {
+function decodeUtf8(bytes: Buffer, allowedExtensions: string[]) {
   try {
     return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   } catch {
-    throw new ApiError("FILE_PARSE_FAILED", "文件解析失败，请上传 UTF-8 编码的 .py、.txt、.log 或 .md 文件", 400);
+    throw new ApiError("FILE_PARSE_FAILED", `文件解析失败，请上传 UTF-8 编码的 ${allowedExtensions.join("、")} 文件`, 400);
   }
 }
 
@@ -336,6 +342,47 @@ function isCompatibleImageExtension(uploadedExt: string, detectedExt: string) {
 
 function isImageExtension(ext: string) {
   return IMAGE_EXTENSIONS.has(ext);
+}
+
+function getAllowedExtensionsForPurpose(purpose: FileUploadPurpose) {
+  const envAllowedExtensions = new Set(getFileAllowedExtensions());
+  const allowedExtensions = getFileUploadRule(purpose).allowedExtensions.filter((ext) => envAllowedExtensions.has(ext));
+
+  return allowedExtensions.length > 0 ? allowedExtensions : [...getFileUploadRule(purpose).allowedExtensions];
+}
+
+function assertMimeCompatibleWithExtension(mimeType: string, ext: string, allowedExtensions: string[]) {
+  if (!mimeType) {
+    return;
+  }
+
+  const normalizedMime = mimeType.toLowerCase();
+
+  if (isImageUploadExtension(ext)) {
+    if (normalizedMime === "image/png" || normalizedMime === "image/jpeg") {
+      return;
+    }
+
+    throw new ApiError("UNSUPPORTED_FILE_TYPE", formatAllowedUploadMessage(allowedExtensions), 400);
+  }
+
+  if (normalizedMime.startsWith("image/")) {
+    throw new ApiError("UNSUPPORTED_FILE_TYPE", formatAllowedUploadMessage(allowedExtensions), 400);
+  }
+
+  if (
+    normalizedMime.startsWith("text/")
+    || normalizedMime === "application/octet-stream"
+    || normalizedMime === "application/x-python-code"
+  ) {
+    return;
+  }
+
+  throw new ApiError("UNSUPPORTED_FILE_TYPE", formatAllowedUploadMessage(allowedExtensions), 400);
+}
+
+function formatAllowedUploadMessage(allowedExtensions: readonly string[]) {
+  return `仅支持上传 ${allowedExtensions.join(" / ")} 文件`;
 }
 
 function buildStorageKey(userId: string, ext: string) {

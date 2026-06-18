@@ -1,7 +1,7 @@
 import { getAiModelName } from "@/server/env";
 import type { AiTask, AiTaskScopeStatus } from "@/server/domain";
 import { ApiError } from "@/server/http/api-response";
-import { escapeHtml, formatProviderResultAsMarkdown } from "@/server/ai/streaming-markdown-result";
+import { formatProviderResultAsMarkdown } from "@/server/ai/streaming-markdown-result";
 import type { AiProviderInput, AiProviderResult, AiProviderStreamCallbacks, AiProviderStreamResult } from "@/server/ai/providers/types";
 
 export async function runMockAiProvider(input: AiProviderInput): Promise<AiProviderResult> {
@@ -28,16 +28,8 @@ export async function runMockAiProvider(input: AiProviderInput): Promise<AiProvi
 
 export async function runMockAiProviderStream(input: AiProviderInput, callbacks: AiProviderStreamCallbacks = {}): Promise<AiProviderStreamResult> {
   const result = await runMockAiProvider(input);
-  const visibleThinking = escapeHtml("正在识别任务类型、平台和输入内容。\n正在整理最终 Markdown 结构。");
+  const visibleThinking = "";
   const finalAnswerMarkdown = formatProviderResultAsMarkdown(result, input.task);
-
-  for (const delta of chunkText(visibleThinking, 12)) {
-    await callbacks.onDelta?.({
-      type: "thinking_delta",
-      delta
-    });
-    await delay(8);
-  }
 
   for (const delta of chunkText(finalAnswerMarkdown, 18)) {
     await callbacks.onDelta?.({
@@ -66,7 +58,7 @@ function applyMockImageContext(result: AiProviderResult, input: AiProviderInput)
   return {
     ...result,
     explanation: [imageSummary, result.explanation].filter(Boolean).join("\n\n"),
-    riskWarnings: [...new Set([imageSummary, ...result.riskWarnings])].slice(0, 12),
+    riskWarnings: input.task.type === "code_conversion" ? [] : [...new Set([imageSummary, ...result.riskWarnings])].slice(0, 12),
     reportJson: {
       ...(result.reportJson ?? {}),
       imageContext: {
@@ -156,10 +148,11 @@ ${input}
 `,
     explanation: `已生成 ${targetPlatform} 版本的代码草稿，并保留原策略核心结构。`,
     migrationNotes: `${sourcePlatform} 到 ${targetPlatform} 的迁移重点是行情接口、下单函数、账户对象和交易日调度语义。`,
-    riskWarnings: ["不同平台回测撮合和复权规则可能不同。", "转换后必须逐行复核接口兼容性。"],
+    riskWarnings: [],
     reportJson: baseReport(task, "in_scope", config, {
       sourcePlatform,
       targetPlatform,
+      targetCode: true,
       changedAreas: ["行情数据接口", "下单函数", "账户字段"]
     }),
     model: getAiModelName("mock"),
@@ -175,10 +168,56 @@ function mockCodeAnalysis({ task, config }: AiProviderInput): AiProviderResult {
     migrationNotes: null,
     riskWarnings: ["未看到完整异常处理。", "需要确认仓位上限和止损规则。", "历史数据窗口不足时应避免直接下单。"],
     reportJson: baseReport(task, "in_scope", config, {
-      overview: "策略通过技术指标生成交易信号，并根据条件调整仓位。",
-      tradingLogic: ["读取历史行情", "计算指标", "判断买卖信号", "执行目标仓位"],
-      parameters: ["均线窗口", "标的代码", "目标仓位"],
-      optimizationSuggestions: ["加入交易成本假设。", "增加最大回撤控制。", "处理停牌和涨跌停场景。"]
+      overview: [
+        { title: "策略名称", value: "示例技术指标策略", lines: ["示例技术指标策略。"] },
+        { title: "平台识别", value: task.sourcePlatform ?? "代码中未明确给出", lines: [task.sourcePlatform ?? "代码中未明确给出"] },
+        { title: "策略类型", value: "技术指标择时策略", lines: ["通过价格指标判断持仓方向。"] },
+        { title: "交易范围", value: "单一或少量标的", lines: ["围绕预设标的运行。", "没有展示全市场选股流程。"] },
+        { title: "核心思路", value: "读取行情、计算信号并调整仓位", lines: ["策略读取历史行情。", "根据指标关系生成买卖信号。", "再把持仓调整到目标仓位。"] },
+        { title: "运行频率", value: "代码中未明确给出", lines: ["代码中未明确给出"] },
+        { title: "无信号处理", value: "代码中未明确给出", lines: ["代码中未明确给出"] }
+      ],
+      tradingLogic: [
+        { title: "初始化", value: "设置标的和核心参数", lines: ["策略启动时设置标的。", "同时准备指标窗口和仓位参数。"] },
+        { title: "盘前/记录", value: "代码中未明确给出", lines: ["代码中未明确给出"] },
+        { title: "调仓时间", value: "代码中未明确给出", lines: ["代码中未明确给出"] },
+        { title: "数据读取", value: "读取历史行情", lines: ["策略读取历史收盘价。", "数据用于后续指标计算。"] },
+        { title: "信号生成", value: "根据指标关系生成买卖信号", lines: ["策略先读取观察周期内的价格。", "再计算短期和长期指标。", "短期指标强于长期指标时形成买入倾向。", "短期指标弱于长期指标时形成降低仓位倾向。"] },
+        { title: "目标标的形成", value: "使用预设标的", lines: ["目标标的来自初始化设置。", "代码中未展示排序截取流程。"] },
+        { title: "买入逻辑", value: "指标满足条件时提高仓位", lines: ["当买入信号成立时，策略尝试把标的调到目标仓位。"] },
+        { title: "卖出逻辑", value: "指标转弱时降低仓位", lines: ["当信号转弱时，策略降低或清空对应持仓。"] },
+        { title: "下单限制", value: "代码中未明确给出", lines: ["代码中未明确给出"] }
+      ],
+      keyParameters: [
+        { title: "观察周期", value: "均线窗口和调仓周期需要从代码确认", lines: ["示例中包含指标观察窗口。", "具体周期需要以输入代码为准。"] },
+        { title: "目标持仓数", value: "代码中未明确给出", lines: ["代码中未明确给出"] },
+        { title: "持仓权重", value: "代码中未明确给出", lines: ["代码中未明确给出"] },
+        { title: "最小交易金额", value: "代码中未明确给出", lines: ["代码中未明确给出"] },
+        { title: "止损线", value: "代码中未明确给出", lines: ["代码中未明确给出"] },
+        { title: "滑点", value: "代码中未明确给出", lines: ["代码中未明确给出"] },
+        { title: "交易费用", value: "代码中未明确给出", lines: ["代码中未明确给出"] },
+        { title: "最低佣金", value: "代码中未明确给出", lines: ["代码中未明确给出"] },
+        { title: "现金处理", value: "代码中未明确给出", lines: ["代码中未明确给出"] },
+        { title: "其他关键阈值", value: "标的代码、目标仓位等", lines: ["标的代码和目标仓位是主要运行参数。"] }
+      ],
+      risks: [
+        { title: "主题集中风险", value: "代码中未明确给出", lines: ["代码中未明确给出"] },
+        { title: "单标的集中风险", value: "需要确认仓位上限和止损规则", lines: ["示例围绕少量标的运行。", "需要确认单票仓位是否有上限。"] },
+        { title: "无信号处理风险", value: "代码中未明确给出", lines: ["代码中未明确给出"] },
+        { title: "交易可达性风险", value: "未看到停牌、涨跌停或成交失败处理", lines: ["代码中未看到停牌过滤。", "代码中未看到涨跌停和成交失败处理。"] },
+        { title: "流动性风险", value: "代码中未明确给出", lines: ["代码中未明确给出"] },
+        { title: "参数敏感性", value: "指标窗口可能影响信号稳定性", lines: ["观察窗口变化会影响买卖信号。", "需要在回测中单独验证。"] },
+        { title: "回测与实盘差异", value: "历史数据窗口不足时应避免直接下单", lines: ["历史数据不足会影响指标计算。", "回测成交和真实成交可能不同。"] }
+      ],
+      suggestions: [
+        { title: "信号计算可解释性", value: "将信号计算过程拆成独立说明", lines: ["把数据读取、指标计算和信号判断分开记录。", "便于回看每次交易的触发原因。"] },
+        { title: "止损独立运行", value: "代码中未明确给出", lines: ["代码中未明确给出"] },
+        { title: "交易可达性检查", value: "补充停牌、涨跌停和成交失败检查", lines: ["下单前检查标的是否可交易。", "记录被跳过的原因。"] },
+        { title: "单票集中度控制", value: "补充单票仓位上限", lines: ["把单票最大仓位写成显式参数。"] },
+        { title: "日志可读性", value: "记录信号、订单和异常分支", lines: ["记录信号值。", "记录目标仓位。", "记录下单结果。"] },
+        { title: "参数显式化", value: "把窗口、仓位、标的等参数集中配置", lines: ["把观察周期集中到参数区。", "把目标仓位集中到参数区。"] },
+        { title: "回测验证", value: "加入交易成本和滑点假设", lines: ["补充交易费用。", "补充滑点。", "补充异常行情场景。"] }
+      ]
     }),
     model: getAiModelName("mock"),
     tokenUsage: mockTokenUsage(task)

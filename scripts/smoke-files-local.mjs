@@ -22,6 +22,7 @@ console.log(
 
 try {
   const unauthorized = await uploadFile("unauthorized.py", "print('hi')", {
+    purpose: "code_conversion",
     useCookie: false
   });
   assertFailure("unauthorized-upload", unauthorized, "UNAUTHORIZED");
@@ -53,45 +54,73 @@ try {
       "",
       "def handle_data(context, data):",
       "    pass"
-    ].join("\n")
+    ].join("\n"),
+    {
+      purpose: "code_conversion"
+    }
   );
   assertUpload("safe-py", safePy, {
     ext: ".py",
     scanStatus: "PASSED"
   });
 
-  const safeTxt = await uploadFile("notes.txt", "PTrade strategy notes\nbuy when ma5 crosses ma20");
+  const safeTxt = await uploadFile("notes.txt", "PTrade strategy notes\nbuy when ma5 crosses ma20", {
+    purpose: "code_analysis"
+  });
   assertUpload("safe-txt", safeTxt, {
     ext: ".txt",
     scanStatus: "PASSED"
   });
 
-  const warning = await uploadFile("danger.py", "import os\nos.system('echo hello')");
+  const safeLog = await uploadFile("strategy.log", "strategy generated\nrisk checked", {
+    purpose: "strategy_generation"
+  });
+  assertUpload("safe-log", safeLog, {
+    ext: ".log",
+    scanStatus: "PASSED"
+  });
+
+  const warning = await uploadFile("danger.py", "import os\nos.system('echo hello')", {
+    purpose: "code_conversion"
+  });
   assertUpload("warning-file", warning, {
     ext: ".py",
     scanStatus: "WARNING",
     riskFlag: "OS_SYSTEM"
   });
 
-  const blocked = await uploadFile("secret.py", "api_key = 'sk-test-1234567890'\nprint('redacted')");
+  const blocked = await uploadFile("secret.py", "api_key = 'sk-test-1234567890'\nprint('redacted')", {
+    purpose: "code_conversion"
+  });
   assertUpload("blocked-file", blocked, {
     ext: ".py",
     scanStatus: "BLOCKED",
     riskFlag: "SECRET_ASSIGNMENT"
   });
 
-  const unsupported = await uploadFile("strategy.csv", "a,b,c\n1,2,3");
+  const unsupported = await uploadFile("strategy.csv", "a,b,c\n1,2,3", {
+    purpose: "code_conversion"
+  });
   assertFailure("unsupported-file", unsupported, "UNSUPPORTED_FILE_TYPE");
 
-  const empty = await uploadFile("empty.py", "");
+  const disallowedAnalysisPy = await uploadFile("analysis.py", "print('analysis')", {
+    purpose: "code_analysis"
+  });
+  assertFailure("analysis-py-file", disallowedAnalysisPy, "UNSUPPORTED_FILE_TYPE");
+
+  const empty = await uploadFile("empty.py", "", {
+    purpose: "code_conversion"
+  });
   assertFailure("empty-file", empty, "FILE_EMPTY");
 
   const oversizedContent = "x".repeat(Math.max(1, maxBytes) + 1);
-  const oversized = await uploadFile("oversized.txt", oversizedContent);
+  const oversized = await uploadFile("oversized.txt", oversizedContent, {
+    purpose: "code_analysis"
+  });
   assertFailure("oversized-file", oversized, "FILE_TOO_LARGE");
 
   const blockedTask = await requestJson("POST", "/api/v1/ai/tasks", {
-    type: "code_analysis",
+    type: "code_conversion",
     inputFileId: blocked.json.data.fileId,
     clientRequestId: `blocked-file-${Date.now()}-${Math.random().toString(16).slice(2)}`
   });
@@ -114,12 +143,14 @@ try {
         uploads: {
           safePy: summarizeUpload(safePy),
           safeTxt: summarizeUpload(safeTxt),
+          safeLog: summarizeUpload(safeLog),
           warning: summarizeUpload(warning),
           blocked: summarizeUpload(blocked)
         },
         validationErrors: {
           unauthorized: unauthorized.json.error.code,
           unsupported: unsupported.json.error.code,
+          disallowedAnalysisPy: disallowedAnalysisPy.json.error.code,
           empty: empty.json.error.code,
           oversized: oversized.json.error.code,
           blockedTask: blockedTask.json.error.code
@@ -146,6 +177,7 @@ try {
 async function uploadFile(name, content, options = {}) {
   const formData = new FormData();
   formData.append("file", new Blob([content], { type: "text/plain;charset=utf-8" }), name);
+  formData.append("purpose", options.purpose ?? "code_conversion");
 
   return request("POST", "/api/v1/files", formData, {
     useCookie: options.useCookie !== false

@@ -1,3 +1,5 @@
+import { getFileExtension, getFileUploadRule, isImageUploadExtension, type FileUploadPurpose } from "@/lib/file-upload-rules";
+
 type ApiResponse<T> =
   | { success: true; data: T; requestId: string }
   | { success: false; error: { code: string; message: string }; requestId: string };
@@ -20,9 +22,12 @@ export type UploadedCodeFile = {
   createdAt: string;
 };
 
-export async function uploadCodeFile(file: File) {
+export async function uploadCodeFile(file: File, purpose: FileUploadPurpose) {
+  validateUploadFile(file, purpose);
+
   const formData = new FormData();
   formData.append("file", file);
+  formData.append("purpose", purpose);
 
   const response = await fetch("/api/v1/files", {
     method: "POST",
@@ -35,6 +40,43 @@ export async function uploadCodeFile(file: File) {
   }
 
   return payload.data;
+}
+
+export function getUploadAccept(purpose: FileUploadPurpose) {
+  return getFileUploadRule(purpose).accept;
+}
+
+export function getUploadButtonLabel(purpose: FileUploadPurpose) {
+  return getFileUploadRule(purpose).buttonLabel;
+}
+
+function validateUploadFile(file: File, purpose: FileUploadPurpose) {
+  const rule = getFileUploadRule(purpose);
+  const ext = getFileExtension(file.name);
+
+  if (!rule.allowedExtensions.includes(ext)) {
+    throw new Error(`UNSUPPORTED_FILE_TYPE:${rule.description}`);
+  }
+
+  if (file.type && !isMimeCompatibleWithExtension(file.type, ext)) {
+    throw new Error(`UNSUPPORTED_FILE_TYPE:${rule.description}`);
+  }
+}
+
+function isMimeCompatibleWithExtension(mimeType: string, ext: string) {
+  const normalizedMime = mimeType.toLowerCase();
+
+  if (isImageUploadExtension(ext)) {
+    return normalizedMime === "image/png" || normalizedMime === "image/jpeg";
+  }
+
+  if (normalizedMime.startsWith("image/")) {
+    return false;
+  }
+
+  return normalizedMime.startsWith("text/")
+    || normalizedMime === "application/octet-stream"
+    || normalizedMime === "application/x-python-code";
 }
 
 export function getFileUploadFriendlyError(error: unknown) {

@@ -684,23 +684,155 @@ export function getAiTaskStreamingContent(data: AiTaskData | null | undefined, t
 }
 
 export function formatAiTaskResultAsMarkdown(result: NonNullable<AiTaskData["result"]>, taskType: WorkbenchTaskType | string | null | undefined) {
+  if (taskType === "strategy_generation") {
+    return [
+      "## 结论摘要",
+      result.explanation?.trim() || "已完成策略处理。",
+      "",
+      "## 策略代码",
+      result.generatedCode?.trim()
+        ? `\`\`\`python\n${result.generatedCode.trim()}\n\`\`\``
+        : "暂无可直接运行的策略代码。"
+    ].join("\n");
+  }
+
+  if (taskType === "code_analysis") {
+    const report = readRecord(result.reportJson);
+    const overview = hasReportMarkdownItems(report?.overview)
+      ? report?.overview
+      : hasReportMarkdownItems([report?.codeStructure, report?.platformDependencies])
+        ? [report?.codeStructure, report?.platformDependencies]
+        : result.explanation;
+    const risks = hasReportMarkdownItems(report?.risks)
+      ? report?.risks
+      : hasReportMarkdownItems(report?.riskWarnings)
+        ? report?.riskWarnings
+        : result.riskWarnings;
+
+    return [
+      "## 策略概览",
+      formatReportItemsAsMarkdown(overview),
+      "",
+      "## 交易逻辑",
+      formatReportItemsAsMarkdown(report?.tradingLogic),
+      "",
+      "## 关键参数",
+      formatReportItemsAsMarkdown(report?.keyParameters ?? report?.parameters),
+      "",
+      "## 风险提醒",
+      formatReportItemsAsMarkdown(risks),
+      "",
+      "## 优化建议",
+      formatReportItemsAsMarkdown(report?.suggestions ?? report?.optimizationSuggestions)
+    ].join("\n");
+  }
+
   return [
-    "## 结论摘要",
-    result.explanation?.trim() || "已完成处理。",
-    "",
-    "## 代码块 / 目标平台代码",
+    "## 目标平台代码",
     result.generatedCode?.trim()
       ? `\`\`\`python\n${result.generatedCode.trim()}\n\`\`\``
-      : taskType === "code_analysis" ? "本次任务不需要生成目标平台代码。" : "暂无可直接运行的目标平台代码。",
+      : "暂无可直接运行的目标平台代码。",
     "",
-    "## 迁移说明 / 解析说明",
-    result.migrationNotes?.trim() || (taskType === "code_conversion" ? "请按目标平台 API 逐项复核后再运行。" : "请结合输入代码和业务场景复核结论。"),
-    "",
-    "## 风险提醒",
-    result.riskWarnings.length > 0
-      ? result.riskWarnings.map((warning) => `- ${warning}`).join("\n")
-      : "- 请在回测和模拟盘中验证结果，不构成投资建议。"
+    "## 迁移说明",
+    result.migrationNotes?.trim() || "请按目标平台 API 逐项复核后再运行。"
   ].join("\n");
+}
+
+function formatReportItemsAsMarkdown(value: unknown) {
+  const items = normalizeReportItemsForMarkdown(value);
+
+  if (items.length === 0) {
+    return "- 代码中未明确给出";
+  }
+
+  return items.map((item) => {
+    if (item.lines.length > 0) {
+      return [
+        `- ${item.title}：`,
+        ...item.lines.map((line, index) => `  ${index + 1}. ${line}`)
+      ].join("\n");
+    }
+
+    return `- ${item.title}：${item.value}`;
+  }).join("\n");
+}
+
+function hasReportMarkdownItems(value: unknown) {
+  return normalizeReportItemsForMarkdown(value).length > 0;
+}
+
+function normalizeReportItemsForMarkdown(value: unknown): Array<{ title: string; value: string; lines: string[] }> {
+  if (value === null || typeof value === "undefined") {
+    return [];
+  }
+
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    const text = String(value).trim();
+
+    return text ? [{ title: "补充说明", value: sanitizeReportMarkdownValue(text), lines: splitReportMarkdownLines(text) }] : [];
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => normalizeReportItemsForMarkdown(item));
+  }
+
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const title = typeof record.title === "string" ? record.title.trim() : "";
+    const itemValue = typeof record.value === "string" || typeof record.value === "number" || typeof record.value === "boolean"
+      ? String(record.value).trim()
+      : "";
+    const lines = readReportMarkdownLines(record.lines ?? record.details);
+
+    if (title || itemValue || lines.length) {
+      return [{
+        title: sanitizeReportMarkdownValue(title || "补充说明"),
+        value: sanitizeReportMarkdownValue(itemValue || lines[0] || "代码中未明确给出"),
+        lines: lines.length ? lines : splitReportMarkdownLines(itemValue)
+      }];
+    }
+  }
+
+  return [];
+}
+
+function splitReportMarkdownLines(value: string) {
+  const text = sanitizeReportMarkdownValue(value);
+
+  if (!text || text === "代码中未明确给出") {
+    return [];
+  }
+
+  return text
+    .split(/\r?\n+/)
+    .map((line) => line.replace(/^\s*(?:[-*+]|(?:\d+|[A-Za-z])[\.)\u3001:]|[\(（]?[A-Za-z][\)）]|[一二三四五六七八九十]+[\u3001.])\s*/, "").trim())
+    .filter(Boolean);
+}
+
+function readReportMarkdownLines(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => splitReportMarkdownLines(String(item))).filter((item) => item && item !== "代码中未明确给出");
+  }
+
+  if (typeof value === "string") {
+    return splitReportMarkdownLines(value);
+  }
+
+  return [];
+}
+
+function sanitizeReportMarkdownValue(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed || /^\s*[{[]/.test(trimmed) || /\b(scopeStatus|analysisType|reportJson|generatedCode)\b/.test(trimmed)) {
+    return "代码中未明确给出";
+  }
+
+  return trimmed
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^`{3,}[\w+-]*\s*$/gm, "")
+    .replace(/^`{3,}\s*$/gm, "")
+    .trim() || "代码中未明确给出";
 }
 
 export function readRecord(value: unknown): Record<string, unknown> | null {
