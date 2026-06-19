@@ -23,14 +23,14 @@ export function getRepository(): LightQuantRepository {
   const mode = getDataMode();
 
   if (mode === "mock") {
-    if (!globalThis.__lightquantMockRepository) {
+    if (!globalThis.__lightquantMockRepository || !isRepositoryShapeCurrent(globalThis.__lightquantMockRepository)) {
       globalThis.__lightquantMockRepository = new MockLightQuantRepository();
     }
 
     return globalThis.__lightquantMockRepository;
   }
 
-  if (!globalThis.__lightquantDatabaseRepository) {
+  if (!globalThis.__lightquantDatabaseRepository || !isRepositoryShapeCurrent(globalThis.__lightquantDatabaseRepository)) {
     globalThis.__lightquantDatabaseRepository = new DatabaseLightQuantRepository();
   }
 
@@ -45,4 +45,11 @@ export async function withRepositoryTransaction<T>(callback: () => Promise<T>) {
   }
 
   return repositoryContext.run(repository, callback);
+}
+
+function isRepositoryShapeCurrent(repository: LightQuantRepository) {
+  return (
+    typeof repository.listLatestAiTasksForConversations === "function" &&
+    typeof repository.listUploadedFilesByIds === "function"
+  );
 }

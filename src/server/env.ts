@@ -232,14 +232,14 @@ export function getFileStorageRoot() {
 }
 
 export function getFileAllowedExtensions() {
-  const raw = process.env.FILE_ALLOWED_EXTENSIONS ?? ".py,.txt,.log,.md,.png,.jpg,.jpeg,.webp";
+  const raw = process.env.FILE_ALLOWED_EXTENSIONS ?? ".py,.txt,.log,.png,.jpg";
   const extensions = raw
     .split(",")
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean)
     .map((item) => (item.startsWith(".") ? item : `.${item}`));
 
-  return extensions.length > 0 ? extensions : [".py", ".txt", ".log", ".md", ".png", ".jpg", ".jpeg", ".webp"];
+  return extensions.length > 0 ? extensions : [".py", ".txt", ".log", ".png", ".jpg"];
 }
 
 export function getAdminPhoneWhitelist() {

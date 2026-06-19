@@ -518,9 +518,27 @@ export class MockLightQuantRepository implements LightQuantRepository {
   async listAiTasksForConversation(conversationId: string, options: { limit?: number; ascending?: boolean } = {}) {
     const items = [...this.aiTasks.values()]
       .filter((task) => task.conversationId === conversationId)
-      .sort((left, right) => options.ascending ? left.createdAt.localeCompare(right.createdAt) : right.createdAt.localeCompare(left.createdAt));
+      .sort((left, right) => options.ascending ? compareTaskAsc(left, right) : compareTaskDesc(left, right));
 
     return typeof options.limit === "number" ? items.slice(0, options.limit) : items;
+  }
+
+  async listLatestAiTasksForConversations(conversationIds: string[]) {
+    const conversationIdSet = new Set(conversationIds);
+    const latestByConversationId = new Map<string, AiTask>();
+
+    for (const task of [...this.aiTasks.values()].filter((item) => item.conversationId && conversationIdSet.has(item.conversationId))) {
+      const conversationId = task.conversationId!;
+      const current = latestByConversationId.get(conversationId);
+
+      if (!current || compareTaskDesc(task, current) < 0) {
+        latestByConversationId.set(conversationId, task);
+      }
+    }
+
+    return conversationIds
+      .map((conversationId) => latestByConversationId.get(conversationId))
+      .filter((task): task is AiTask => Boolean(task));
   }
 
   async findAiConversationById(id: string) {
@@ -732,6 +750,12 @@ export class MockLightQuantRepository implements LightQuantRepository {
 
   async findUploadedFileById(id: string) {
     return this.uploadedFiles.get(id) ?? null;
+  }
+
+  async listUploadedFilesByIds(fileIds: string[]) {
+    const fileIdSet = new Set(fileIds);
+
+    return [...this.uploadedFiles.values()].filter((file) => fileIdSet.has(file.id));
   }
 
   async getAdminOverview(todayStart: string): Promise<AdminOverview> {
@@ -956,6 +980,18 @@ function compareMessageAsc(left: AiMessage, right: AiMessage) {
   const time = left.createdAt.localeCompare(right.createdAt);
 
   return time !== 0 ? time : left.id.localeCompare(right.id);
+}
+
+function compareTaskAsc(left: AiTask, right: AiTask) {
+  const time = left.createdAt.localeCompare(right.createdAt);
+
+  return time !== 0 ? time : left.id.localeCompare(right.id);
+}
+
+function compareTaskDesc(left: AiTask, right: AiTask) {
+  const time = right.createdAt.localeCompare(left.createdAt);
+
+  return time !== 0 ? time : right.id.localeCompare(left.id);
 }
 
 function compareRunEventAsc(left: AiRunEvent, right: AiRunEvent) {

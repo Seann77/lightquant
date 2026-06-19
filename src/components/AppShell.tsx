@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { flushSync } from "react-dom";
 import { useCallback, useEffect, useRef, useState, type ReactNode, type UIEvent } from "react";
 import { Code2, LoaderCircle, Menu, MessageCircle, Repeat2, Sparkles, UserRoundPlus } from "lucide-react";
 import { CreditActionPopover } from "@/components/shell/CreditActionPopover";
@@ -10,6 +11,13 @@ import { LoginModal } from "@/components/shell/LoginModal";
 import { RechargeModal } from "@/components/shell/RechargeModal";
 import { ShellNavItem } from "@/components/shell/ShellNavItem";
 import { WechatQrModal } from "@/components/shell/WechatQrModal";
+import {
+  WORKBENCH_SWITCH_COMPLETE_EVENT,
+  beginWorkbenchSwitchPerf,
+  getWorkbenchSwitchPerf,
+  logWorkbenchPerf,
+  type WorkbenchSwitchCompleteDetail
+} from "@/lib/ai/workbench-client";
 
 type AppShellProps = {
   children: ReactNode;
@@ -73,6 +81,11 @@ type RecentConversationsData = {
   nextCursor?: string | null;
 };
 
+type PendingRecentConversation = {
+  id: string;
+  href: string;
+};
+
 const navItems: NavItem[] = [
   {
     href: "/chat?mode=strategy",
@@ -107,6 +120,8 @@ const conversationModeLabels: Record<RecentConversation["mode"], string> = {
 };
 
 const RECENT_CONVERSATION_LIMIT = 20;
+const TASK_SWITCH_MIN_VISIBLE_MS = 220;
+const TASK_SWITCH_FALLBACK_MS = 30000;
 
 export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
@@ -126,7 +141,22 @@ export function AppShell({ children }: AppShellProps) {
   const [recentNextCursor, setRecentNextCursor] = useState<string | null>(null);
   const [recentLoading, setRecentLoading] = useState(false);
   const [recentLoadingMore, setRecentLoadingMore] = useState(false);
+  const [pendingRecentConversation, setPendingRecentConversation] = useState<PendingRecentConversation | null>(null);
+  const [mainSwitching, setMainSwitching] = useState(false);
   const recentLoadingCursorRef = useRef<string | null>(null);
+  const recentSwitchResetTimerRef = useRef<number | null>(null);
+  const pendingRecentConversationRef = useRef<PendingRecentConversation | null>(null);
+  const currentConversationIdFromUrl = searchParams.get("conversationId");
+  const activeRecentConversationId = pendingRecentConversation?.id ?? currentConversationIdFromUrl;
+
+  const clearRecentSwitchResetTimer = useCallback(() => {
+    if (recentSwitchResetTimerRef.current === null) {
+      return;
+    }
+
+    window.clearTimeout(recentSwitchResetTimerRef.current);
+    recentSwitchResetTimerRef.current = null;
+  }, []);
 
   const refreshCurrentUser = useCallback(async () => {
     try {
@@ -165,12 +195,22 @@ export function AppShell({ children }: AppShellProps) {
         query.set("cursor", cursor);
       }
 
+      const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
       const conversationsResponse = await fetch(`/api/v1/ai/conversations?${query.toString()}`, {
         cache: "no-store"
       });
       const conversationsPayload = (await conversationsResponse.json()) as ApiResponse<RecentConversationsData>;
 
       if (conversationsPayload.success) {
+        const finishedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
+
+        logWorkbenchPerf("recent.response", {
+          append,
+          hasCursor: Boolean(cursor),
+          items: conversationsPayload.data.items.length,
+          hasNextCursor: Boolean(conversationsPayload.data.nextCursor),
+          durationMs: Math.round(finishedAt - startedAt)
+        });
         setRecentNextCursor(conversationsPayload.data.nextCursor ?? null);
         setRecentConversations((current) => append ? mergeRecentConversations(current, conversationsPayload.data.items) : conversationsPayload.data.items);
       }
@@ -186,6 +226,54 @@ export function AppShell({ children }: AppShellProps) {
   useEffect(() => {
     void refreshCurrentUser();
   }, [refreshCurrentUser]);
+
+  useEffect(() => {
+    return () => {
+      clearRecentSwitchResetTimer();
+    };
+  }, [clearRecentSwitchResetTimer]);
+
+  useEffect(() => {
+    pendingRecentConversationRef.current = pendingRecentConversation;
+  }, [pendingRecentConversation]);
+
+  const finishRecentConversationSwitch = useCallback((conversationId: string) => {
+    if (pendingRecentConversationRef.current?.id !== conversationId) {
+      return;
+    }
+
+    clearRecentSwitchResetTimer();
+    const perfState = getWorkbenchSwitchPerf(conversationId);
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+    const elapsed = perfState ? now - perfState.clickedAt : TASK_SWITCH_MIN_VISIBLE_MS;
+    const resetDelay = Math.max(0, TASK_SWITCH_MIN_VISIBLE_MS - elapsed);
+    recentSwitchResetTimerRef.current = window.setTimeout(() => {
+      if (pendingRecentConversationRef.current?.id !== conversationId) {
+        return;
+      }
+
+      setMainSwitching(false);
+      setPendingRecentConversation((current) => current?.id === conversationId ? null : current);
+      recentSwitchResetTimerRef.current = null;
+    }, resetDelay);
+  }, [clearRecentSwitchResetTimer]);
+
+  useEffect(() => {
+    function handleWorkbenchSwitchComplete(event: Event) {
+      const detail = (event as CustomEvent<WorkbenchSwitchCompleteDetail>).detail;
+
+      if (!detail?.conversationId) {
+        return;
+      }
+
+      finishRecentConversationSwitch(detail.conversationId);
+    }
+
+    window.addEventListener(WORKBENCH_SWITCH_COMPLETE_EVENT, handleWorkbenchSwitchComplete);
+    return () => {
+      window.removeEventListener(WORKBENCH_SWITCH_COMPLETE_EVENT, handleWorkbenchSwitchComplete);
+    };
+  }, [finishRecentConversationSwitch]);
 
   useEffect(() => {
     if (!currentUserId) {
@@ -287,6 +375,55 @@ export function AppShell({ children }: AppShellProps) {
     }
   }
 
+  function handleRecentConversationClick(conversation: RecentConversation) {
+    const href = getRecentConversationHref(conversation);
+
+    beginWorkbenchSwitchPerf({
+      conversationId: conversation.id,
+      href
+    });
+    logWorkbenchPerf("recent.click", {
+      conversationId: conversation.id,
+      mode: conversation.mode,
+      latestTaskStatus: conversation.latestTaskStatus ?? null
+    });
+    clearRecentSwitchResetTimer();
+    flushSync(() => {
+      setPendingRecentConversation({
+        id: conversation.id,
+        href
+      });
+      setMainSwitching(true);
+    });
+    const perfState = getWorkbenchSwitchPerf(conversation.id);
+
+    if (perfState) {
+      const activeLink = document.querySelector(`[data-conversation-id="${conversation.id}"]`);
+      const loadingOverlay = document.querySelector(".lq-main-switch-overlay");
+      const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+
+      logWorkbenchPerf("recent.visible-feedback", {
+        conversationId: conversation.id,
+        durationMs: Math.round(now - perfState.clickedAt),
+        active: Boolean(activeLink?.classList.contains("is-active")),
+        loading: Boolean(loadingOverlay)
+      });
+    }
+
+    const resetDelay = currentConversationIdFromUrl === conversation.id ? TASK_SWITCH_MIN_VISIBLE_MS : TASK_SWITCH_FALLBACK_MS;
+    recentSwitchResetTimerRef.current = window.setTimeout(() => {
+      if (pendingRecentConversationRef.current?.id !== conversation.id) {
+        return;
+      }
+
+      setMainSwitching(false);
+      setPendingRecentConversation((current) => (
+        current?.id === conversation.id && current.href === href ? null : current
+      ));
+      recentSwitchResetTimerRef.current = null;
+    }, resetDelay);
+  }
+
   if (isAdminPath) {
     return <>{children}</>;
   }
@@ -313,9 +450,18 @@ export function AppShell({ children }: AppShellProps) {
           <div className="lq-recent-scroll app-scrollbar" onScroll={handleRecentScroll}>
             {recentConversations.map((conversation) => {
               const title = getRecentConversationTitle(conversation);
+              const href = getRecentConversationHref(conversation);
+              const active = activeRecentConversationId === conversation.id;
 
               return (
-                <Link className="lq-recent-link" href={getRecentConversationHref(conversation)} key={conversation.id} title={title}>
+                <Link
+                  className={`lq-recent-link ${active ? "is-active" : ""}`}
+                  data-conversation-id={conversation.id}
+                  href={href}
+                  key={conversation.id}
+                  onClick={() => handleRecentConversationClick(conversation)}
+                  title={title}
+                >
                   <RecentConversationIcon conversation={conversation} />
                   <span>{title}</span>
                 </Link>
@@ -394,7 +540,19 @@ export function AppShell({ children }: AppShellProps) {
           </button>
         </header>
 
-        <main className="lq-main app-scrollbar">{children}</main>
+        <main aria-busy={mainSwitching || undefined} className="lq-main app-scrollbar">
+          <div className={`lq-main-stage ${mainSwitching ? "is-switching" : ""}`}>
+            {children}
+          </div>
+          {mainSwitching ? (
+            <div aria-live="polite" className="lq-main-switch-overlay" role="status">
+              <div className="lq-task-switch-indicator">
+                <LoaderCircle aria-hidden="true" className="animate-spin" size={18} />
+                <span>正在载入任务...</span>
+              </div>
+            </div>
+          ) : null}
+        </main>
       </div>
 
       <LoginModal onClose={() => setLoginOpen(false)} onLoginSuccess={handleLoginSuccess} open={loginOpen} />

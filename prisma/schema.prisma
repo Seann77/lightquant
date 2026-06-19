@@ -373,7 +373,7 @@ model AiTask {
 
   @@unique([userId, clientRequestId])
   @@index([userId, createdAt])
-  @@index([conversationId, createdAt])
+  @@index([conversationId, createdAt, id])
   @@index([inputFileId])
   @@map("ai_tasks")
 }
@@ -416,6 +416,7 @@ model AiConversation {
   runEvents AiRunEvent[]
 
   @@index([userId, mode, lastMessageAt])
+  @@index([userId, status, lastMessageAt, id])
   @@index([status, lastMessageAt])
   @@map("ai_conversations")
 }
@@ -435,7 +436,7 @@ model AiMessage {
   task         AiTask?        @relation(fields: [taskId], references: [id], onDelete: SetNull)
   attachments  AiMessageAttachment[]
 
-  @@index([conversationId, createdAt])
+  @@index([conversationId, createdAt, id])
   @@index([userId, createdAt])
   @@map("ai_messages")
 }

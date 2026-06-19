@@ -24,7 +24,8 @@ import {
   getFriendlyAiError as getFriendlyError,
   persistConversationActiveTab,
   replaceWorkbenchConversationUrl,
-  streamWorkbenchAiTask
+  streamWorkbenchAiTask,
+  waitForAiTaskResult
 } from "@/lib/ai/workbench-client";
 import { useWorkbenchConversationRestore } from "@/lib/ai/use-workbench-conversation";
 import type { AiTaskData } from "@/lib/ai/workbench-types";
@@ -53,8 +54,13 @@ export function CodeAnalysisClient() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pollingAnalysisTaskIdRef = useRef<string | null>(null);
+  const streamingAnalysisTaskIdRef = useRef<string | null>(null);
   const conversationIdFromUrl = searchParams.get("conversationId");
-  const elapsedSeconds = useElapsedSeconds(loading);
+  const activeAnalysisTaskStatus = data?.task.status ?? null;
+  const activeAnalysisTaskRunning = activeAnalysisTaskStatus === "PENDING" || activeAnalysisTaskStatus === "RUNNING";
+  const analysisBusy = loading || activeAnalysisTaskRunning;
+  const elapsedSeconds = useElapsedSeconds(analysisBusy);
 
   const activeAnalysisConversationId = data?.conversation?.id ?? data?.task.conversationId ?? conversationIdFromUrl;
 
@@ -87,6 +93,9 @@ export function CodeAnalysisClient() {
       setData(restored.taskData);
       setStreamState(createThinkingStateFromTaskData(restored.taskData));
       setActiveTab(getConversationActiveTab(conversationData.conversation, codeAnalysisTabs, codeAnalysisTabs[0]));
+      setLoading(false);
+      pollingAnalysisTaskIdRef.current = null;
+      streamingAnalysisTaskIdRef.current = null;
     },
     onError: (historyError) => {
       setError(getFriendlyError(historyError));
@@ -96,6 +105,91 @@ export function CodeAnalysisClient() {
   useEffect(() => {
     persistConversationActiveTab(activeAnalysisConversationId, activeTab, "analysis");
   }, [activeAnalysisConversationId, activeTab]);
+
+  useEffect(() => {
+    const currentTaskData = data;
+    const currentTask = currentTaskData?.task;
+    const currentTaskConversationId = currentTaskData?.conversation?.id ?? currentTask?.conversationId ?? null;
+
+    if (!currentTask || (currentTask.status !== "PENDING" && currentTask.status !== "RUNNING")) {
+      return;
+    }
+
+    if (conversationIdFromUrl && currentTaskConversationId && currentTaskConversationId !== conversationIdFromUrl) {
+      return;
+    }
+
+    if (streamingAnalysisTaskIdRef.current === currentTask.id) {
+      return;
+    }
+
+    if (pollingAnalysisTaskIdRef.current === currentTask.id) {
+      return;
+    }
+
+    let disposed = false;
+    const pollController = new AbortController();
+    pollingAnalysisTaskIdRef.current = currentTask.id;
+    setLoading(true);
+    setError("");
+
+    void (async () => {
+      try {
+        const completed = await waitForAiTaskResult(currentTaskData, (nextData) => {
+          if (disposed) {
+            return;
+          }
+
+          setData(nextData);
+          setStreamState((current) => createThinkingStateFromTaskData(nextData, current));
+        }, {
+          signal: pollController.signal
+        });
+
+        if (disposed) {
+          return;
+        }
+
+        setData(completed);
+        setStreamState((current) => createThinkingStateFromTaskData(completed, current));
+        replaceWorkbenchConversationUrl(router, { type: "analysis" }, conversationIdFromUrl, completed.conversation?.id ?? completed.task.conversationId ?? null);
+        window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
+
+        if (completed.result || completed.task.status === "SUCCEEDED") {
+          window.dispatchEvent(new Event("lightquant:credits-updated"));
+        }
+      } catch (pollError) {
+        window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
+
+        if (!disposed && !isAbortError(pollError)) {
+          const friendly = getFriendlyError(pollError);
+          setError(friendly);
+          setStreamState((current) => ({
+            ...current,
+            status: "failed",
+            error: friendly
+          }));
+        }
+      } finally {
+        if (pollingAnalysisTaskIdRef.current === currentTask.id) {
+          pollingAnalysisTaskIdRef.current = null;
+        }
+
+        if (!disposed) {
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      disposed = true;
+      pollController.abort();
+
+      if (pollingAnalysisTaskIdRef.current === currentTask.id) {
+        pollingAnalysisTaskIdRef.current = null;
+      }
+    };
+  }, [data?.task.id, data?.task.status, conversationIdFromUrl, router]);
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -166,6 +260,7 @@ export function CodeAnalysisClient() {
         clientRequestId: createWorkbenchClientRequestId("analysis")
       }, {
         onTask: (payload) => {
+          streamingAnalysisTaskIdRef.current = payload.task.id;
           setData(payload);
           setStreamState((current) => ({
             ...current,
@@ -210,6 +305,7 @@ export function CodeAnalysisClient() {
       }));
     } finally {
       setLoading(false);
+      streamingAnalysisTaskIdRef.current = null;
     }
   }
 
@@ -219,7 +315,7 @@ export function CodeAnalysisClient() {
   const parseFailed = Boolean(reportRecord?.providerFallback || (data?.task.status === "SUCCEEDED" && !result));
   const finalInputText = getFinalInputText(inputCode, inputSource);
   const analysisInputChars = finalInputText.length;
-  const canSubmit = Boolean(finalInputText) && !loading && uploadedFile?.scanStatus !== "BLOCKED";
+  const canSubmit = Boolean(finalInputText) && !analysisBusy && uploadedFile?.scanStatus !== "BLOCKED";
 
   return (
     <WorkbenchShell className="lq-analysis-page min-h-full">
@@ -270,6 +366,8 @@ export function CodeAnalysisClient() {
                 setUploadedFile(null);
                 setUploadError("");
                 setLoading(false);
+                pollingAnalysisTaskIdRef.current = null;
+                streamingAnalysisTaskIdRef.current = null;
               }}
               type="button"
             >
@@ -282,8 +380,8 @@ export function CodeAnalysisClient() {
               onClick={handleSubmit}
               type="button"
             >
-              {loading ? <LoaderCircle aria-hidden="true" className="animate-spin" size={18} /> : <Sparkles aria-hidden="true" size={18} />}
-              {loading ? `解析中 ${elapsedSeconds}s` : "开始解析"}
+              {analysisBusy ? <LoaderCircle aria-hidden="true" className="animate-spin" size={18} /> : <Sparkles aria-hidden="true" size={18} />}
+              {analysisBusy ? `解析中 ${elapsedSeconds}s` : "开始解析"}
             </button>
             <div className="lq-cost-pill">
               <DollarSign aria-hidden="true" />
@@ -306,12 +404,12 @@ export function CodeAnalysisClient() {
 
         {result && !parseFailed ? (
           <CodeAnalysisResultView activeTab={activeTab} report={reportRecord} result={result} />
-        ) : loading ? (
+        ) : analysisBusy ? (
           <div className="lq-empty-result">
             <div className="lq-empty-icon">
               <BarChart3 aria-hidden="true" size={25} />
             </div>
-            <h2>解析中...</h2>
+            <h2>{loading ? "解析中..." : "正在同步任务状态..."}</h2>
           </div>
         ) : parseFailed ? (
           <div className="lq-empty-result">
@@ -382,6 +480,10 @@ function getFinalInputText(inputCode: string, inputSource: AnalysisInputSource) 
   }
 
   return inputCode.trim() ? inputCode : "";
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof Error && error.name === "AbortError";
 }
 
 function useElapsedSeconds(active: boolean) {

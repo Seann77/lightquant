@@ -3,7 +3,9 @@ import type {
   AiConversationData,
   AiConversationMessagesData,
   AiMessageData,
+  AiRunEventData,
   AiTaskData,
+  AiTaskStatusData,
   AiTaskStreamEventData,
   ApiResponse,
   MessageAttachmentData,
@@ -15,14 +17,80 @@ import type {
 
 export const AI_TASK_POLL_INTERVAL_MS = 3000;
 export const AI_TASK_POLL_TIMEOUT_MS = 5 * 60 * 1000;
+export const WORKBENCH_SWITCH_COMPLETE_EVENT = "lightquant:workbench-switch-complete";
+
+export type WorkbenchSwitchCompleteDetail = {
+  conversationId: string;
+  status: "rendered" | "error";
+};
+
+type WorkbenchSwitchPerfState = {
+  conversationId: string;
+  href?: string;
+  clickedAt: number;
+};
 
 type RouterLike = {
   replace(href: string, options?: { scroll?: boolean }): void;
 };
 
-export async function fetchAiConversationSummary(conversationId: string) {
+declare global {
+  interface Window {
+    __lightquantWorkbenchSwitchPerf?: WorkbenchSwitchPerfState;
+  }
+}
+
+export function logWorkbenchPerf(event: string, details: Record<string, unknown> = {}) {
+  if (process.env.NODE_ENV === "production" || typeof window === "undefined") {
+    return;
+  }
+
+  console.debug("[workbench-perf]", JSON.stringify({
+    event,
+    ...details
+  }));
+}
+
+export function beginWorkbenchSwitchPerf(input: { conversationId: string; href?: string }) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.__lightquantWorkbenchSwitchPerf = {
+    conversationId: input.conversationId,
+    href: input.href,
+    clickedAt: getPerfNow()
+  };
+}
+
+export function getWorkbenchSwitchPerf(conversationId?: string | null) {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const state = window.__lightquantWorkbenchSwitchPerf ?? null;
+
+  if (!state || (conversationId && state.conversationId !== conversationId)) {
+    return null;
+  }
+
+  return state;
+}
+
+export function notifyWorkbenchSwitchComplete(detail: WorkbenchSwitchCompleteDetail) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(new CustomEvent(WORKBENCH_SWITCH_COMPLETE_EVENT, {
+    detail
+  }));
+}
+
+export async function fetchAiConversationSummary(conversationId: string, options: { signal?: AbortSignal } = {}) {
   const response = await fetch(`/api/v1/ai/conversations/${encodeURIComponent(conversationId)}`, {
-    cache: "no-store"
+    cache: "no-store",
+    signal: options.signal
   });
   const payload = (await response.json()) as ApiResponse<AiConversationData>;
 
@@ -39,6 +107,7 @@ export async function fetchAiConversationMessages(conversationId: string, option
   limit?: number;
   taskLimit?: number;
   includeTaskResults?: "none" | "latest" | "all";
+  signal?: AbortSignal;
 } = {}) {
   const params = new URLSearchParams();
 
@@ -64,13 +133,67 @@ export async function fetchAiConversationMessages(conversationId: string, option
 
   const query = params.size > 0 ? `?${params.toString()}` : "";
   const response = await fetch(`/api/v1/ai/conversations/${encodeURIComponent(conversationId)}/messages${query}`, {
-    cache: "no-store"
+    cache: "no-store",
+    signal: options.signal
   });
   const payload = (await response.json()) as ApiResponse<AiConversationMessagesData>;
 
   if (!payload.success) {
     throw new Error(`${payload.error.code}:${payload.error.message}`);
   }
+
+  return payload.data;
+}
+
+export async function fetchAiConversationSnapshot(conversationId: string, options: {
+  cursor?: string;
+  direction?: "before" | "after";
+  limit?: number;
+  taskLimit?: number;
+  includeTaskResults?: "none" | "latest" | "all";
+  signal?: AbortSignal;
+} = {}) {
+  const params = new URLSearchParams();
+
+  if (options.cursor) {
+    params.set("cursor", options.cursor);
+  }
+
+  if (options.direction) {
+    params.set("direction", options.direction);
+  }
+
+  if (options.limit) {
+    params.set("limit", String(options.limit));
+  }
+
+  if (options.taskLimit) {
+    params.set("taskLimit", String(options.taskLimit));
+  }
+
+  if (options.includeTaskResults) {
+    params.set("includeTaskResults", options.includeTaskResults);
+  }
+
+  const query = params.size > 0 ? `?${params.toString()}` : "";
+  const startedAt = getPerfNow();
+  const response = await fetch(`/api/v1/ai/conversations/${encodeURIComponent(conversationId)}/snapshot${query}`, {
+    cache: "no-store",
+    signal: options.signal
+  });
+  const payload = (await response.json()) as ApiResponse<AiConversationMessagesData>;
+
+  if (!payload.success) {
+    throw new Error(`${payload.error.code}:${payload.error.message}`);
+  }
+
+  logWorkbenchPerf("snapshot.response", {
+    conversationId,
+    durationMs: Math.round(getPerfNow() - startedAt),
+    messages: payload.data.messages.length,
+    tasks: payload.data.tasks?.length ?? 0,
+    hasResult: Boolean(payload.data.latestResult ?? payload.data.result)
+  });
 
   return payload.data;
 }
@@ -202,6 +325,44 @@ export async function fetchAiTaskResult(taskId: string) {
   return payload.data;
 }
 
+export async function fetchAiTaskStatus(taskId: string, options: {
+  afterSeq?: number;
+  limit?: number;
+  signal?: AbortSignal;
+} = {}) {
+  const params = new URLSearchParams();
+
+  if (typeof options.afterSeq === "number") {
+    params.set("afterSeq", String(options.afterSeq));
+  }
+
+  if (typeof options.limit === "number") {
+    params.set("limit", String(options.limit));
+  }
+
+  const query = params.size > 0 ? `?${params.toString()}` : "";
+  const startedAt = getPerfNow();
+  const response = await fetch(`/api/v1/ai/tasks/${encodeURIComponent(taskId)}/status${query}`, {
+    cache: "no-store",
+    signal: options.signal
+  });
+  const payload = (await response.json()) as ApiResponse<AiTaskStatusData>;
+
+  if (!payload.success) {
+    throw new Error(`${payload.error.code}:${payload.error.message}`);
+  }
+
+  logWorkbenchPerf("status.response", {
+    taskId,
+    status: payload.data.task.status,
+    durationMs: Math.round(getPerfNow() - startedAt),
+    events: payload.data.latestEvents?.length ?? 0,
+    hasResult: Boolean(payload.data.result)
+  });
+
+  return normalizeAiTaskStatusData(payload.data);
+}
+
 export async function cancelAiTask(taskId: string) {
   const response = await fetch(`/api/v1/ai/tasks/${encodeURIComponent(taskId)}/cancel`, {
     method: "POST"
@@ -234,7 +395,7 @@ export async function retryAiTask(taskId: string, clientRequestId: string) {
   return payload.data;
 }
 
-export async function waitForAiTaskResult(initialData: AiTaskData, onUpdate: (data: AiTaskData) => void) {
+export async function waitForAiTaskResult(initialData: AiTaskData, onUpdate: (data: AiTaskData) => void, options: { signal?: AbortSignal } = {}) {
   if (initialData.result || initialData.task.status === "SUCCEEDED") {
     return initialData;
   }
@@ -244,11 +405,28 @@ export async function waitForAiTaskResult(initialData: AiTaskData, onUpdate: (da
   }
 
   const startedAt = Date.now();
+  const pollStartedAt = getPerfNow();
   let latest = initialData;
+  let afterSeq = getLatestEventSeq(initialData.events ?? initialData.task.events ?? []);
+  let pollCount = 0;
+  logWorkbenchPerf("status.poll.start", {
+    taskId: initialData.task.id,
+    status: initialData.task.status
+  });
 
+  try {
   while (Date.now() - startedAt < AI_TASK_POLL_TIMEOUT_MS) {
-    await delay(AI_TASK_POLL_INTERVAL_MS);
-    const next = await fetchAiTaskResult(initialData.task.id);
+    await delay(AI_TASK_POLL_INTERVAL_MS, options.signal);
+    if (options.signal?.aborted) {
+      throw createAbortError();
+    }
+
+    const next = await fetchAiTaskStatus(initialData.task.id, {
+      afterSeq,
+      signal: options.signal
+    });
+    pollCount += 1;
+    afterSeq = Math.max(afterSeq, next.latestEventSeq ?? 0, getLatestEventSeq(next.events ?? []));
     latest = mergeAiTaskData(latest, next);
     onUpdate(latest);
 
@@ -262,11 +440,44 @@ export async function waitForAiTaskResult(initialData: AiTaskData, onUpdate: (da
   }
 
   throw new Error("AI_TASK_FAILED:任务仍在处理中，请稍后刷新页面或到历史记录查看结果；系统不会因为刷新页面重复扣费。");
+  } finally {
+    logWorkbenchPerf("status.poll.stop", {
+      taskId: initialData.task.id,
+      status: latest.task.status,
+      polls: pollCount,
+      aborted: Boolean(options.signal?.aborted),
+      durationMs: Math.round(getPerfNow() - pollStartedAt)
+    });
+  }
+}
+
+function normalizeAiTaskStatusData(data: AiTaskStatusData): AiTaskData {
+  return {
+    task: data.task,
+    result: data.result ?? null,
+    conversation: data.conversation
+      ? {
+          id: data.conversation.id,
+          mode: data.conversation.mode,
+          title: "",
+          targetPlatform: data.task.targetPlatform ?? null,
+          sourcePlatform: data.task.sourcePlatform ?? null,
+          status: "active",
+          uiState: null,
+          lastMessageAt: data.task.updatedAt ?? data.task.createdAt ?? "",
+          createdAt: data.task.createdAt ?? "",
+          updatedAt: data.task.updatedAt ?? data.task.createdAt ?? ""
+        }
+      : null,
+    events: data.latestEvents ?? [],
+    latestEventSeq: data.latestEventSeq
+  };
 }
 
 export function restoreWorkbenchConversation(data: AiConversationMessagesData, taskType: WorkbenchTaskType): RestoredWorkbenchSnapshot {
   const input = getLatestUserInputSnapshot(data.messages, taskType);
-  const taskData = getLatestTaskDataFromMessages(data.messages, taskType)
+  const taskData = getLatestTaskDataFromSnapshot(data, taskType)
+    ?? getLatestTaskDataFromMessages(data.messages, taskType)
     ?? getLatestTaskDataFromTasks(data.tasks ?? [], taskType, data.conversation);
 
   return {
@@ -278,6 +489,21 @@ export function restoreWorkbenchConversation(data: AiConversationMessagesData, t
     inputFileName: input.inputFileName,
     inputAttachment: input.inputAttachment,
     taskData
+  };
+}
+
+function getLatestTaskDataFromSnapshot(data: AiConversationMessagesData, taskType: WorkbenchTaskType): AiTaskData | null {
+  const task = data.latestTask ?? null;
+
+  if (!task || task.type !== taskType) {
+    return null;
+  }
+
+  return {
+    task,
+    result: data.latestResult ?? data.result ?? null,
+    conversation: data.conversation,
+    messages: data.messages
   };
 }
 
@@ -974,6 +1200,31 @@ function throwTaskStatusError(task: AiTaskData["task"]): never {
   throw new Error(`${task.errorCode ?? "AI_TASK_FAILED"}:${task.errorMessage ?? "AI 任务执行失败，请稍后再试"}`);
 }
 
-function delay(ms: number) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
+function getLatestEventSeq(events: AiRunEventData[] | null | undefined) {
+  return events?.reduce((latestSeq, event) => Math.max(latestSeq, event.seq), 0) ?? 0;
+}
+
+function createAbortError() {
+  const error = new Error("Aborted");
+  error.name = "AbortError";
+  return error;
+}
+
+function getPerfNow() {
+  return typeof performance !== "undefined" ? performance.now() : Date.now();
+}
+
+function delay(ms: number, signal?: AbortSignal) {
+  if (signal?.aborted) {
+    return Promise.reject(createAbortError());
+  }
+
+  return new Promise<void>((resolve, reject) => {
+    const timer = window.setTimeout(resolve, ms);
+
+    signal?.addEventListener("abort", () => {
+      window.clearTimeout(timer);
+      reject(createAbortError());
+    }, { once: true });
+  });
 }

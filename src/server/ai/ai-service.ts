@@ -74,6 +74,7 @@ const DEFAULT_CONVERSATION_TASK_LIMIT = 5;
 const MAX_CONVERSATION_TASK_LIMIT = 30;
 const DEFAULT_TASK_EVENT_LIMIT = 100;
 const MAX_TASK_EVENT_LIMIT = 200;
+const DEFAULT_TASK_STATUS_EVENT_LIMIT = 20;
 const TASK_RESPONSE_EVENT_LIMIT = 40;
 
 export async function createAiTask(userId: string, input: CreateAiTaskRequest, requestId: string) {
@@ -822,6 +823,36 @@ export async function getAiTaskResultForUser(userId: string, taskId: string) {
   });
 }
 
+export async function getAiTaskStatusForUser(userId: string, taskId: string, options: ListAiTaskEventsOptions = {}) {
+  const task = await getOwnedTask(userId, taskId);
+  const repository = getRepository();
+  const limit = normalizeLimit(options.limit ?? DEFAULT_TASK_STATUS_EVENT_LIMIT, MAX_TASK_EVENT_LIMIT, "limit");
+  const afterSeq = normalizeAfterSeq(options.afterSeq);
+  const [result, events, conversation] = await Promise.all([
+    task.status === "SUCCEEDED" ? repository.findAiTaskResult(task.id) : Promise.resolve(null),
+    repository.listAiRunEvents(task.id, {
+      afterSeq,
+      limit
+    }),
+    task.conversationId ? repository.findAiConversationById(task.conversationId) : Promise.resolve(null)
+  ]);
+  const latestEventSeq = events.at(-1)?.seq ?? afterSeq ?? 0;
+
+  return {
+    task: toTaskResponse(task, result),
+    result: result ? toResultResponse(result) : null,
+    latestEvents: events.map(toRunEventResponse),
+    latestEventSeq,
+    conversation: conversation
+      ? {
+          id: conversation.id,
+          mode: conversation.mode
+        }
+      : null,
+    limit
+  };
+}
+
 export async function listAiTaskEventsForUser(userId: string, taskId: string, options: ListAiTaskEventsOptions = {}) {
   const task = await getOwnedTask(userId, taskId);
   const limit = normalizeLimit(options.limit ?? DEFAULT_TASK_EVENT_LIMIT, MAX_TASK_EVENT_LIMIT, "limit");
@@ -943,37 +974,58 @@ export async function updateAiConversationForUser(userId: string, conversationId
 }
 
 export async function getAiConversationMessagesForUser(userId: string, conversationId: string, options: GetAiConversationMessagesOptions = {}) {
+  return getAiConversationSnapshotForUser(userId, conversationId, options);
+}
+
+export async function getAiConversationSnapshotForUser(userId: string, conversationId: string, options: GetAiConversationMessagesOptions = {}) {
   const conversation = await getOwnedConversation(userId, conversationId);
   const repository = getRepository();
   const limit = normalizeLimit(options.limit ?? DEFAULT_CONVERSATION_MESSAGE_LIMIT, MAX_CONVERSATION_MESSAGE_LIMIT, "limit");
   const direction = normalizeMessageDirection(options.direction);
   const cursor = options.cursor ? decodeCursor(options.cursor) : undefined;
-  const fetchedMessages = await repository.listAiMessages(conversation.id, {
-    limit: limit + 1,
-    cursor,
-    direction,
-    ascending: true
-  });
-  const { items: messages, nextCursor } = sliceCursorMessages(fetchedMessages, limit, direction);
-  const attachmentsByMessageId = await buildMessageAttachmentsByMessageId(userId, messages);
   const taskLimit = normalizeLimit(options.taskLimit ?? DEFAULT_CONVERSATION_TASK_LIMIT, MAX_CONVERSATION_TASK_LIMIT, "taskLimit");
-  const recentTasks = await repository.listAiTasksForConversation(conversation.id, {
-    limit: taskLimit,
-    ascending: false
-  });
-  const tasks = [...recentTasks].reverse();
   const includeTaskResults = normalizeIncludeTaskResults(options.includeTaskResults);
-  const latestTaskId = tasks.at(-1)?.id ?? null;
-  const taskResponses = await Promise.all(tasks.map(async (task) => {
-    const shouldLoadResult = includeTaskResults === "all" || (includeTaskResults === "latest" && task.id === latestTaskId);
 
-    return toTaskResponse(task, shouldLoadResult ? await repository.findAiTaskResult(task.id) : null);
-  }));
+  const [fetchedMessages, recentTasks] = await Promise.all([
+    repository.listAiMessages(conversation.id, {
+      limit: limit + 1,
+      cursor,
+      direction,
+      ascending: true
+    }),
+    repository.listAiTasksForConversation(conversation.id, {
+      limit: taskLimit,
+      ascending: false
+    })
+  ]);
+  const { items: messages, nextCursor } = sliceCursorMessages(fetchedMessages, limit, direction);
+  const tasks = [...recentTasks].reverse();
+  const latestTaskId = tasks.at(-1)?.id ?? null;
+
+  const [attachmentsByMessageId, taskResultEntries] = await Promise.all([
+    buildMessageAttachmentsByMessageId(userId, messages),
+    Promise.all(tasks.map(async (task) => {
+      const shouldLoadResult = includeTaskResults === "all" || (includeTaskResults === "latest" && task.id === latestTaskId);
+      const result = shouldLoadResult ? await repository.findAiTaskResult(task.id) : null;
+
+      return {
+        task,
+        result
+      };
+    }))
+  ]);
+  const taskResponses = taskResultEntries.map(({ task, result }) => toTaskResponse(task, result));
+  const latestTaskEntry = taskResultEntries.at(-1) ?? null;
+  const latestTask = latestTaskEntry ? toTaskResponse(latestTaskEntry.task, latestTaskEntry.result) : null;
+  const latestResult = latestTaskEntry?.result ? toResultResponse(latestTaskEntry.result) : null;
 
   return {
     conversation: toConversationResponse(conversation),
     messages: messages.map((message) => toMessageResponse(message, attachmentsByMessageId.get(message.id) ?? [])),
     tasks: taskResponses,
+    latestTask,
+    latestResult,
+    result: latestResult,
     nextCursor,
     limit,
     taskLimit
@@ -1149,19 +1201,22 @@ function toConversationResponse(conversation: AiConversation) {
 
 async function toConversationListResponses(conversations: AiConversation[]) {
   const repository = getRepository();
+  const latestTasks = await repository.listLatestAiTasksForConversations(conversations.map((conversation) => conversation.id));
+  const latestTaskByConversationId = new Map(
+    latestTasks
+      .filter((task) => task.conversationId)
+      .map((task) => [task.conversationId!, task])
+  );
 
-  return Promise.all(conversations.map(async (conversation) => {
-    const latestTask = (await repository.listAiTasksForConversation(conversation.id, {
-      limit: 1,
-      ascending: false
-    }))[0];
+  return conversations.map((conversation) => {
+    const latestTask = latestTaskByConversationId.get(conversation.id);
 
     return {
       ...toConversationResponse(conversation),
       latestTaskStatus: latestTask?.status ?? null,
       latestTaskType: latestTask?.type ?? null
     };
-  }));
+  });
 }
 
 function toMessageResponse(message: AiMessage, attachments: AiMessageAttachmentSummary[] = []) {
@@ -1251,36 +1306,37 @@ async function buildMessageAttachmentsByMessageId(userId: string, messages: AiMe
     byMessageId.set(attachment.messageId, list);
   }
 
+  const legacyCandidates: Array<{ message: AiMessage; inputFileId: string }> = [];
+
   for (const message of messages) {
     if ((byMessageId.get(message.id)?.length ?? 0) > 0) {
       continue;
     }
 
-    const fallback = await createLegacyAttachmentSummaryForMessage(userId, message);
+    const contentJson = readRecord(message.contentJson);
+    const inputFileId = typeof contentJson?.inputFileId === "string" ? contentJson.inputFileId : null;
 
-    if (fallback) {
-      byMessageId.set(message.id, [fallback]);
+    if (inputFileId) {
+      legacyCandidates.push({ message, inputFileId });
+    }
+  }
+
+  if (legacyCandidates.length === 0) {
+    return byMessageId;
+  }
+
+  const files = await repository.listUploadedFilesByIds(legacyCandidates.map((candidate) => candidate.inputFileId));
+  const fileById = new Map(files.filter((file) => file.userId === userId).map((file) => [file.id, file]));
+
+  for (const { message, inputFileId } of legacyCandidates) {
+    const file = fileById.get(inputFileId);
+
+    if (file) {
+      byMessageId.set(message.id, [toLegacyAttachmentSummary(message, file)]);
     }
   }
 
   return byMessageId;
-}
-
-async function createLegacyAttachmentSummaryForMessage(userId: string, message: AiMessage): Promise<AiMessageAttachmentSummary | null> {
-  const contentJson = readRecord(message.contentJson);
-  const inputFileId = typeof contentJson?.inputFileId === "string" ? contentJson.inputFileId : null;
-
-  if (!inputFileId) {
-    return null;
-  }
-
-  const file = await getRepository().findUploadedFileById(inputFileId);
-
-  if (!file || file.userId !== userId) {
-    return null;
-  }
-
-  return toLegacyAttachmentSummary(message, file);
 }
 
 function toLegacyAttachmentSummary(message: AiMessage, file: UploadedFile): AiMessageAttachmentSummary {
@@ -1492,7 +1548,7 @@ function assertUploadedFileAllowedForTask(type: AiTaskType, uploadedFile: Upload
 
   if (!isFileExtensionAllowedForPurpose(ext, purpose)) {
     const rule = getFileUploadRule(purpose);
-    throw new ApiError("UNSUPPORTED_FILE_TYPE", `该模块仅支持 ${rule.allowedExtensions.join(" / ")} 文件`, 400);
+    throw new ApiError("UNSUPPORTED_FILE_TYPE", `仅支持上传 ${rule.allowedExtensions.join(" / ")} 文件`, 400);
   }
 }
 

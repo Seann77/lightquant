@@ -769,13 +769,51 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
       where: {
         conversationId
       },
-      orderBy: {
-        createdAt: options.ascending ? "asc" : "desc"
-      },
+      orderBy: [
+        { createdAt: options.ascending ? "asc" : "desc" },
+        { id: options.ascending ? "asc" : "desc" }
+      ],
       take: options.limit
     });
 
     return items.map(toAiTask);
+  }
+
+  async listLatestAiTasksForConversations(conversationIds: string[]) {
+    const uniqueConversationIds = [...new Set(conversationIds)];
+
+    if (uniqueConversationIds.length === 0) {
+      return [];
+    }
+
+    const conversationIdSql = Prisma.join(uniqueConversationIds.map((id) => Prisma.sql`${id}::uuid`));
+    const rows = await this.db.$queryRaw<Array<{
+      conversationId: string | null;
+      type: AiTask["type"];
+      status: AiTask["status"];
+    }>>`
+      SELECT
+        "conversation_id" AS "conversationId",
+        "type",
+        "status"
+      FROM (
+        SELECT
+          "conversation_id",
+          "type",
+          "status",
+          "created_at",
+          "id",
+          ROW_NUMBER() OVER (
+            PARTITION BY "conversation_id"
+            ORDER BY "created_at" DESC, "id" DESC
+          ) AS "rank"
+        FROM "ai_tasks"
+        WHERE "conversation_id" IN (${conversationIdSql})
+      ) AS "latest_tasks"
+      WHERE "rank" = 1
+    `;
+
+    return rows;
   }
 
   async findAiConversationById(id: string) {
@@ -1187,6 +1225,24 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
     });
 
     return uploadedFile ? toUploadedFile(uploadedFile) : null;
+  }
+
+  async listUploadedFilesByIds(fileIds: string[]) {
+    const uniqueFileIds = [...new Set(fileIds)];
+
+    if (uniqueFileIds.length === 0) {
+      return [];
+    }
+
+    const uploadedFiles = await this.db.uploadedFile.findMany({
+      where: {
+        id: {
+          in: uniqueFileIds
+        }
+      }
+    });
+
+    return uploadedFiles.map(toUploadedFile);
   }
 
   async getAdminOverview(todayStart: string): Promise<AdminOverview> {

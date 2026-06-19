@@ -79,6 +79,7 @@ export type AiTaskData = {
   conversation?: AiConversationData | null;
   messages?: AiMessageData[];
   events?: AiRunEventData[];
+  latestEventSeq?: number;
 };
 
 export type AiConversationData = {
@@ -146,6 +147,21 @@ export type AiConversationMessagesData = {
   conversation: AiConversationData;
   messages: AiMessageData[];
   tasks?: AiTaskData["task"][];
+  latestTask?: AiTaskData["task"] | null;
+  latestResult?: AiTaskData["result"] | null;
+  result?: AiTaskData["result"] | null;
+  nextCursor?: string | null;
+  limit?: number;
+  taskLimit?: number;
+};
+
+export type AiTaskStatusData = {
+  task: AiTaskData["task"];
+  result: AiTaskData["result"] | null;
+  latestEvents?: AiRunEventData[];
+  latestEventSeq?: number;
+  conversation?: Pick<AiConversationData, "id" | "mode"> | null;
+  limit?: number;
 };
 
 export type AiTaskStreamEventData =

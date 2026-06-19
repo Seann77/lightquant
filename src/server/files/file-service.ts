@@ -35,7 +35,7 @@ export type StoredFilePayload = {
 };
 
 const CONTENT_PREVIEW_LENGTH = 800;
-const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp"]);
+const IMAGE_EXTENSIONS = new Set([".png", ".jpg"]);
 
 export async function uploadCodeFileForUser(userId: string, file: File, purpose: FileUploadPurpose): Promise<UploadedFileResponse> {
   const originalName = normalizeOriginalName(file.name);
@@ -205,7 +205,7 @@ async function uploadImageFileForUser(userId: string, file: File, originalName: 
   const detected = detectImageType(bytes);
 
   if (!detected) {
-    throw new ApiError("FILE_PARSE_FAILED", "图片格式无法识别，请上传 PNG、JPG、JPEG 或 WebP 图片", 400);
+    throw new ApiError("FILE_PARSE_FAILED", "图片格式无法识别，请上传 PNG 或 JPG 图片", 400);
   }
 
   if (!isCompatibleImageExtension(ext, detected.ext)) {
@@ -322,21 +322,10 @@ function detectImageType(bytes: Buffer) {
     };
   }
 
-  if (bytes.length >= 12 && bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP") {
-    return {
-      ext: ".webp",
-      mimeType: "image/webp"
-    };
-  }
-
   return null;
 }
 
 function isCompatibleImageExtension(uploadedExt: string, detectedExt: string) {
-  if (detectedExt === ".jpg") {
-    return uploadedExt === ".jpg" || uploadedExt === ".jpeg";
-  }
-
   return uploadedExt === detectedExt;
 }
 

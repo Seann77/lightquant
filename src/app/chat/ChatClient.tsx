@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } fro
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
+  AlertTriangle,
   Bot,
   Code2,
   DollarSign,
@@ -31,13 +32,14 @@ import {
   createRestoredUploadedFile,
   createWorkbenchClientRequestId,
   cancelAiTask,
-  fetchAiTaskResult,
+  fetchAiTaskStatus,
   formatRestoredInputText,
   getConversationActiveTab,
   getFriendlyAiError as getFriendlyError,
   getAiTaskStreamingContent,
   formatAiTaskResultAsMarkdown,
   getMessageAttachments,
+  logWorkbenchPerf,
   persistConversationActiveTab,
   readRecord,
   readNullableString,
@@ -141,7 +143,7 @@ function StrategyModeContent() {
   const conversationIdFromUrl = searchParams.get("conversationId");
   const currentConversationKey = conversation?.id ?? conversationIdFromUrl ?? DRAFT_CONVERSATION_KEY;
   const activeConversationKeyRef = useRef(currentConversationKey);
-  const pollingJobsRef = useRef(new Set<string>());
+  const pollingJobsRef = useRef(new Map<string, AbortController>());
   const canceledLocalJobIdsRef = useRef(new Set<string>());
   const streamAbortControllersRef = useRef(new Map<string, AbortController>());
   const activeJobId = activeJobByConversationId[currentConversationKey];
@@ -152,6 +154,14 @@ function StrategyModeContent() {
   useEffect(() => {
     activeConversationKeyRef.current = currentConversationKey;
   }, [currentConversationKey]);
+
+  useEffect(() => {
+    abortAllStrategyPolls();
+  }, [conversationIdFromUrl]);
+
+  useEffect(() => () => {
+    abortAllStrategyPolls();
+  }, []);
 
   const restoreState = useWorkbenchConversationRestore({
     conversationId: conversationIdFromUrl,
@@ -230,6 +240,14 @@ function StrategyModeContent() {
       window.cancelAnimationFrame(frameId);
     };
   }, [messages.length, activeJob?.id, activeJob?.status, activeJob?.partialResult, activeJob?.events?.length, activeJobRunning, elapsedSeconds, error]);
+
+  function abortAllStrategyPolls() {
+    for (const controller of pollingJobsRef.current.values()) {
+      controller.abort();
+    }
+
+    pollingJobsRef.current.clear();
+  }
 
   function getStrategyThreadScrollContainer() {
     const thread = strategyThreadRef.current;
@@ -613,15 +631,33 @@ function StrategyModeContent() {
       return;
     }
 
-    pollingJobsRef.current.add(jobId);
+    const controller = new AbortController();
+    let afterSeq = getLatestRunEventSeq(jobsById[jobId]?.events ?? jobsById[jobId]?.task?.events ?? []);
+    const pollStartedAt = getClientPerfNow();
+    let pollCount = 0;
+    pollingJobsRef.current.set(jobId, controller);
+    logWorkbenchPerf("status.poll.start", {
+      taskId: jobId,
+      source: "strategy"
+    });
 
     void (async () => {
       const startedAt = Date.now();
 
       try {
         while (Date.now() - startedAt < AI_TASK_POLL_TIMEOUT_MS) {
-          await delay(AI_TASK_POLL_INTERVAL_MS);
-          const next = await fetchAiTaskResult(jobId);
+          await delay(AI_TASK_POLL_INTERVAL_MS, controller.signal);
+          const next = await fetchAiTaskStatus(jobId, {
+            afterSeq,
+            signal: controller.signal
+          });
+
+          if (controller.signal.aborted || pollingJobsRef.current.get(jobId) !== controller) {
+            return;
+          }
+
+          pollCount += 1;
+          afterSeq = Math.max(afterSeq, next.latestEventSeq ?? 0, getLatestRunEventSeq(next.events ?? next.task.events ?? []));
           applyConversationPayload(next, {
             sourceConversationKey
           });
@@ -655,7 +691,11 @@ function StrategyModeContent() {
             }
           };
         });
-      } catch {
+      } catch (pollError) {
+        if (isAbortError(pollError) || controller.signal.aborted || pollingJobsRef.current.get(jobId) !== controller) {
+          return;
+        }
+
         setJobsById((current) => {
           const job = current[jobId];
 
@@ -674,7 +714,17 @@ function StrategyModeContent() {
           };
         });
       } finally {
-        pollingJobsRef.current.delete(jobId);
+        logWorkbenchPerf("status.poll.stop", {
+          taskId: jobId,
+          source: "strategy",
+          polls: pollCount,
+          aborted: controller.signal.aborted,
+          durationMs: Math.round(getClientPerfNow() - pollStartedAt)
+        });
+
+        if (pollingJobsRef.current.get(jobId) === controller) {
+          pollingJobsRef.current.delete(jobId);
+        }
       }
     })();
   }
@@ -685,6 +735,8 @@ function StrategyModeContent() {
     }
 
     streamAbortControllersRef.current.get(job.id)?.abort();
+    pollingJobsRef.current.get(job.id)?.abort();
+    pollingJobsRef.current.delete(job.id);
 
     if (!job.task) {
       canceledLocalJobIdsRef.current.add(job.id);
@@ -838,7 +890,9 @@ function StrategyModeContent() {
     void handleSubmit();
   }
 
-  const hasInlineError = messages.some((message) => message.localStatus === "error" || Boolean(getMessageError(message)));
+  const hasInlineError = messages.some((message) => message.localStatus === "error" || Boolean(getMessageError(message)) || isFailedStrategyMessage(message));
+  const shouldShowActiveJobPanel = Boolean(activeJob && shouldRenderStrategyJobPanel(activeJob, messages));
+  const hasActiveJobFailurePanel = Boolean(shouldShowActiveJobPanel && activeJob && (activeJob.status === "failed" || activeJob.status === "canceled"));
 
   return (
     <WorkbenchShell className="lq-strategy-page">
@@ -869,7 +923,7 @@ function StrategyModeContent() {
             {messages.map((message) => (
               <StrategyMessageBubble elapsedSeconds={message.localStatus === "pending" ? elapsedSeconds : undefined} key={message.id} message={message} />
             ))}
-            {activeJob && shouldRenderStrategyJobPanel(activeJob, messages) ? (
+            {activeJob && shouldShowActiveJobPanel ? (
               <StrategyJobBubble
                 elapsedSeconds={elapsedSeconds}
                 job={activeJob}
@@ -877,7 +931,7 @@ function StrategyModeContent() {
                 onRetry={() => void handleRetryJob(activeJob)}
               />
             ) : null}
-            {error && !hasInlineError ? (
+            {error && !hasInlineError && !hasActiveJobFailurePanel ? (
               <div className="lq-assistant-row">
                 <ErrorPanel message={error} />
               </div>
@@ -1003,6 +1057,11 @@ function ConvertModeContent() {
       setTaskData(restored.taskData);
       setStreamState(createThinkingStateFromTaskData(restored.taskData, "code_conversion"));
       setActiveTab(getConversationActiveTab(conversationData.conversation, conversionTabs, conversionTabs[0]));
+      setLoading(false);
+      setCanceling(false);
+      cancelRequestedRef.current = false;
+      pollingConversionTaskIdRef.current = null;
+      streamingConversionTaskIdRef.current = null;
     },
     onError: (historyError) => {
       setError(getFriendlyError(historyError));
@@ -1024,8 +1083,13 @@ function ConvertModeContent() {
   useEffect(() => {
     const currentTaskData = taskData;
     const currentTask = currentTaskData?.task;
+    const currentTaskConversationId = currentTaskData?.conversation?.id ?? currentTask?.conversationId ?? null;
 
     if (!currentTask || (currentTask.status !== "PENDING" && currentTask.status !== "RUNNING") || cancelRequestedRef.current) {
+      return;
+    }
+
+    if (conversationIdFromUrl && currentTaskConversationId && currentTaskConversationId !== conversationIdFromUrl) {
       return;
     }
 
@@ -1038,6 +1102,7 @@ function ConvertModeContent() {
     }
 
     let disposed = false;
+    const pollController = new AbortController();
     pollingConversionTaskIdRef.current = currentTask.id;
     setLoading(true);
 
@@ -1050,6 +1115,8 @@ function ConvertModeContent() {
 
           setTaskData(nextData);
           setStreamState(createThinkingStateFromTaskData(nextData, "code_conversion"));
+        }, {
+          signal: pollController.signal
         });
 
         if (disposed || cancelRequestedRef.current) {
@@ -1067,7 +1134,7 @@ function ConvertModeContent() {
       } catch (pollError) {
         window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
 
-        if (!disposed && !cancelRequestedRef.current) {
+        if (!disposed && !cancelRequestedRef.current && !isAbortError(pollError)) {
           setError(getFriendlyError(pollError));
         }
       } finally {
@@ -1084,12 +1151,13 @@ function ConvertModeContent() {
 
     return () => {
       disposed = true;
+      pollController.abort();
 
       if (pollingConversionTaskIdRef.current === currentTask.id) {
         pollingConversionTaskIdRef.current = null;
       }
     };
-  }, [taskData?.task.id]);
+  }, [conversationIdFromUrl, taskData?.task.id, taskData?.task.status]);
 
   function resetConversionLocalState() {
     setInputCode("");
@@ -1514,16 +1582,20 @@ function StrategyMessageBubble({ elapsedSeconds, message }: { elapsedSeconds?: n
   const result = getMessageResult(message);
   const task = getMessageTask(message);
   const error = getMessageError(message);
-  const status = message.localStatus === "pending" ? "running" : message.localStatus === "error" || error ? "failed" : result ? "succeeded" : "idle";
+  const failedByTask = task?.status === "FAILED" || task?.status === "CANCELLED";
+  const status = message.localStatus === "pending" ? "running" : message.localStatus === "error" || error || failedByTask ? "failed" : result ? "succeeded" : "idle";
   const streamContent = getMessageStreamingContent(message, result, "strategy_generation");
   const thinkingStatus: AssistantThinkingStatus = status === "failed" ? "failed" : status === "succeeded" ? "completed" : message.localStatus === "pending" ? "thinking" : "idle";
+  const failureMessage = error?.message ?? task?.errorMessage ?? message.content;
 
   return (
     <div className="lq-assistant-row">
       <div className={`lq-assistant-message ${status === "failed" ? "is-error" : ""}`}>
-        {streamContent.finalAnswerMarkdown || streamContent.visibleThinking || result || status === "failed" ? (
+        {status === "failed" ? (
+          <StrategyFailureMessage message={failureMessage} title={task?.status === "CANCELLED" ? "任务已取消" : "生成失败"} />
+        ) : streamContent.finalAnswerMarkdown || streamContent.visibleThinking || result ? (
           <AssistantThinkingMessage
-            error={status === "failed" ? error?.message ?? message.content : null}
+            error={null}
             finalAnswerMarkdown={streamContent.finalAnswerMarkdown}
             status={thinkingStatus}
             thinking={streamContent.visibleThinking}
@@ -1560,29 +1632,54 @@ function StrategyJobBubble({
   const thinkingStatus: AssistantThinkingStatus = failed || canceled ? "failed" : completed ? "completed" : job.status === "streaming" ? "answering" : "thinking";
   const visibleThinking = job.visibleThinking?.trim() ?? "";
   const visibleError = failed || canceled ? job.error ?? null : null;
+  const runningFallback = isJobActive(job) && !visibleThinking && !finalAnswerMarkdown.trim() && !visibleError ? "正在同步任务状态..." : "";
 
-  if (!visibleThinking && !finalAnswerMarkdown.trim() && !visibleError) {
+  if (failed || canceled) {
+    return (
+      <div className="lq-assistant-row">
+        <StrategyFailureMessage
+          message={visibleError ?? (canceled ? "任务已取消，未生成策略结果。" : "AI 任务执行失败，请稍后重试。")}
+          onRetry={onRetry}
+          title={canceled ? "任务已取消" : "生成失败"}
+        />
+      </div>
+    );
+  }
+
+  if (!visibleThinking && !finalAnswerMarkdown.trim() && !visibleError && !runningFallback) {
     return null;
   }
 
   return (
     <div className="lq-assistant-row">
-      <div className={`lq-assistant-message ${failed || canceled ? "is-error" : ""}`}>
+      <div className="lq-assistant-message">
         <AssistantThinkingMessage
-          error={visibleError}
+          error={null}
           finalAnswerMarkdown={finalAnswerMarkdown}
           status={thinkingStatus}
-          thinking={visibleThinking}
+          thinking={visibleThinking || runningFallback}
         />
-        {failed || canceled ? (
-          <div className="lq-job-actions">
-            <button className="lq-job-action is-primary" onClick={onRetry} type="button">
-              <ArrowRight aria-hidden="true" size={15} />
-              重试
-            </button>
-          </div>
-        ) : null}
       </div>
+    </div>
+  );
+}
+
+function StrategyFailureMessage({ message, onRetry, title = "生成失败" }: { message: string; onRetry?: () => void; title?: string }) {
+  return (
+    <div className="lq-strategy-failure-card" role="status">
+      <span className="lq-strategy-failure-icon">
+        <AlertTriangle aria-hidden="true" size={18} />
+      </span>
+      <div className="lq-strategy-failure-body">
+        <strong>{title}</strong>
+        <p>{message}</p>
+      </div>
+      {onRetry ? (
+        <button className="lq-job-action is-primary lq-strategy-failure-retry" onClick={onRetry} type="button">
+          <ArrowRight aria-hidden="true" size={15} />
+          重试
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -1807,11 +1904,33 @@ function isJobTerminal(job: StrategyJob) {
 }
 
 function shouldRenderStrategyJobPanel(job: StrategyJob, messages: StrategyChatMessage[]) {
-  if (isJobActive(job) || job.status === "failed" || job.status === "canceled") {
+  if (isJobActive(job)) {
     return true;
   }
 
-  return job.status === "completed" && !hasAssistantMessageForTask(messages, job.id);
+  if (job.status === "failed" || job.status === "canceled") {
+    return !hasAssistantMessageForTask(messages, job.id);
+  }
+
+  if (job.status === "completed") {
+    return !hasAssistantMessageForTask(messages, job.id);
+  }
+
+  return false;
+}
+
+function isFailedStrategyMessage(message: StrategyChatMessage) {
+  if (message.role !== "assistant") {
+    return false;
+  }
+
+  if (message.localStatus === "error" || getMessageError(message)) {
+    return true;
+  }
+
+  const task = getMessageTask(message);
+
+  return task?.status === "FAILED" || task?.status === "CANCELLED";
 }
 
 function hasAssistantMessageForTask(messages: Array<Pick<AiMessageData, "role" | "taskId">>, taskId: string) {
@@ -1898,6 +2017,35 @@ function getMessageError(message: StrategyChatMessage) {
   };
 }
 
-function delay(ms: number) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
+function getLatestRunEventSeq(events: AiRunEventData[] | null | undefined) {
+  return events?.reduce((latestSeq, event) => Math.max(latestSeq, event.seq), 0) ?? 0;
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof Error && error.name === "AbortError";
+}
+
+function createAbortError() {
+  const error = new Error("Aborted");
+  error.name = "AbortError";
+  return error;
+}
+
+function getClientPerfNow() {
+  return typeof performance !== "undefined" ? performance.now() : Date.now();
+}
+
+function delay(ms: number, signal?: AbortSignal) {
+  if (signal?.aborted) {
+    return Promise.reject(createAbortError());
+  }
+
+  return new Promise<void>((resolve, reject) => {
+    const timer = window.setTimeout(resolve, ms);
+
+    signal?.addEventListener("abort", () => {
+      window.clearTimeout(timer);
+      reject(createAbortError());
+    }, { once: true });
+  });
 }

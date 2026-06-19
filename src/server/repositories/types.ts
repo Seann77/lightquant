@@ -291,6 +291,8 @@ export type AiConversationPage = {
   nextCursor?: string | null;
 };
 
+export type AiConversationLatestTask = Pick<AiTask, "conversationId" | "type" | "status">;
+
 export type AdminOverview = {
   totals: {
     users: number;
@@ -433,6 +435,7 @@ export interface LightQuantRepository {
   findAiTaskResult(taskId: string): Promise<AiTaskResult | null>;
   listAiTasks(userId: string, pagination: Pagination, filters: { type?: AiTaskType; status?: AiTaskStatus }): Promise<AiTaskPage>;
   listAiTasksForConversation(conversationId: string, options?: { limit?: number; ascending?: boolean }): Promise<AiTask[]>;
+  listLatestAiTasksForConversations(conversationIds: string[]): Promise<AiConversationLatestTask[]>;
   findAiConversationById(id: string): Promise<AiConversation | null>;
   createAiConversation(input: CreateAiConversationInput): Promise<AiConversation>;
   updateAiConversation(conversationId: string, input: UpdateAiConversationInput): Promise<AiConversation>;
@@ -448,6 +451,7 @@ export interface LightQuantRepository {
   getNextRunEventSeq(taskId: string): Promise<number>;
   createUploadedFile(input: CreateUploadedFileInput): Promise<UploadedFile>;
   findUploadedFileById(id: string): Promise<UploadedFile | null>;
+  listUploadedFilesByIds(fileIds: string[]): Promise<UploadedFile[]>;
   getAdminOverview(todayStart: string): Promise<AdminOverview>;
   listAdminUsers(pagination: Pagination, filters: { phone?: string }): Promise<AdminUserPage>;
   listAdminOrders(pagination: Pagination, filters: { status?: OrderStatus }): Promise<AdminOrderPage>;
