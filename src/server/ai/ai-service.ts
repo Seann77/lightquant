@@ -7,8 +7,9 @@ import { getAiTaskConfig, getTotalInputChars, parseAiTaskType } from "@/server/a
 import { runAiProvider, runAiProviderStream } from "@/server/ai/ai-provider";
 import { getAiTaskProgress, setAiTaskProgress, type AiTaskProgressSnapshot, type AiTaskProgressUpdate } from "@/server/ai/ai-task-progress";
 import { getAiPerfNow, logAiPerf, measureAiPerf } from "@/server/ai/ai-perf";
-import { getAiModelName, getAiProviderMode, getAiSupportsVision, getAiTaskTimeoutMs } from "@/server/env";
+import { getAiModelName, getAiProviderMode, getAiSupportsVision, getAiTaskTimeoutMs, getBetaVipConfig } from "@/server/env";
 import { getUploadedImageDataUrl, inferUploadedFileKind } from "@/server/files/file-service";
+import { getAiTaskBillingForUserAt, type AiTaskBilling } from "@/server/memberships/beta-membership-service";
 import type { AiProviderAttachment, AiProviderStreamDelta } from "@/server/ai/providers/types";
 import { normalizeStrategyFinalAnswerMarkdown } from "@/lib/ai/strategy-result-format";
 
@@ -59,6 +60,7 @@ type ListAiTaskEventsOptions = {
 };
 
 type AiTaskResponse = Awaited<ReturnType<typeof buildAiTaskResponse>>;
+type ModelCallRunEventType = "call_model" | "call_model_stream";
 
 export type AiTaskStreamEvent =
   | { type: "task"; data: AiTaskResponse }
@@ -83,6 +85,8 @@ const DEFAULT_TASK_EVENT_LIMIT = 100;
 const MAX_TASK_EVENT_LIMIT = 200;
 const DEFAULT_TASK_STATUS_EVENT_LIMIT = 20;
 const TASK_RESPONSE_EVENT_LIMIT = 40;
+const BETA_VIP_RATE_LIMIT_MESSAGE = "内测VIP使用过于频繁，请稍后再试";
+const CHINA_TIME_OFFSET_MS = 8 * 60 * 60 * 1000;
 
 export async function createAiTask(userId: string, input: CreateAiTaskRequest, requestId: string, options: CreateAiTaskOptions = {}) {
   const totalStartedAt = getAiPerfNow();
@@ -283,6 +287,23 @@ export async function createAiTask(userId: string, input: CreateAiTaskRequest, r
       }, () => appendInputFileRunEvents(createdTask, resolvedInput.inputFileName ?? null, now));
       }
 
+      const billing = await measureAiPerf("create_task.tx.resolve_billing", {
+        requestId,
+        taskId: createdTask.id,
+        taskType: type,
+        costPoints: createdTask.costPoints
+      }, () => getBillingForTask(createdTask));
+
+      if (billing.waivedByMembership) {
+        await measureAiPerf("create_task.tx.beta_vip_limits", {
+          requestId,
+          taskId: createdTask.id,
+          taskType: type
+        }, () => assertBetaVipTaskUsageAllowed(createdTask));
+
+        return createdTask;
+      }
+
       await measureAiPerf("create_task.tx.reserve_credits", {
         requestId,
         taskId: createdTask.id,
@@ -411,14 +432,38 @@ export async function runAiTask(taskId: string, requestId: string) {
         visionAttachments: providerAttachments.length
       }
     });
-    const providerResult = await runAiProvider(
-      runningProviderTask,
-      conversationContext,
-      async (progress) => {
-        await recordAiTaskProgress(runningProviderTask, progress);
-      },
-      providerAttachments
-    );
+    let completedProviderResult: Awaited<ReturnType<typeof runAiProvider>> | null = null;
+    let providerRunError: unknown = null;
+
+    try {
+      const providerResult = await runAiProvider(
+        runningProviderTask,
+        conversationContext,
+        async (progress) => {
+          await recordAiTaskProgress(runningProviderTask, progress);
+        },
+        providerAttachments
+      );
+      completedProviderResult = providerResult;
+    } catch (error) {
+      providerRunError = error;
+      throw error;
+    } finally {
+      await appendModelCallClosedRunEvent(runningProviderTask, {
+        type: "call_model",
+        status: completedProviderResult ? "completed" : "failed",
+        summary: completedProviderResult ? getModelCallCompletedSummary("call_model") : getModelCallFailedSummary("call_model"),
+        progressPercent: completedProviderResult ? 84 : 96,
+        detailJson: completedProviderResult ? {
+          provider: providerDiagnostics.provider,
+          model: completedProviderResult.model,
+          visionAttachments: providerAttachments.length,
+          tokenUsage: completedProviderResult.tokenUsage
+        } : getModelCallFailureDetailJson(providerRunError)
+      });
+    }
+
+    const providerResult = completedProviderResult as Awaited<ReturnType<typeof runAiProvider>>;
     const latestAfterProvider = await repository.findAiTaskById(runningProviderTask.id);
 
     if (!latestAfterProvider) {
@@ -473,7 +518,7 @@ export async function runAiTask(taskId: string, requestId: string) {
     const runningTask = runningProviderTask;
     const completed = await withRepositoryTransaction(async () => {
       const transactionRepository = getRepository();
-      const credit = await confirmReservation(runningTask, requestId);
+      const billingSettlement = await settleAiTaskBilling(runningTask, requestId);
       const finishedAt = new Date().toISOString();
       const result = await transactionRepository.createAiTaskResult({
         taskId: runningTask.id,
@@ -514,7 +559,7 @@ export async function runAiTask(taskId: string, requestId: string) {
       });
 
       return {
-        credit,
+        credit: billingSettlement.credit,
         result,
         task: updatedTask
       };
@@ -546,7 +591,7 @@ export async function runAiTask(taskId: string, requestId: string) {
 
     return buildAiTaskResponse(completed.task, {
       result: completed.result,
-      creditAccount: completed.credit.account,
+      creditAccount: completed.credit?.account,
       duplicated: false
     });
   } catch (error) {
@@ -807,18 +852,42 @@ async function runAiTaskStreaming(
       taskType: runningTask.type,
       durationMs: getAiPerfNow() - startedAt
     });
-    const providerStream = await measureAiPerf("run_stream.provider_stream", {
-      requestId,
-      taskId: runningTask.id,
-      taskType: runningTask.type
-    }, () => runAiProviderStream(
-      runningTask,
-      conversationContext,
-      {
-        onDelta: emit
-      },
-      providerAttachments
-    ));
+    let completedProviderStream: Awaited<ReturnType<typeof runAiProviderStream>> | null = null;
+    let providerStreamError: unknown = null;
+
+    try {
+      const providerStream = await measureAiPerf("run_stream.provider_stream", {
+        requestId,
+        taskId: runningTask.id,
+        taskType: runningTask.type
+      }, () => runAiProviderStream(
+        runningTask,
+        conversationContext,
+        {
+          onDelta: emit
+        },
+        providerAttachments
+      ));
+      completedProviderStream = providerStream;
+    } catch (error) {
+      providerStreamError = error;
+      throw error;
+    } finally {
+      await appendModelCallClosedRunEvent(runningTask, {
+        type: "call_model_stream",
+        status: completedProviderStream ? "completed" : "failed",
+        summary: completedProviderStream ? getModelCallCompletedSummary("call_model_stream") : getModelCallFailedSummary("call_model_stream"),
+        progressPercent: completedProviderStream ? 86 : 96,
+        detailJson: completedProviderStream ? {
+          provider: providerDiagnostics.provider,
+          model: completedProviderStream.result.model,
+          visionAttachments: providerAttachments.length,
+          tokenUsage: completedProviderStream.result.tokenUsage
+        } : getModelCallFailureDetailJson(providerStreamError)
+      });
+    }
+
+    const providerStream = completedProviderStream as Awaited<ReturnType<typeof runAiProviderStream>>;
     const latestAfterProvider = await repository.findAiTaskById(runningTask.id);
 
     if (!latestAfterProvider) {
@@ -852,7 +921,7 @@ async function runAiTaskStreaming(
 
     const completed = await withRepositoryTransaction(async () => {
       const transactionRepository = getRepository();
-      const credit = await confirmReservation(runningTask, requestId);
+      const billingSettlement = await settleAiTaskBilling(runningTask, requestId);
       const finishedAt = new Date().toISOString();
       const result = await transactionRepository.createAiTaskResult({
         taskId: runningTask.id,
@@ -898,7 +967,7 @@ async function runAiTaskStreaming(
       });
 
       return {
-        credit,
+        credit: billingSettlement.credit,
         result,
         task: updatedTask
       };
@@ -929,7 +998,7 @@ async function runAiTaskStreaming(
 
     const response = await buildAiTaskResponse(completed.task, {
       result: completed.result,
-      creditAccount: completed.credit.account,
+      creditAccount: completed.credit?.account,
       duplicated: false
     });
     const parsedResult = toResultResponse(completed.result);
@@ -1057,6 +1126,7 @@ export async function getAiTaskStatusForUser(userId: string, taskId: string, opt
   return {
     task: toTaskResponse(task, result),
     result: result ? toResultResponse(result) : null,
+    billing: await getBillingForTask(task),
     latestEvents: events.map(toRunEventResponse),
     latestEventSeq,
     conversation: conversation
@@ -1319,6 +1389,59 @@ export async function retryAiTaskForUser(userId: string, taskId: string, clientR
   );
 }
 
+async function getBillingForTask(task: Pick<AiTask, "userId" | "costPoints" | "createdAt">): Promise<AiTaskBilling> {
+  return getAiTaskBillingForUserAt({
+    userId: task.userId,
+    costPoints: task.costPoints,
+    at: task.createdAt
+  });
+}
+
+async function settleAiTaskBilling(task: AiTask, requestId: string) {
+  const billing = await getBillingForTask(task);
+
+  if (billing.waivedByMembership) {
+    return {
+      billing,
+      credit: null
+    };
+  }
+
+  return {
+    billing,
+    credit: await confirmReservation(task, requestId)
+  };
+}
+
+async function assertBetaVipTaskUsageAllowed(task: AiTask) {
+  const config = getBetaVipConfig();
+  const repository = getRepository();
+  const createdAtMs = new Date(task.createdAt).getTime();
+  const dailySince = getChinaDayStartIso(task.createdAt);
+  const minuteSince = new Date(createdAtMs - 60_000).toISOString();
+  const [dailyCount, minuteCount, activeCount] = await Promise.all([
+    repository.countAiTasksForUserSince(task.userId, dailySince),
+    repository.countAiTasksForUserSince(task.userId, minuteSince),
+    repository.countActiveAiTasksForUser(task.userId)
+  ]);
+
+  if (
+    dailyCount > config.dailyTaskLimit ||
+    minuteCount > config.minuteTaskLimit ||
+    activeCount > config.concurrentTaskLimit
+  ) {
+    throw new ApiError("BETA_VIP_RATE_LIMITED", BETA_VIP_RATE_LIMIT_MESSAGE, 429);
+  }
+}
+
+function getChinaDayStartIso(value: string) {
+  const dayMs = 24 * 60 * 60 * 1000;
+  const timestamp = new Date(value).getTime();
+  const chinaTimestamp = timestamp + CHINA_TIME_OFFSET_MS;
+
+  return new Date(Math.floor(chinaTimestamp / dayMs) * dayMs - CHINA_TIME_OFFSET_MS).toISOString();
+}
+
 function toTaskListItemResponse(task: AiTask) {
   return {
     id: task.id,
@@ -1498,13 +1621,7 @@ async function buildAiTaskResponse(
   const includeMessages = options.includeMessages ?? true;
   const includeEvents = options.includeEvents ?? true;
   const includeCreditAccount = options.includeCreditAccount ?? true;
-  const result = options.result === undefined
-    ? await measureAiPerf("build_task_response.find_result", {
-        taskId: task.id,
-        taskType: task.type,
-        label: options.perfLabel
-      }, () => getRepository().findAiTaskResult(task.id))
-    : options.result;
+  const result = options.result === undefined ? await getRepository().findAiTaskResult(task.id) : options.result;
   const conversation = includeConversation && task.conversationId
     ? await measureAiPerf("build_task_response.find_conversation", {
         taskId: task.id,
@@ -1548,10 +1665,16 @@ async function buildAiTaskResponse(
         label: options.perfLabel
       }, () => getCreditAccountForUser(task.userId))
     : undefined;
+  const billing = await measureAiPerf("build_task_response.billing", {
+    taskId: task.id,
+    taskType: task.type,
+    label: options.perfLabel
+  }, () => getBillingForTask(task));
 
   const response = {
     task: toTaskResponse(task, result),
     result: result ? toResultResponse(result) : null,
+    billing,
     creditAccount,
     duplicated: options.duplicated ?? false,
     conversation: conversation ? toConversationResponse(conversation) : null,
@@ -1930,6 +2053,58 @@ async function appendRunEvent(
     durationMs: getAiPerfNow() - startedAt
   });
   return event;
+}
+
+async function appendModelCallClosedRunEvent(
+  task: AiTask,
+  input: {
+    type: ModelCallRunEventType;
+    status: "completed" | "failed";
+    summary: string;
+    progressPercent: number;
+    detailJson: Record<string, unknown> | null;
+  }
+) {
+  try {
+    await appendRunEvent(task, {
+      type: input.type,
+      status: input.status,
+      title: getModelCallEventTitle(input.type),
+      summary: input.summary,
+      progressPercent: input.progressPercent,
+      detailJson: input.detailJson
+    });
+  } catch (error) {
+    console.warn("[ai-task] failed to append model call close event", {
+      taskId: task.id,
+      taskType: task.type,
+      eventType: input.type,
+      eventStatus: input.status,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+function getModelCallEventTitle(type: ModelCallRunEventType) {
+  return type === "call_model_stream" ? "Streaming model response" : "\u8c03\u7528 AI \u6a21\u578b";
+}
+
+function getModelCallCompletedSummary(type: ModelCallRunEventType) {
+  return type === "call_model_stream"
+    ? "Model thinking and final answer stream completed."
+    : "AI \u6a21\u578b\u5df2\u8fd4\u56de\u5b8c\u6574\u8f93\u51fa\u3002";
+}
+
+function getModelCallFailedSummary(type: ModelCallRunEventType) {
+  return type === "call_model_stream"
+    ? "Model streaming failed before completion."
+    : "AI \u6a21\u578b\u8c03\u7528\u5931\u8d25\u3002";
+}
+
+function getModelCallFailureDetailJson(error: unknown) {
+  return {
+    errorCode: error instanceof ApiError ? error.code : "MODEL_CALL_FAILED"
+  };
 }
 
 async function appendInputFileRunEvents(task: AiTask, inputFileName: string | null, createdAt: string) {
@@ -2388,6 +2563,7 @@ async function createAssistantMessageForTask(
       result: parsedResult
     }) || rawFinalAnswerMarkdown
     : rawFinalAnswerMarkdown;
+  const billing = await getBillingForTask(task);
 
   await repository.createAiMessage({
     conversationId: task.conversationId,
@@ -2401,6 +2577,7 @@ async function createAssistantMessageForTask(
       visibleThinking,
       finalAnswerMarkdown,
       parsedResult,
+      billing,
       visibleSteps: buildVisibleStepsForTask(task, "succeeded")
     },
     createdAt

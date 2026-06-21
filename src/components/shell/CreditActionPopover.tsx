@@ -1,19 +1,33 @@
 "use client";
 
-import { MaterialIcon } from "@/components/ui/MaterialIcon";
+import { CreditCard, FileText, Gift, LogOut } from "lucide-react";
 
 type CreditActionPopoverProps = {
+  betaVipActive?: boolean;
+  betaVipExpiryLabel?: string;
   onClose: () => void;
+  onOpenInvite: () => void;
   onOpenRecharge: () => void;
   onOpenStatement: () => void;
   onLogout: () => void;
   open: boolean;
 };
 
-export function CreditActionPopover({ onClose, onLogout, onOpenRecharge, onOpenStatement, open }: CreditActionPopoverProps) {
+export function CreditActionPopover({
+  betaVipActive = false,
+  betaVipExpiryLabel = "",
+  onClose,
+  onLogout,
+  onOpenInvite,
+  onOpenRecharge,
+  onOpenStatement,
+  open
+}: CreditActionPopoverProps) {
   if (!open) {
     return null;
   }
+
+  const vipExpiryText = betaVipExpiryLabel ? `会员${betaVipExpiryLabel}到期` : "会员6月28日到期";
 
   return (
     <>
@@ -27,14 +41,30 @@ export function CreditActionPopover({ onClose, onLogout, onOpenRecharge, onOpenS
         className="absolute bottom-[calc(100%+12px)] left-0 z-40 w-full overflow-hidden rounded-xl border border-outline-variant bg-paper p-xs shadow-modal"
         role="menu"
       >
+        {betaVipActive ? (
+          <div className="lq-credit-vip-panel" role="status">
+            <p className="lq-credit-vip-title">内测VIP生效中</p>
+            <p>{vipExpiryText}</p>
+            <p>会员期内使用不消耗积分</p>
+          </div>
+        ) : null}
         <button
           className="flex w-full items-center gap-sm rounded-lg px-sm py-sm text-left text-body-emphasis text-primary transition-colors hover:bg-primary-soft"
           onClick={onOpenRecharge}
           role="menuitem"
           type="button"
         >
-          <MaterialIcon size={20}>add_card</MaterialIcon>
+          <CreditCard aria-hidden="true" size={20} strokeWidth={1.8} />
           充值积分
+        </button>
+        <button
+          className="flex w-full items-center gap-sm rounded-lg px-sm py-sm text-left text-body-emphasis text-secondary transition-colors hover:bg-surface-container-low hover:text-primary"
+          onClick={onOpenInvite}
+          role="menuitem"
+          type="button"
+        >
+          <Gift aria-hidden="true" size={20} strokeWidth={1.8} />
+          邀请好友
         </button>
         <button
           className="flex w-full items-center gap-sm rounded-lg px-sm py-sm text-left text-body-emphasis text-secondary transition-colors hover:bg-surface-container-low hover:text-primary"
@@ -42,16 +72,17 @@ export function CreditActionPopover({ onClose, onLogout, onOpenRecharge, onOpenS
           role="menuitem"
           type="button"
         >
-          <MaterialIcon size={20}>receipt_long</MaterialIcon>
+          <FileText aria-hidden="true" size={20} strokeWidth={1.8} />
           积分流水
         </button>
+        <div className="lq-credit-menu-divider" aria-hidden="true" />
         <button
           className="flex w-full items-center gap-sm rounded-lg px-sm py-sm text-left text-body-emphasis text-secondary transition-colors hover:bg-surface-container-low hover:text-primary"
           onClick={onLogout}
           role="menuitem"
           type="button"
         >
-          <MaterialIcon size={20}>logout</MaterialIcon>
+          <LogOut aria-hidden="true" size={20} strokeWidth={1.8} />
           退出登录
         </button>
       </div>

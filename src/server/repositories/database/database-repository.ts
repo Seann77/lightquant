@@ -17,7 +17,8 @@ import type {
   SmsCodeRecord,
   UploadedFile,
   User,
-  UserLegalConsent
+  UserLegalConsent,
+  UserMembership
 } from "@/server/domain";
 import { ApiError } from "@/server/http/api-response";
 import { measureAiPerf } from "@/server/ai/ai-perf";
@@ -49,6 +50,7 @@ import type {
   CreateUserInput,
   LedgerPage,
   LightQuantRepository,
+  UpsertUserMembershipInput,
   UpdateAiConversationInput,
   UpdateAiTaskInput
 } from "@/server/repositories/types";
@@ -234,6 +236,59 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
     });
 
     return toUser(user);
+  }
+
+  async findActiveMembershipForUser(userId: string, type: UserMembership["type"], at: string) {
+    const membership = await this.db.userMembership.findFirst({
+      where: {
+        userId,
+        type,
+        status: "active",
+        startsAt: {
+          lte: toDate(at)
+        },
+        endsAt: {
+          gte: toDate(at)
+        }
+      },
+      orderBy: {
+        endsAt: "desc"
+      }
+    });
+
+    return membership ? toUserMembership(membership) : null;
+  }
+
+  async upsertUserMembership(input: UpsertUserMembershipInput) {
+    const membership = await this.db.userMembership.upsert({
+      where: {
+        userId_type_sourceType_sourceId: {
+          userId: input.userId,
+          type: input.type,
+          sourceType: input.sourceType,
+          sourceId: input.sourceId
+        }
+      },
+      create: {
+        userId: input.userId,
+        type: input.type,
+        status: input.status,
+        startsAt: toDate(input.startsAt),
+        endsAt: toDate(input.endsAt),
+        sourceType: input.sourceType,
+        sourceId: input.sourceId,
+        createdAt: toDate(input.createdAt),
+        updatedAt: toDate(input.updatedAt)
+      },
+      update: {
+        status: input.status,
+        startsAt: toDate(input.startsAt),
+        endsAt: toDate(input.endsAt),
+        updatedAt: toDate(input.updatedAt)
+      }
+    });
+
+    return toUserMembership(membership);
   }
 
   async getCreditAccount(userId: string) {
@@ -668,6 +723,28 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
     }));
 
     return task ? toAiTask(task) : null;
+  }
+
+  async countAiTasksForUserSince(userId: string, since: string) {
+    return this.db.aiTask.count({
+      where: {
+        userId,
+        createdAt: {
+          gte: toDate(since)
+        }
+      }
+    });
+  }
+
+  async countActiveAiTasksForUser(userId: string) {
+    return this.db.aiTask.count({
+      where: {
+        userId,
+        status: {
+          in: ["PENDING", "RUNNING"]
+        }
+      }
+    });
   }
 
   async createAiTask(input: CreateAiTaskInput) {
@@ -1728,6 +1805,32 @@ function toUserLegalConsent(consent: {
     requestIp: consent.requestIp,
     userAgent: consent.userAgent,
     source: consent.source
+  };
+}
+
+function toUserMembership(membership: {
+  id: string;
+  userId: string;
+  type: UserMembership["type"];
+  status: UserMembership["status"];
+  startsAt: Date;
+  endsAt: Date;
+  sourceType: string;
+  sourceId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}): UserMembership {
+  return {
+    id: membership.id,
+    userId: membership.userId,
+    type: membership.type,
+    status: membership.status,
+    startsAt: toIso(membership.startsAt),
+    endsAt: toIso(membership.endsAt),
+    sourceType: membership.sourceType,
+    sourceId: membership.sourceId,
+    createdAt: toIso(membership.createdAt),
+    updatedAt: toIso(membership.updatedAt)
   };
 }
 

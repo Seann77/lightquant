@@ -69,6 +69,14 @@ export type AiTaskData = {
     riskWarnings: string[];
     reportJson: Record<string, unknown> | null;
   } | null;
+  billing: {
+    nominalCostPoints: number;
+    chargedPoints: number;
+    waivedByMembership: boolean;
+    membershipType: "beta_vip" | null;
+    membershipLabel: "内测VIP" | null;
+    membershipEndsAt: string | null;
+  };
   visibleThinking?: string | null;
   finalAnswerMarkdown?: string | null;
   parsedResult?: AiTaskData["result"] | null;
@@ -158,6 +166,7 @@ export type AiConversationMessagesData = {
 export type AiTaskStatusData = {
   task: AiTaskData["task"];
   result: AiTaskData["result"] | null;
+  billing?: AiTaskData["billing"];
   latestEvents?: AiRunEventData[];
   latestEventSeq?: number;
   conversation?: Pick<AiConversationData, "id" | "mode"> | null;

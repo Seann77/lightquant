@@ -21,6 +21,7 @@ import type {
   CreditLedgerType,
   CreditReservation,
   CreditReservationStatus,
+  MembershipType,
   OrderStatus,
   Pagination,
   PayChannel,
@@ -36,7 +37,8 @@ import type {
   UploadedFileParseStatus,
   UploadedFileScanStatus,
   User,
-  UserLegalConsent
+  UserLegalConsent,
+  UserMembership
 } from "@/server/domain";
 
 export type PaymentActionType = "mock" | "redirect" | "qr_code";
@@ -97,6 +99,18 @@ export type CreateUserLegalConsentInput = {
   requestIp: string | null;
   userAgent: string | null;
   source: string;
+};
+
+export type UpsertUserMembershipInput = {
+  userId: string;
+  type: UserMembership["type"];
+  status: UserMembership["status"];
+  startsAt: string;
+  endsAt: string;
+  sourceType: string;
+  sourceId: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type ApplyCreditLedgerInput = {
@@ -411,6 +425,8 @@ export interface LightQuantRepository {
   createUser(input: CreateUserInput): Promise<User>;
   createUserLegalConsent(input: CreateUserLegalConsentInput): Promise<UserLegalConsent>;
   updateUserLastLogin(userId: string, lastLoginAt: string): Promise<User>;
+  findActiveMembershipForUser(userId: string, type: MembershipType, at: string): Promise<UserMembership | null>;
+  upsertUserMembership(input: UpsertUserMembershipInput): Promise<UserMembership>;
   getCreditAccount(userId: string): Promise<CreditAccount | null>;
   ensureCreditAccount(userId: string, now: string): Promise<CreditAccount>;
   applyCreditLedger(input: ApplyCreditLedgerInput): Promise<AppliedCreditLedger>;
@@ -429,6 +445,8 @@ export interface LightQuantRepository {
   createPaymentTransaction(input: CreatePaymentTransactionInput): Promise<PaymentTransaction>;
   findAiTaskById(id: string): Promise<AiTask | null>;
   findAiTaskByClientRequestId(userId: string, clientRequestId: string): Promise<AiTask | null>;
+  countAiTasksForUserSince(userId: string, since: string): Promise<number>;
+  countActiveAiTasksForUser(userId: string): Promise<number>;
   createAiTask(input: CreateAiTaskInput): Promise<AiTask>;
   updateAiTask(taskId: string, input: UpdateAiTaskInput): Promise<AiTask>;
   createAiTaskResult(input: CreateAiTaskResultInput): Promise<AiTaskResult>;

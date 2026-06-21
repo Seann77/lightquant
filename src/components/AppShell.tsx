@@ -6,6 +6,7 @@ import { flushSync } from "react-dom";
 import { useCallback, useEffect, useRef, useState, type ReactNode, type UIEvent } from "react";
 import { Code2, LoaderCircle, Menu, MessageCircle, Repeat2, Sparkles, UserRoundPlus } from "lucide-react";
 import { CreditActionPopover } from "@/components/shell/CreditActionPopover";
+import { InviteFriendModal } from "@/components/shell/InviteFriendModal";
 import { Logo } from "@/components/shell/Logo";
 import { LoginModal } from "@/components/shell/LoginModal";
 import { RechargeModal } from "@/components/shell/RechargeModal";
@@ -47,6 +48,20 @@ type CurrentUserData = {
     totalSpent: number;
     version: number;
     updatedAt: string;
+  };
+  membership?: {
+    betaVip?: {
+      active: boolean;
+      startsAt: string | null;
+      endsAt: string | null;
+      label: string;
+    };
+  } | null;
+  inviteReward?: {
+    granted: boolean;
+    inviterUserId: string | null;
+    points: number;
+    duplicated: boolean;
   };
 };
 
@@ -131,12 +146,17 @@ export function AppShell({ children, initialCurrentUser = null }: AppShellProps)
   const [currentUser, setCurrentUser] = useState<CurrentUserData | null>(() => initialCurrentUser);
   const [creditActionsOpen, setCreditActionsOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(() => searchParams.get("login") === "1");
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [rechargeOpen, setRechargeOpen] = useState(false);
   const [wechatOpen, setWechatOpen] = useState(false);
   const mode = searchParams.get("mode");
+  const inviteCodeFromUrl = searchParams.get("inviteCode") ?? searchParams.get("invite") ?? "";
   const isAdminPath = pathname.startsWith("/admin");
   const isLoggedIn = Boolean(currentUser);
   const userPoints = currentUser?.creditAccount.balance ?? 0;
+  const betaVip = currentUser?.membership?.betaVip;
+  const betaVipActive = betaVip?.active === true;
+  const betaVipExpiryLabel = betaVip?.endsAt ? formatBetaVipExpiry(betaVip.endsAt) : "";
   const currentUserId = currentUser?.user.id ?? null;
   const [recentConversations, setRecentConversations] = useState<RecentConversation[]>([]);
   const [recentNextCursor, setRecentNextCursor] = useState<string | null>(null);
@@ -149,6 +169,12 @@ export function AppShell({ children, initialCurrentUser = null }: AppShellProps)
   const pendingRecentConversationRef = useRef<PendingRecentConversation | null>(null);
   const currentConversationIdFromUrl = searchParams.get("conversationId");
   const activeRecentConversationId = pendingRecentConversation?.id ?? currentConversationIdFromUrl;
+
+  useEffect(() => {
+    if (searchParams.get("login") === "1") {
+      setLoginOpen(true);
+    }
+  }, [searchParams]);
 
   const clearRecentSwitchResetTimer = useCallback(() => {
     if (recentSwitchResetTimerRef.current === null) {
@@ -348,6 +374,7 @@ export function AppShell({ children, initialCurrentUser = null }: AppShellProps)
   function handleLoginSuccess(data: CurrentUserData) {
     setCurrentUser(data);
     setCreditActionsOpen(false);
+    setInviteOpen(false);
     setLoginOpen(false);
     setRechargeOpen(false);
   }
@@ -362,12 +389,18 @@ export function AppShell({ children, initialCurrentUser = null }: AppShellProps)
     router.push("/credits");
   }
 
+  function handleOpenInviteFromMenu() {
+    setCreditActionsOpen(false);
+    setInviteOpen(true);
+  }
+
   async function handleLogout() {
     await fetch("/api/v1/auth/logout", {
       method: "POST"
     });
     setCurrentUser(null);
     setCreditActionsOpen(false);
+    setInviteOpen(false);
     setRechargeOpen(false);
   }
 
@@ -510,22 +543,32 @@ export function AppShell({ children, initialCurrentUser = null }: AppShellProps)
 
         <div className="lq-login-area">
           <CreditActionPopover
+            betaVipActive={betaVipActive}
+            betaVipExpiryLabel={betaVipExpiryLabel}
             onClose={() => setCreditActionsOpen(false)}
             onLogout={handleLogout}
+            onOpenInvite={handleOpenInviteFromMenu}
             onOpenRecharge={handleOpenRechargeFromMenu}
             onOpenStatement={handleOpenStatement}
             open={creditActionsOpen}
           />
           <button
             aria-label={isLoggedIn ? "打开积分操作菜单" : "打开登录注册弹窗"}
-            className="lq-login-card"
+            className={`lq-login-card ${betaVipActive ? "is-vip" : ""}`.trim()}
             onClick={handleCreditStatusClick}
             type="button"
           >
-            <span className="lq-login-icon">
-              <UserRoundPlus aria-hidden="true" size={21} strokeWidth={1.8} />
+            <span className="lq-login-avatar-shell">
+              {betaVipActive ? (
+                <span className="lq-vip-badge" title={betaVipExpiryLabel ? `内测VIP · ${betaVipExpiryLabel}到期` : "内测VIP"}>
+                  内测VIP
+                </span>
+              ) : null}
+              <span className="lq-login-icon">
+                <UserRoundPlus aria-hidden="true" size={21} strokeWidth={1.8} />
+              </span>
             </span>
-            <span>
+            <span className="lq-login-content">
               <p className="lq-login-title">{currentUser?.user.displayName ?? "未登录"}</p>
               <p className="lq-login-subtitle">{isLoggedIn ? `积分余额 ${userPoints.toLocaleString("zh-CN")}` : "登录后查看积分"}</p>
             </span>
@@ -563,7 +606,8 @@ export function AppShell({ children, initialCurrentUser = null }: AppShellProps)
         </main>
       </div>
 
-      <LoginModal onClose={() => setLoginOpen(false)} onLoginSuccess={handleLoginSuccess} open={loginOpen} />
+      <LoginModal initialInviteCode={inviteCodeFromUrl} onClose={() => setLoginOpen(false)} onLoginSuccess={handleLoginSuccess} open={loginOpen} />
+      <InviteFriendModal inviteCode={currentUser?.user.inviteCode} onClose={() => setInviteOpen(false)} open={inviteOpen && isLoggedIn} />
       <RechargeModal onClose={() => setRechargeOpen(false)} onRechargeSuccess={refreshCurrentUser} open={rechargeOpen} points={userPoints} />
       <WechatQrModal onClose={() => setWechatOpen(false)} open={wechatOpen} />
     </div>
@@ -601,6 +645,16 @@ function mergeRecentConversations(current: RecentConversation[], incoming: Recen
   }
 
   return merged;
+}
+
+function formatBetaVipExpiry(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return `${date.getMonth() + 1}月${date.getDate()}日`;
 }
 
 function RecentConversationIcon({ conversation }: { conversation: RecentConversation }) {

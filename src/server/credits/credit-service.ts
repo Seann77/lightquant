@@ -3,7 +3,8 @@ import { ApiError } from "@/server/http/api-response";
 import { getAiPerfNow, logAiPerf, measureAiPerf } from "@/server/ai/ai-perf";
 import { getRepository } from "@/server/repositories";
 
-const SIGNUP_BONUS_POINTS = 500;
+const SIGNUP_BONUS_POINTS = 300;
+export const INVITE_BONUS_POINTS = 200;
 
 export type CreditLedgerResponseItem = {
   id: string;
@@ -37,7 +38,26 @@ export async function ensureSignupBonus(userId: string, requestId: string) {
     sourceType: "auth",
     sourceId: userId,
     idempotencyKey: `signup_bonus:${userId}`,
-    remark: "新用户注册赠送 500 基础积分",
+    remark: "新用户注册赠送 300 基础积分",
+    createdAt: now
+  });
+}
+
+export async function applyInviteBonus(input: { inviterUserId: string; newUserId: string; requestId: string }) {
+  const now = new Date().toISOString();
+  const repository = getRepository();
+
+  return repository.applyCreditLedger({
+    userId: input.inviterUserId,
+    requestId: input.requestId,
+    scene: "invite_bonus",
+    type: "bonus",
+    direction: "in",
+    amount: INVITE_BONUS_POINTS,
+    sourceType: "invite",
+    sourceId: input.newUserId,
+    idempotencyKey: `invite_bonus:${input.newUserId}`,
+    remark: "推荐新用户注册奖励 200 积分",
     createdAt: now
   });
 }
@@ -244,6 +264,14 @@ function toCreditLedgerResponseItem(ledger: CreditLedger): CreditLedgerResponseI
 }
 
 function categoryForLedger(ledger: CreditLedger) {
+  if (ledger.scene === "signup_bonus") {
+    return "注册赠送";
+  }
+
+  if (ledger.scene === "invite_bonus") {
+    return "邀请奖励";
+  }
+
   if (ledger.direction === "in" && ledger.type === "refund") {
     return "退回";
   }
@@ -257,7 +285,11 @@ function categoryForLedger(ledger: CreditLedger) {
 
 function titleForLedger(ledger: CreditLedger) {
   if (ledger.scene === "signup_bonus") {
-    return "新用户注册赠送";
+    return "新用户注册赠送 300 基础积分";
+  }
+
+  if (ledger.scene === "invite_bonus") {
+    return "推荐新用户注册奖励";
   }
 
   if (ledger.scene === "recharge") {

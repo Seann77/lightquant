@@ -30,9 +30,11 @@ const CODE_ANALYSIS_REPORT_TITLES = {
 } as const;
 
 export function StrategyResultView({
+  billing,
   result,
   task
 }: {
+  billing?: AiTaskData["billing"] | null;
   result: NonNullable<AiTaskData["result"]>;
   task: AiTaskData["task"] | null;
 }) {
@@ -42,7 +44,7 @@ export function StrategyResultView({
     <div className="lq-assistant-answer">
       <div className="lq-answer-head">
         <h2>{outOfScope ? "模块范围提示" : "策略生成结果"}</h2>
-        {task ? <span className="lq-cost-tag">已扣除 {task.costPoints} 积分</span> : null}
+        {task ? <BillingCostTag billing={billing} task={task} /> : null}
       </div>
       {result.explanation ? <RichTextWithCodeBlocks content={result.explanation} textClassName="lq-answer-text" /> : null}
       {result.generatedCode ? <CopyableCodeBlock code={result.generatedCode} /> : null}
@@ -65,12 +67,24 @@ export function StrategyResultCard({ data }: { data: AiTaskData }) {
     <div className="lq-result-card">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2>{outOfScope ? "模块范围提示" : "策略生成结果"}</h2>
-        <span className="lq-cost-tag">已扣除 {data.task.costPoints} 积分</span>
+        <BillingCostTag billing={data.billing} task={data.task} />
       </div>
       {result.explanation ? <RichTextWithCodeBlocks content={result.explanation} textClassName="m-0 text-sm leading-7 text-[#5b6472]" /> : null}
       {result.generatedCode ? <CopyableCodeBlock code={result.generatedCode} /> : null}
       <p className="lq-answer-footnote">结果仅供研究和回测参考，实盘前请自行验证。</p>
     </div>
+  );
+}
+
+function BillingCostTag({ billing, task }: { billing?: AiTaskData["billing"] | null; task: AiTaskData["task"] }) {
+  const nominalCostPoints = billing?.nominalCostPoints ?? task.costPoints;
+  const chargedPoints = billing?.chargedPoints ?? task.costPoints;
+  const waivedByMembership = billing?.waivedByMembership === true;
+
+  return (
+    <span className={`lq-cost-tag ${waivedByMembership ? "is-waived" : ""}`.trim()}>
+      {waivedByMembership ? `内测VIP免扣 ${nominalCostPoints} 积分` : `已扣除 ${chargedPoints} 积分`}
+    </span>
   );
 }
 

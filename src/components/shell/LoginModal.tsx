@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useState, type FormEvent } from "react";
-import { ArrowRight, CircleDollarSign, Gift, LockKeyhole, Phone, Ticket, X } from "lucide-react";
+import { ArrowRight, CircleDollarSign, Gift, LockKeyhole, Phone, X } from "lucide-react";
 
 type CurrentUserData = {
   user: {
@@ -20,6 +20,20 @@ type CurrentUserData = {
     totalSpent: number;
     version: number;
     updatedAt: string;
+  };
+  membership?: {
+    betaVip?: {
+      active: boolean;
+      startsAt: string | null;
+      endsAt: string | null;
+      label: string;
+    };
+  } | null;
+  inviteReward?: {
+    granted: boolean;
+    inviterUserId: string | null;
+    points: number;
+    duplicated: boolean;
   };
 };
 
@@ -39,12 +53,13 @@ type ApiResponse<T> =
     };
 
 type LoginModalProps = {
+  initialInviteCode?: string | null;
   open: boolean;
   onClose: () => void;
   onLoginSuccess: (data: CurrentUserData) => void;
 };
 
-export function LoginModal({ onClose, onLoginSuccess, open }: LoginModalProps) {
+export function LoginModal({ initialInviteCode, onClose, onLoginSuccess, open }: LoginModalProps) {
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [inviteCode, setInviteCode] = useState("");
@@ -57,10 +72,16 @@ export function LoginModal({ onClose, onLoginSuccess, open }: LoginModalProps) {
 
   useEffect(() => {
     if (open) {
+      const urlInviteCode = normalizeInviteCode(initialInviteCode || readInviteCodeFromLocation());
+
+      if (urlInviteCode) {
+        setInviteCode(urlInviteCode);
+      }
+
       setAcceptedLegal(false);
       setLegalError("");
     }
-  }, [open]);
+  }, [initialInviteCode, open]);
 
   if (!open) {
     return null;
@@ -119,7 +140,7 @@ export function LoginModal({ onClose, onLoginSuccess, open }: LoginModalProps) {
         body: JSON.stringify({
           phone,
           code,
-          inviteCode: inviteCode.trim() || undefined,
+          inviteCode: normalizeInviteCode(inviteCode) || undefined,
           acceptedLegal
         })
       });
@@ -159,7 +180,7 @@ export function LoginModal({ onClose, onLoginSuccess, open }: LoginModalProps) {
           </h2>
           <p className="lq-modal-subtitle">
             <CircleDollarSign aria-hidden="true" size={14} />
-            注册即送 500 基础积分
+            注册即送 300 基础积分
           </p>
         </div>
 
@@ -210,8 +231,8 @@ export function LoginModal({ onClose, onLoginSuccess, open }: LoginModalProps) {
                 autoComplete="off"
                 id="login-invite"
                 name="invite"
-                onChange={(event) => setInviteCode(event.target.value)}
-                placeholder="请输入邀请码"
+                onChange={(event) => setInviteCode(normalizeInviteCode(event.target.value))}
+                placeholder="填写好友邀请码，TA 可获得 200 积分"
                 type="text"
                 value={inviteCode}
               />
@@ -254,13 +275,21 @@ export function LoginModal({ onClose, onLoginSuccess, open }: LoginModalProps) {
           </button>
         </form>
 
-        <div className="lq-bonus-card">
-          <span>注册即送 500 基础积分，可用于策略生成与代码转换。</span>
-          <span className="lq-coin">
-            <Ticket aria-hidden="true" size={18} />
-          </span>
-        </div>
       </section>
     </div>
   );
+}
+
+function normalizeInviteCode(value: string) {
+  return value.trim().toUpperCase();
+}
+
+function readInviteCodeFromLocation() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const params = new URLSearchParams(window.location.search);
+
+  return params.get("inviteCode") ?? params.get("invite") ?? "";
 }

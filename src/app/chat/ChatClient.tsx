@@ -94,6 +94,7 @@ type StrategyJob = {
   finishedAt?: string;
   task?: AiTaskData["task"];
   result?: AiTaskData["result"];
+  billing?: AiTaskData["billing"];
   request?: StrategyJobRequest;
   events?: AiRunEventData[];
 };
@@ -523,6 +524,7 @@ function StrategyModeContent() {
     const nextJob = createStrategyJobFromTask(data.task, {
       conversationId: responseConversationId,
       result: data.result,
+      billing: data.billing,
       events: data.events,
       previous: previousJob,
       request: options.request ?? previousJob?.request,
@@ -581,7 +583,9 @@ function StrategyModeContent() {
     }
 
     if (shouldUpdateVisibleConversation && data.messages?.length) {
-      const serverMessages = data.messages.map(toStrategyMessage);
+      const serverMessages = data.messages
+        .map(toStrategyMessage)
+        .map((message) => withStrategyMessageBilling(message, data));
       setMessages(serverMessages);
       return;
     }
@@ -599,7 +603,8 @@ function StrategyModeContent() {
             content: result.explanation || "已完成策略生成。",
             contentJson: {
               task: data.task,
-              result
+              result,
+              billing: data.billing
             },
             createdAt: data.task.finishedAt ?? new Date().toISOString()
           })
@@ -1592,6 +1597,7 @@ function StrategyMessageBubble({ elapsedSeconds, message }: { elapsedSeconds?: n
     finalAnswerMarkdown: streamContent.finalAnswerMarkdown,
     result
   }) || streamContent.finalAnswerMarkdown;
+  const billingTag = getBillingTag(getMessageBilling(message), task);
 
   return (
     <div className="lq-assistant-row">
@@ -1600,6 +1606,8 @@ function StrategyMessageBubble({ elapsedSeconds, message }: { elapsedSeconds?: n
           <StrategyFailureMessage message={failureMessage} title={task?.status === "CANCELLED" ? "任务已取消" : "生成失败"} />
         ) : finalAnswerMarkdown || streamContent.visibleThinking || result ? (
           <AssistantThinkingMessage
+            billingLabel={billingTag?.label}
+            billingWaived={billingTag?.waived}
             error={null}
             finalAnswerMarkdown={finalAnswerMarkdown}
             status={thinkingStatus}
@@ -1644,6 +1652,7 @@ function StrategyJobBubble({
   const visibleThinking = job.visibleThinking?.trim() ?? "";
   const visibleError = failed || canceled ? job.error ?? null : null;
   const runningFallback = isJobActive(job) && !visibleThinking && !finalAnswerMarkdown.trim() && !visibleError ? "正在同步任务状态..." : "";
+  const billingTag = getBillingTag(job.billing, job.task);
 
   if (failed || canceled) {
     return (
@@ -1665,6 +1674,8 @@ function StrategyJobBubble({
     <div className="lq-assistant-row">
       <div className="lq-assistant-message">
         <AssistantThinkingMessage
+          billingLabel={billingTag?.label}
+          billingWaived={billingTag?.waived}
           error={null}
           finalAnswerMarkdown={finalAnswerMarkdown}
           status={thinkingStatus}
@@ -1787,6 +1798,7 @@ function createStrategyJobFromTask(
   input: {
     conversationId: string;
     result?: AiTaskData["result"];
+    billing?: AiTaskData["billing"];
     events?: AiRunEventData[];
     previous?: StrategyJob;
     request?: StrategyJobRequest;
@@ -1820,6 +1832,7 @@ function createStrategyJobFromTask(
     finishedAt: task.finishedAt ?? input.previous?.finishedAt ?? undefined,
     task,
     result: input.result ?? input.previous?.result,
+    billing: input.billing ?? input.previous?.billing,
     request: input.request ?? input.previous?.request,
     events: input.events ?? task.events ?? input.previous?.events
   };
@@ -2006,6 +2019,65 @@ function getMessageResult(message: StrategyChatMessage): AiTaskData["result"] | 
     migrationNotes: typeof result.migrationNotes === "string" ? result.migrationNotes : null,
     riskWarnings: readStringArray(result.riskWarnings),
     reportJson: readRecord(result.reportJson),
+  };
+}
+
+function withStrategyMessageBilling(message: StrategyChatMessage, data: AiTaskData): StrategyChatMessage {
+  if (message.role !== "assistant" || message.taskId !== data.task.id) {
+    return message;
+  }
+
+  const contentJson = readRecord(message.contentJson) ?? {};
+
+  if (contentJson.billing) {
+    return message;
+  }
+
+  return {
+    ...message,
+    contentJson: {
+      ...contentJson,
+      task: contentJson.task ?? data.task,
+      result: contentJson.result ?? data.result,
+      billing: data.billing
+    }
+  };
+}
+
+function getMessageBilling(message: StrategyChatMessage): AiTaskData["billing"] | null {
+  const contentJson = readRecord(message.contentJson);
+  const billing = readRecord(contentJson?.billing);
+  const task = getMessageTask(message);
+
+  if (!billing || !task) {
+    return null;
+  }
+
+  const waivedByMembership = billing.waivedByMembership === true;
+  const membershipType = billing.membershipType === "beta_vip" ? "beta_vip" : null;
+
+  return {
+    nominalCostPoints: typeof billing.nominalCostPoints === "number" ? billing.nominalCostPoints : task.costPoints,
+    chargedPoints: typeof billing.chargedPoints === "number" ? billing.chargedPoints : waivedByMembership ? 0 : task.costPoints,
+    waivedByMembership,
+    membershipType,
+    membershipLabel: membershipType ? "内测VIP" : null,
+    membershipEndsAt: readNullableString(billing.membershipEndsAt)
+  };
+}
+
+function getBillingTag(billing: AiTaskData["billing"] | null | undefined, task: AiTaskData["task"] | null | undefined) {
+  if (!billing || !task) {
+    return null;
+  }
+
+  const nominalCostPoints = billing.nominalCostPoints ?? task.costPoints;
+  const chargedPoints = billing.chargedPoints ?? task.costPoints;
+  const waived = billing.waivedByMembership === true;
+
+  return {
+    label: waived ? `内测VIP免扣 ${nominalCostPoints} 积分` : `已扣除 ${chargedPoints} 积分`,
+    waived
   };
 }
 

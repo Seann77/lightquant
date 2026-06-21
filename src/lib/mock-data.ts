@@ -72,8 +72,8 @@ export const creditTransactions = [
     time: "2026-05-24 09:30",
     description: "注册成功后获得基础积分",
     category: "获取",
-    amount: 500,
-    balance: 500,
+    amount: 300,
+    balance: 300,
     status: "已完成"
   },
   {
@@ -158,7 +158,7 @@ export const moreItems = [
     title: "积分规则",
     variant: "points",
     rules: [
-      { icon: "add_circle", label: "新用户注册：", text: "赠送 500 基础积分。" },
+      { icon: "add_circle", label: "新用户注册：", text: "赠送 300 基础积分。" },
       { icon: "remove_circle", label: "策略生成：", text: "每次成功生成消耗 10 积分。" },
       { icon: "remove_circle", label: "代码转换：", text: "每次语言转换（如 Python 至 C++）消耗 5 积分。" }
     ]

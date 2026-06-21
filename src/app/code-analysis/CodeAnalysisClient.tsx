@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   BarChart3,
@@ -65,6 +65,21 @@ export function CodeAnalysisClient() {
 
   const activeAnalysisConversationId = data?.conversation?.id ?? data?.task.conversationId ?? conversationIdFromUrl;
 
+  const resetAnalysisLocalState = useCallback(() => {
+    setInputCode("");
+    setInputSource("manual");
+    setData(null);
+    setStreamState(createEmptyThinkingState());
+    setActiveTab(codeAnalysisTabs[0]);
+    setLoading(false);
+    setError("");
+    setUploadedFile(null);
+    setUploading(false);
+    setUploadError("");
+    pollingAnalysisTaskIdRef.current = null;
+    streamingAnalysisTaskIdRef.current = null;
+  }, []);
+
   useWorkbenchConversationRestore({
     conversationId: conversationIdFromUrl,
     expectedMode: "analysis",
@@ -102,6 +117,14 @@ export function CodeAnalysisClient() {
       setError(getFriendlyError(historyError));
     }
   });
+
+  useEffect(() => {
+    if (conversationIdFromUrl) {
+      return;
+    }
+
+    resetAnalysisLocalState();
+  }, [conversationIdFromUrl, resetAnalysisLocalState]);
 
   useEffect(() => {
     persistConversationActiveTab(activeAnalysisConversationId, activeTab, "analysis");
@@ -358,18 +381,7 @@ export function CodeAnalysisClient() {
           <div className="lq-analysis-actions">
             <button
               className="lq-secondary-btn"
-              onClick={() => {
-                setInputCode("");
-                setInputSource("manual");
-                setData(null);
-                setStreamState(createEmptyThinkingState());
-                setError("");
-                setUploadedFile(null);
-                setUploadError("");
-                setLoading(false);
-                pollingAnalysisTaskIdRef.current = null;
-                streamingAnalysisTaskIdRef.current = null;
-              }}
+              onClick={resetAnalysisLocalState}
               type="button"
             >
               <Trash2 aria-hidden="true" size={17} />

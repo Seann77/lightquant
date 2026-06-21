@@ -50,6 +50,10 @@ export async function withRepositoryTransaction<T>(callback: () => Promise<T>) {
 function isRepositoryShapeCurrent(repository: LightQuantRepository) {
   return (
     typeof repository.listLatestAiTasksForConversations === "function" &&
-    typeof repository.listUploadedFilesByIds === "function"
+    typeof repository.listUploadedFilesByIds === "function" &&
+    typeof repository.findActiveMembershipForUser === "function" &&
+    typeof repository.upsertUserMembership === "function" &&
+    typeof repository.countAiTasksForUserSince === "function" &&
+    typeof repository.countActiveAiTasksForUser === "function"
   );
 }

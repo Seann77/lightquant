@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, CalendarDays, DollarSign, FileText, Filter, LineChart } from "lucide-react";
+import { ArrowDown, ArrowUp, BadgeCheck, CalendarDays, DollarSign, FileText, Filter, LineChart } from "lucide-react";
 import { creditFilters } from "@/lib/mock-data";
 
 type ApiResponse<T> =
@@ -44,6 +44,17 @@ type LedgerData = {
   pageSize: number;
   total: number;
   totalPages: number;
+};
+
+type CurrentUserProfile = {
+  membership?: {
+    betaVip?: {
+      active: boolean;
+      startsAt: string | null;
+      endsAt: string | null;
+      label: string;
+    };
+  } | null;
 };
 
 type ReturnedPaymentStatus = {
@@ -103,6 +114,7 @@ export function CreditsClient() {
   const [ledger, setLedger] = useState<LedgerData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [betaVipActive, setBetaVipActive] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [paymentReturnNotice, setPaymentReturnNotice] = useState<PaymentReturnNotice | null>(null);
 
@@ -118,8 +130,10 @@ export function CreditsClient() {
           fetch("/api/v1/credits/account", { cache: "no-store" }),
           fetch("/api/v1/credits/ledger?page=1&pageSize=20", { cache: "no-store" })
         ]);
+        const profileResponse = await fetch("/api/v1/me", { cache: "no-store" }).catch(() => null);
         const accountPayload = (await accountResponse.json()) as ApiResponse<{ account: CreditAccount }>;
         const ledgerPayload = (await ledgerResponse.json()) as ApiResponse<LedgerData>;
+        const profilePayload = profileResponse ? ((await profileResponse.json().catch(() => null)) as ApiResponse<CurrentUserProfile> | null) : null;
 
         if (!accountPayload.success) {
           throw new Error(accountPayload.error.message);
@@ -132,11 +146,13 @@ export function CreditsClient() {
         if (!cancelled) {
           setAccount(accountPayload.data.account);
           setLedger(ledgerPayload.data);
+          setBetaVipActive(profilePayload?.success === true && profilePayload.data.membership?.betaVip?.active === true);
         }
       } catch (loadError) {
         if (!cancelled) {
           setAccount(null);
           setLedger(null);
+          setBetaVipActive(false);
           setError(loadError instanceof Error ? loadError.message : "积分数据加载失败");
         }
       } finally {
@@ -306,6 +322,13 @@ export function CreditsClient() {
           );
         })}
       </section>
+
+      {betaVipActive ? (
+        <div className="lq-vip-inline-notice" role="status">
+          <BadgeCheck aria-hidden="true" size={16} />
+          内测VIP期内使用不消耗积分
+        </div>
+      ) : null}
 
       <section className="lq-ledger-panel">
         <div className="lq-ledger-tools">

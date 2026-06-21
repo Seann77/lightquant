@@ -456,6 +456,7 @@ function normalizeAiTaskStatusData(data: AiTaskStatusData): AiTaskData {
   return {
     task: data.task,
     result: data.result ?? null,
+    billing: data.billing ?? createDefaultBilling(data.task),
     conversation: data.conversation
       ? {
           id: data.conversation.id,
@@ -503,6 +504,7 @@ function getLatestTaskDataFromSnapshot(data: AiConversationMessagesData, taskTyp
   return {
     task,
     result: data.latestResult ?? data.result ?? null,
+    billing: createDefaultBilling(task),
     conversation: data.conversation,
     messages: data.messages
   };
@@ -575,6 +577,7 @@ export function getLatestTaskDataFromMessages(messages: AiMessageData[], taskTyp
     return {
       task,
       result: readAiTaskResult(contentJson?.result),
+      billing: readAiTaskBilling(contentJson?.billing, task),
       visibleThinking: readNullableString(contentJson?.visibleThinking),
       finalAnswerMarkdown: readNullableString(contentJson?.finalAnswerMarkdown),
       parsedResult: readAiTaskResult(contentJson?.parsedResult),
@@ -594,6 +597,7 @@ export function getLatestTaskDataFromTasks(tasks: AiTaskData["task"][], taskType
       return {
         task,
         result: null,
+        billing: createDefaultBilling(task),
         conversation,
         messages: []
       };
@@ -841,6 +845,37 @@ export function readTaskSnapshot(value: unknown): AiTaskData["task"] | null {
     createdAt: readNullableString(task.createdAt),
     updatedAt: readNullableString(task.updatedAt),
     progress: readRecord(task.progress)
+  };
+}
+
+function readAiTaskBilling(value: unknown, task: AiTaskData["task"]): AiTaskData["billing"] {
+  const billing = readRecord(value);
+
+  if (!billing) {
+    return createDefaultBilling(task);
+  }
+
+  const waivedByMembership = billing.waivedByMembership === true;
+  const membershipType = billing.membershipType === "beta_vip" ? "beta_vip" : null;
+
+  return {
+    nominalCostPoints: typeof billing.nominalCostPoints === "number" ? billing.nominalCostPoints : task.costPoints,
+    chargedPoints: typeof billing.chargedPoints === "number" ? billing.chargedPoints : waivedByMembership ? 0 : task.costPoints,
+    waivedByMembership,
+    membershipType,
+    membershipLabel: membershipType ? "内测VIP" : null,
+    membershipEndsAt: readNullableString(billing.membershipEndsAt)
+  };
+}
+
+function createDefaultBilling(task: AiTaskData["task"]): AiTaskData["billing"] {
+  return {
+    nominalCostPoints: task.costPoints,
+    chargedPoints: task.costPoints,
+    waivedByMembership: false,
+    membershipType: null,
+    membershipLabel: null,
+    membershipEndsAt: null
   };
 }
 

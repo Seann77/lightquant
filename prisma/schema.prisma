@@ -12,6 +12,14 @@ enum UserStatus {
   disabled
 }
 
+enum MembershipType {
+  beta_vip
+}
+
+enum MembershipStatus {
+  active
+}
+
 enum SmsScene {
   login
 }
@@ -154,8 +162,28 @@ model User {
   aiRunEvents        AiRunEvent[]
   uploadedFiles      UploadedFile[]
   legalConsents      UserLegalConsent[]
+  memberships        UserMembership[]
 
   @@map("users")
+}
+
+model UserMembership {
+  id         String           @id @default(uuid()) @db.Uuid
+  userId     String           @map("user_id") @db.Uuid
+  type       MembershipType
+  status     MembershipStatus @default(active)
+  startsAt   DateTime         @map("starts_at") @db.Timestamptz(3)
+  endsAt     DateTime         @map("ends_at") @db.Timestamptz(3)
+  sourceType String           @map("source_type") @db.VarChar(80)
+  sourceId   String           @map("source_id") @db.VarChar(120)
+  createdAt  DateTime         @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime         @map("updated_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type, sourceType, sourceId])
+  @@index([userId, type, status, startsAt, endsAt])
+  @@map("user_memberships")
 }
 
 model UserLegalConsent {

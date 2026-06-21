@@ -57,11 +57,16 @@ export async function POST(request: NextRequest) {
   }
 
   const encoder = new TextEncoder();
+  let streamClosed = false;
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const streamStartedAt = getAiPerfNow();
       let firstEmitLogged = false;
       const emit = (event: ClientStreamEvent) => {
+        if (streamClosed) {
+          return;
+        }
+
         if (!firstEmitLogged) {
           logAiPerf("tasks.stream.first_emit", {
             requestId,
@@ -82,8 +87,18 @@ export async function POST(request: NextRequest) {
           });
         }
 
-        controller.enqueue(encoder.encode(`event: ${event.type}\n`));
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+        try {
+          controller.enqueue(encoder.encode(`event: ${event.type}\n`));
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+        } catch (error) {
+          streamClosed = true;
+          logAiPerf("tasks.stream.emit_closed", {
+            requestId,
+            eventType: event.type,
+            durationMs: getAiPerfNow() - streamStartedAt,
+            totalDurationMs: getAiPerfNow() - routeStartedAt
+          });
+        }
       };
 
       try {
@@ -97,18 +112,26 @@ export async function POST(request: NextRequest) {
           durationMs: getAiPerfNow() - streamStartedAt,
           totalDurationMs: getAiPerfNow() - routeStartedAt
         });
-        emit({
-          type: "error",
-          error: normalizeStreamError(error)
-        });
+        if (!streamClosed) {
+          emit({
+            type: "error",
+            error: normalizeStreamError(error)
+          });
+        }
       } finally {
         logAiPerf("tasks.stream.close", {
           requestId,
           durationMs: getAiPerfNow() - streamStartedAt,
           totalDurationMs: getAiPerfNow() - routeStartedAt
         });
-        controller.close();
+        if (!streamClosed) {
+          streamClosed = true;
+          controller.close();
+        }
       }
+    },
+    cancel() {
+      streamClosed = true;
     }
   });
 

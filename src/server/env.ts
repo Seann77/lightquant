@@ -3,7 +3,7 @@ export class ServerConfigError extends Error {}
 export type DataMode = "mock" | "database";
 export type PaymentMode = "mock" | "wechat" | "alipay";
 export type AiProviderMode = "mock" | "deepseek" | "openai_compatible";
-export type SmsProviderMode = "mock" | "aliyun";
+export type SmsProviderMode = "mock" | "aliyun" | "tencent";
 
 export function getDataMode(): DataMode {
   const mode = process.env.LIGHTQUANT_DATA_MODE ?? (process.env.NODE_ENV === "production" ? "database" : "mock");
@@ -29,6 +29,20 @@ export function getAuthSecret() {
   return secret;
 }
 
+export function getBetaVipConfig() {
+  return {
+    enabled: getBoolean(process.env.BETA_VIP_ENABLED, true),
+    registrationDeadline: getIsoDateString(
+      process.env.BETA_VIP_REGISTRATION_DEADLINE,
+      "BETA_VIP_REGISTRATION_DEADLINE",
+      "2026-06-28T15:59:59.999Z"
+    ),
+    dailyTaskLimit: getPositiveInteger(process.env.BETA_VIP_DAILY_TASK_LIMIT, 200),
+    minuteTaskLimit: getPositiveInteger(process.env.BETA_VIP_MINUTE_TASK_LIMIT, 5),
+    concurrentTaskLimit: getPositiveInteger(process.env.BETA_VIP_CONCURRENT_TASK_LIMIT, 2)
+  };
+}
+
 export function getDatabaseUrl() {
   const databaseUrl = process.env.DATABASE_URL;
 
@@ -43,8 +57,8 @@ export function getSmsProviderMode(): SmsProviderMode {
   const explicitMode = process.env.LIGHTQUANT_SMS_PROVIDER?.trim();
   const mode = explicitMode || (hasAliyunSmsCredentials() ? "aliyun" : "mock");
 
-  if (mode !== "mock" && mode !== "aliyun") {
-    throw new ServerConfigError("LIGHTQUANT_SMS_PROVIDER must be mock or aliyun");
+  if (mode !== "mock" && mode !== "aliyun" && mode !== "tencent") {
+    throw new ServerConfigError("LIGHTQUANT_SMS_PROVIDER must be mock, aliyun, or tencent");
   }
 
   if (process.env.NODE_ENV === "production" && mode === "mock" && process.env.LIGHTQUANT_ALLOW_MOCK_SMS_IN_PRODUCTION !== "true") {
@@ -81,8 +95,43 @@ export function getAliyunSmsConfig() {
   };
 }
 
+export function getTencentSmsConfig() {
+  const secretId = process.env.TENCENTCLOUD_SECRET_ID?.trim();
+  const secretKey = process.env.TENCENTCLOUD_SECRET_KEY?.trim();
+  const smsSdkAppId = process.env.TENCENT_SMS_SDK_APP_ID?.trim();
+  const signName = process.env.TENCENT_SMS_SIGN_NAME?.trim();
+  const templateId = process.env.TENCENT_SMS_TEMPLATE_ID?.trim();
+
+  if (!secretId || !secretKey || !smsSdkAppId || !signName || !templateId) {
+    throw new ServerConfigError("Tencent SMS requires TENCENTCLOUD_SECRET_ID, TENCENTCLOUD_SECRET_KEY, TENCENT_SMS_SDK_APP_ID, TENCENT_SMS_SIGN_NAME, and TENCENT_SMS_TEMPLATE_ID");
+  }
+
+  return {
+    secretId,
+    secretKey,
+    smsSdkAppId,
+    signName,
+    templateId,
+    region: process.env.TENCENT_SMS_REGION?.trim() || "ap-guangzhou",
+    endpoint: process.env.TENCENT_SMS_ENDPOINT?.trim() || "sms.tencentcloudapi.com",
+    countryCode: process.env.TENCENT_SMS_COUNTRY_CODE?.trim() || "86",
+    validTimeSeconds: getPositiveInteger(process.env.TENCENT_SMS_VALID_TIME, 300),
+    codeLength: getBoundedInteger(process.env.TENCENT_SMS_CODE_LENGTH, 6, 4, 8),
+    templateParamKeys: getTencentTemplateParamKeys()
+  };
+}
+
 function hasAliyunSmsCredentials() {
   return Boolean(process.env.ALIBABA_CLOUD_ACCESS_KEY_ID?.trim() && process.env.ALIBABA_CLOUD_ACCESS_KEY_SECRET?.trim());
+}
+
+function getTencentTemplateParamKeys() {
+  const keys = (process.env.TENCENT_SMS_TEMPLATE_PARAM_KEYS || "code,minutes")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return keys.length > 0 ? keys : ["code", "minutes"];
 }
 
 function getPositiveInteger(raw: string | undefined, fallback: number) {
@@ -95,6 +144,35 @@ function getBoundedInteger(raw: string | undefined, fallback: number, min: numbe
   const value = getPositiveInteger(raw, fallback);
 
   return Math.min(max, Math.max(min, value));
+}
+
+function getBoolean(raw: string | undefined, fallback: boolean) {
+  const normalized = raw?.trim().toLowerCase();
+
+  if (!normalized) {
+    return fallback;
+  }
+
+  if (["true", "1", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+
+  if (["false", "0", "no", "off"].includes(normalized)) {
+    return false;
+  }
+
+  return fallback;
+}
+
+function getIsoDateString(raw: string | undefined, name: string, fallback: string) {
+  const value = raw?.trim() || fallback;
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    throw new ServerConfigError(`${name} must be a valid ISO datetime`);
+  }
+
+  return parsed.toISOString();
 }
 
 export function getPaymentMode(): PaymentMode {

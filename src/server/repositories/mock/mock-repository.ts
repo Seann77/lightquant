@@ -16,7 +16,8 @@ import type {
   SmsCodeRecord,
   UploadedFile,
   User,
-  UserLegalConsent
+  UserLegalConsent,
+  UserMembership
 } from "@/server/domain";
 import { ApiError } from "@/server/http/api-response";
 import { getOrderExpiresAt, isOrderExpired } from "@/server/payments/payment-config";
@@ -46,6 +47,7 @@ import type {
   CreateUserInput,
   LedgerPage,
   LightQuantRepository,
+  UpsertUserMembershipInput,
   UpdateAiConversationInput,
   UpdateAiTaskInput
 } from "@/server/repositories/types";
@@ -100,6 +102,8 @@ export class MockLightQuantRepository implements LightQuantRepository {
   private readonly usersByInviteCode = new Map<string, string>();
   private readonly legalConsents = new Map<string, UserLegalConsent>();
   private readonly legalConsentsByVersion = new Map<string, string>();
+  private readonly userMemberships = new Map<string, UserMembership>();
+  private readonly userMembershipsBySource = new Map<string, string>();
   private readonly smsCodes = new Map<string, SmsCodeRecord>();
   private readonly creditAccounts = new Map<string, CreditAccount>();
   private readonly creditLedger = new Map<string, CreditLedger>();
@@ -222,6 +226,47 @@ export class MockLightQuantRepository implements LightQuantRepository {
 
     this.users.set(userId, updated);
     return updated;
+  }
+
+  async findActiveMembershipForUser(userId: string, type: UserMembership["type"], at: string) {
+    return [...this.userMemberships.values()]
+      .filter((membership) =>
+        membership.userId === userId &&
+        membership.type === type &&
+        membership.status === "active" &&
+        membership.startsAt <= at &&
+        membership.endsAt >= at
+      )
+      .sort((left, right) => right.endsAt.localeCompare(left.endsAt))[0] ?? null;
+  }
+
+  async upsertUserMembership(input: UpsertUserMembershipInput) {
+    const key = userMembershipSourceKey(input.userId, input.type, input.sourceType, input.sourceId);
+    const existingId = this.userMembershipsBySource.get(key);
+    const existing = existingId ? this.userMemberships.get(existingId) : null;
+
+    if (existing) {
+      const updated: UserMembership = {
+        ...existing,
+        status: input.status,
+        startsAt: input.startsAt,
+        endsAt: input.endsAt,
+        updatedAt: input.updatedAt
+      };
+
+      this.userMemberships.set(updated.id, updated);
+      return updated;
+    }
+
+    const membership: UserMembership = {
+      id: randomUUID(),
+      ...input
+    };
+
+    this.userMemberships.set(membership.id, membership);
+    this.userMembershipsBySource.set(key, membership.id);
+
+    return membership;
   }
 
   async getCreditAccount(userId: string) {
@@ -456,6 +501,16 @@ export class MockLightQuantRepository implements LightQuantRepository {
   async findAiTaskByClientRequestId(userId: string, clientRequestId: string) {
     const taskId = this.aiTasksByClientRequestId.get(clientRequestKey(userId, clientRequestId));
     return taskId ? this.findAiTaskById(taskId) : null;
+  }
+
+  async countAiTasksForUserSince(userId: string, since: string) {
+    return [...this.aiTasks.values()].filter((task) => task.userId === userId && task.createdAt >= since).length;
+  }
+
+  async countActiveAiTasksForUser(userId: string) {
+    return [...this.aiTasks.values()].filter((task) =>
+      task.userId === userId && (task.status === "PENDING" || task.status === "RUNNING")
+    ).length;
   }
 
   async createAiTask(input: CreateAiTaskInput) {
@@ -858,6 +913,13 @@ export class MockLightQuantRepository implements LightQuantRepository {
       return existing;
     }
 
+    const account = await this.ensureCreditAccount(input.userId, input.createdAt);
+    const activeReserved = await this.getActiveReservedAmount(input.userId);
+
+    if (account.balance - activeReserved < input.amount) {
+      throw new ApiError("INSUFFICIENT_CREDITS", "积分余额不足，请先充值", 402);
+    }
+
     const reservation: CreditReservation = {
       id: randomUUID(),
       ...input
@@ -900,6 +962,10 @@ function clientRequestKey(userId: string, clientRequestId: string) {
 
 function legalConsentKey(userId: string, agreementVersion: string, privacyVersion: string) {
   return `${userId}:${agreementVersion}:${privacyVersion}`;
+}
+
+function userMembershipSourceKey(userId: string, type: string, sourceType: string, sourceId: string) {
+  return `${userId}:${type}:${sourceType}:${sourceId}`;
 }
 
 function toAdminUserItem(user: User, creditAccounts: Map<string, CreditAccount>, creditLedger: Map<string, CreditLedger>): AdminUserPage["items"][number] {

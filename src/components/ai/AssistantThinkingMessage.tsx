@@ -14,6 +14,8 @@ type AssistantThinkingMessageProps = {
   className?: string;
   tone?: "light" | "dark";
   defaultThinkingExpanded?: boolean;
+  billingLabel?: string | null;
+  billingWaived?: boolean;
 };
 
 type ThinkingCollapseProps = {
@@ -25,6 +27,8 @@ type ThinkingCollapseProps = {
 type StreamProps = {
   text: string;
   streaming?: boolean;
+  billingLabel?: string | null;
+  billingWaived?: boolean;
 };
 
 type MarkdownBlock =
@@ -40,7 +44,9 @@ export function AssistantThinkingMessage({
   error,
   className = "",
   tone = "light",
-  defaultThinkingExpanded
+  defaultThinkingExpanded,
+  billingLabel,
+  billingWaived = false
 }: AssistantThinkingMessageProps) {
   const displayThinking = thinking.trim();
   const hasFinal = Boolean(finalAnswerMarkdown.trim());
@@ -58,7 +64,7 @@ export function AssistantThinkingMessage({
       <div className="lq-thinking-message-body">
         {displayThinking ? <ThinkingCollapse defaultExpanded={defaultThinkingExpanded} status={status} thinking={displayThinking} /> : null}
         {hasFinal ? (
-          <FinalAnswerStream streaming={status === "answering"} text={finalAnswerMarkdown} />
+          <FinalAnswerStream billingLabel={billingLabel} billingWaived={billingWaived} streaming={status === "answering"} text={finalAnswerMarkdown} />
         ) : null}
         {error ? <div className="lq-thinking-error">{error}</div> : null}
       </div>
@@ -113,12 +119,15 @@ export function ThinkingStream({ text }: StreamProps) {
   return <pre className="lq-thinking-stream">{text}</pre>;
 }
 
-export function FinalAnswerStream({ text, streaming = false }: StreamProps) {
+export function FinalAnswerStream({ text, streaming = false, billingLabel, billingWaived = false }: StreamProps) {
   return (
     <section className="lq-final-section">
       <div className="lq-final-title">
         <span>最终结果：</span>
         {streaming ? <em>正在输出</em> : null}
+        {billingLabel ? (
+          <span className={`lq-cost-tag ${billingWaived ? "is-waived" : ""}`.trim()}>{billingLabel}</span>
+        ) : null}
       </div>
       {text.trim() ? <StreamingMarkdownResult markdown={text} /> : <div className="lq-final-placeholder">等待最终答案...</div>}
     </section>

@@ -22,6 +22,22 @@ export type UserLegalConsent = {
   source: string;
 };
 
+export type MembershipType = "beta_vip";
+export type MembershipStatus = "active";
+
+export type UserMembership = {
+  id: string;
+  userId: string;
+  type: MembershipType;
+  status: MembershipStatus;
+  startsAt: string;
+  endsAt: string;
+  sourceType: string;
+  sourceId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type SmsScene = "login";
 
 export type SmsCodeRecord = {
