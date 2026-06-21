@@ -6,6 +6,7 @@ import { getRepository, withRepositoryTransaction } from "@/server/repositories"
 import { getAiTaskConfig, getTotalInputChars, parseAiTaskType } from "@/server/ai/ai-task-config";
 import { runAiProvider, runAiProviderStream } from "@/server/ai/ai-provider";
 import { getAiTaskProgress, setAiTaskProgress, type AiTaskProgressSnapshot, type AiTaskProgressUpdate } from "@/server/ai/ai-task-progress";
+import { getAiPerfNow, logAiPerf, measureAiPerf } from "@/server/ai/ai-perf";
 import { getAiModelName, getAiProviderMode, getAiSupportsVision, getAiTaskTimeoutMs } from "@/server/env";
 import { getUploadedImageDataUrl, inferUploadedFileKind } from "@/server/files/file-service";
 import type { AiProviderAttachment, AiProviderStreamDelta } from "@/server/ai/providers/types";
@@ -20,6 +21,11 @@ type CreateAiTaskRequest = {
   inputCode?: string;
   inputFileId?: string;
   clientRequestId: string;
+};
+
+type CreateAiTaskOptions = {
+  responseMode?: "full" | "stream_initial";
+  deferInitialRunEvents?: boolean;
 };
 
 type ListAiConversationsRequest = {
@@ -77,43 +83,96 @@ const MAX_TASK_EVENT_LIMIT = 200;
 const DEFAULT_TASK_STATUS_EVENT_LIMIT = 20;
 const TASK_RESPONSE_EVENT_LIMIT = 40;
 
-export async function createAiTask(userId: string, input: CreateAiTaskRequest, requestId: string) {
+export async function createAiTask(userId: string, input: CreateAiTaskRequest, requestId: string, options: CreateAiTaskOptions = {}) {
+  const totalStartedAt = getAiPerfNow();
   const type = normalizeTaskType(input.type);
   const clientRequestId = normalizeNonEmpty(input.clientRequestId, "clientRequestId");
   const normalized = normalizeTaskInput(type, input);
   const config = getAiTaskConfig(type);
   const repository = getRepository();
-  const existing = await repository.findAiTaskByClientRequestId(userId, clientRequestId);
+  const existing = await measureAiPerf("create_task.find_existing", {
+    requestId,
+    taskType: type
+  }, () => repository.findAiTaskByClientRequestId(userId, clientRequestId));
+
+  logAiPerf("create_task.start", {
+    requestId,
+    taskType: type,
+    hasConversation: Boolean(input.conversationId),
+    hasInputFile: Boolean(input.inputFileId),
+    inputChars: getTotalInputChars(normalized)
+  });
 
   if (existing) {
-    return buildAiTaskResponse(existing, {
+    const response = await measureAiPerf("create_task.build_existing_response", {
+      requestId,
+      taskId: existing.id,
+      taskType: existing.type
+    }, () => buildAiTaskResponse(existing, {
       duplicated: true
+    }));
+    logAiPerf("create_task.total", {
+      requestId,
+      taskId: existing.id,
+      taskType: existing.type,
+      duplicated: true,
+      durationMs: getAiPerfNow() - totalStartedAt
     });
+    return response;
   }
 
-  const resolvedInput = await resolveInputFile(userId, type, normalized);
-  const conversationDraft = await prepareConversationForTask(userId, type, normalizeOptionalText(input.conversationId));
+  const resolvedInput = await measureAiPerf("create_task.resolve_input_file", {
+    requestId,
+    taskType: type,
+    hasInputFile: Boolean(normalized.inputFileId)
+  }, () => resolveInputFile(userId, type, normalized));
+  const conversationDraft = await measureAiPerf("create_task.prepare_conversation", {
+    requestId,
+    taskType: type,
+    hasConversation: Boolean(input.conversationId)
+  }, () => prepareConversationForTask(userId, type, normalizeOptionalText(input.conversationId)));
 
-  assertInputWithinLimit(config, {
+  const limitInput = {
     ...resolvedInput,
     inputCode: appendContextForLimit(resolvedInput.inputCode, conversationDraft?.contextText)
+  };
+  const assertStartedAt = getAiPerfNow();
+  assertInputWithinLimit(config, {
+    ...limitInput
+  });
+  logAiPerf("create_task.assert_input", {
+    requestId,
+    taskType: type,
+    inputChars: getTotalInputChars(limitInput),
+    durationMs: getAiPerfNow() - assertStartedAt
   });
 
   try {
-    const task = await withRepositoryTransaction(async () => {
+    const task = await measureAiPerf("create_task.transaction", {
+      requestId,
+      taskType: type
+    }, () => withRepositoryTransaction(async () => {
       const transactionRepository = getRepository();
       const now = new Date().toISOString();
       let conversation = conversationDraft?.conversation ?? null;
 
       if (conversation) {
-        conversation = await transactionRepository.updateAiConversation(conversation.id, {
+        const conversationId = conversation.id;
+        conversation = await measureAiPerf("create_task.tx.update_conversation", {
+          requestId,
+          taskType: type,
+          conversationId
+        }, () => transactionRepository.updateAiConversation(conversationId, {
           targetPlatform: resolvedInput.targetPlatform,
           sourcePlatform: resolvedInput.sourcePlatform,
           lastMessageAt: now,
           updatedAt: now
-        });
+        }));
       } else {
-        conversation = await transactionRepository.createAiConversation({
+        conversation = await measureAiPerf("create_task.tx.create_conversation", {
+          requestId,
+          taskType: type
+        }, () => transactionRepository.createAiConversation({
           userId,
           mode: getConversationModeForTaskType(type),
           title: createConversationTitle(type, resolvedInput),
@@ -123,10 +182,14 @@ export async function createAiTask(userId: string, input: CreateAiTaskRequest, r
           lastMessageAt: now,
           createdAt: now,
           updatedAt: now
-        });
+        }));
       }
 
-      const createdTask = await transactionRepository.createAiTask({
+      const createdTask = await measureAiPerf("create_task.tx.create_task", {
+        requestId,
+        taskType: type,
+        conversationId: conversation?.id ?? null
+      }, () => transactionRepository.createAiTask({
         userId,
         conversationId: conversation?.id ?? null,
         type,
@@ -146,14 +209,19 @@ export async function createAiTask(userId: string, input: CreateAiTaskRequest, r
         finishedAt: null,
         createdAt: now,
         updatedAt: now
-      });
+      }));
 
       if (createdTask.requestId !== requestId) {
         return createdTask;
       }
 
       if (conversation) {
-        const userMessage = await transactionRepository.createAiMessage({
+        const userMessage = await measureAiPerf("create_task.tx.create_user_message", {
+          requestId,
+          taskId: createdTask.id,
+          taskType: type,
+          conversationId: conversation.id
+        }, () => transactionRepository.createAiMessage({
           conversationId: conversation.id,
           userId,
           role: "user",
@@ -170,45 +238,93 @@ export async function createAiTask(userId: string, input: CreateAiTaskRequest, r
             clientRequestId
           },
           createdAt: now
-        });
+        }));
 
         if (resolvedInput.inputFileId) {
-          await transactionRepository.createAiMessageAttachment({
+          const inputFileId = resolvedInput.inputFileId;
+          const conversationId = conversation.id;
+          await measureAiPerf("create_task.tx.create_attachment", {
+            requestId,
+            taskId: createdTask.id,
+            taskType: type,
+            messageId: userMessage.id
+          }, () => transactionRepository.createAiMessageAttachment({
             messageId: userMessage.id,
-            conversationId: conversation.id,
+            conversationId,
             userId,
-            fileId: resolvedInput.inputFileId,
+            fileId: inputFileId,
             role: "input",
             displayOrder: 0,
             caption: resolvedInput.inputFileName,
             createdAt: now
-          });
+          }));
         }
       }
 
-      await appendRunEvent(createdTask, {
+      if (!options.deferInitialRunEvents) {
+        await measureAiPerf("create_task.tx.append_queued_event", {
+        requestId,
+        taskId: createdTask.id,
+        taskType: type
+      }, () => appendRunEvent(createdTask, {
         type: "queued",
         status: "completed",
         title: "任务已提交",
         summary: "LightQuant 已接收任务，等待后台执行。",
         progressPercent: 2,
         createdAt: now
-      });
-      await appendInputFileRunEvents(createdTask, resolvedInput.inputFileName ?? null, now);
+      }));
+      await measureAiPerf("create_task.tx.append_input_file_events", {
+        requestId,
+        taskId: createdTask.id,
+        taskType: type,
+        hasInputFile: Boolean(createdTask.inputFileId)
+      }, () => appendInputFileRunEvents(createdTask, resolvedInput.inputFileName ?? null, now));
+      }
 
-      await reserveCredits({
+      await measureAiPerf("create_task.tx.reserve_credits", {
+        requestId,
+        taskId: createdTask.id,
+        taskType: type,
+        costPoints: createdTask.costPoints
+      }, () => reserveCredits({
         userId,
         taskId: createdTask.id,
         amount: createdTask.costPoints
-      });
+      }));
 
       return createdTask;
-    });
+    }));
 
-    return buildAiTaskResponse(task, {
-      duplicated: task.requestId !== requestId
+    const useStreamInitialResponse = options.responseMode === "stream_initial" && task.requestId === requestId;
+    const response = await measureAiPerf("create_task.build_response", {
+      requestId,
+      taskId: task.id,
+      taskType: task.type,
+      responseMode: useStreamInitialResponse ? "stream_initial" : "full"
+    }, () => buildAiTaskResponse(task, {
+      duplicated: task.requestId !== requestId,
+      result: useStreamInitialResponse ? null : undefined,
+      includeConversation: useStreamInitialResponse ? false : undefined,
+      includeMessages: useStreamInitialResponse ? false : undefined,
+      includeEvents: useStreamInitialResponse ? false : undefined,
+      includeCreditAccount: useStreamInitialResponse ? false : undefined,
+      perfLabel: useStreamInitialResponse ? "stream_initial" : undefined
+    }));
+    logAiPerf("create_task.total", {
+      requestId,
+      taskId: task.id,
+      taskType: task.type,
+      duplicated: task.requestId !== requestId,
+      durationMs: getAiPerfNow() - totalStartedAt
     });
+    return response;
   } catch (error) {
+    logAiPerf("create_task.failed", {
+      requestId,
+      taskType: type,
+      durationMs: getAiPerfNow() - totalStartedAt
+    });
     throw normalizeTaskError(error);
   }
 }
@@ -237,14 +353,20 @@ export async function runAiTask(taskId: string, requestId: string) {
 
   try {
     const now = new Date().toISOString();
+    const taskToRun = task;
 
-    task = await repository.updateAiTask(task.id, {
+    task = await measureAiPerf("run_task.update_running", {
+      requestId,
+      taskId: taskToRun.id,
+      taskType: taskToRun.type,
+      shouldRestartRunningTask
+    }, () => repository.updateAiTask(taskToRun.id, {
       status: "RUNNING",
-      startedAt: shouldRestartRunningTask ? now : task.startedAt ?? now,
+      startedAt: shouldRestartRunningTask ? now : taskToRun.startedAt ?? now,
       errorCode: null,
       errorMessage: null,
       updatedAt: now
-    });
+    }));
     const runningProviderTask = task;
 
     logAiTaskStatus(runningProviderTask, "RUNNING", {
@@ -506,16 +628,37 @@ export async function createAndStreamAiTask(
   requestId: string,
   emit: (event: AiTaskStreamEvent) => void | Promise<void>
 ) {
-  const created = await createAiTask(userId, input, requestId);
-  await emit({
-    type: "task",
-    data: created
+  const startedAt = getAiPerfNow();
+  const created = await measureAiPerf("stream_task.create_task", {
+    requestId,
+    taskType: input.type
+  }, () => createAiTask(userId, input, requestId, {
+    responseMode: "stream_initial",
+    deferInitialRunEvents: true
+  }));
+  await measureAiPerf("stream_task.emit_initial_task", {
+    requestId,
+    taskId: created.task.id,
+    taskType: created.task.type,
+    taskStatus: created.task.status
+  }, async () => {
+    await emit({
+      type: "task",
+      data: created
+    });
   });
 
   if (created.result || created.task.status === "SUCCEEDED" || created.task.status === "FAILED" || created.task.status === "CANCELLED") {
     await emit({
       type: "done",
       data: created
+    });
+    logAiPerf("stream_task.total", {
+      requestId,
+      taskId: created.task.id,
+      taskType: created.task.type,
+      taskStatus: created.task.status,
+      durationMs: getAiPerfNow() - startedAt
     });
     return created;
   }
@@ -524,7 +667,15 @@ export async function createAndStreamAiTask(
     throw new ApiError("IDEMPOTENCY_CONFLICT", "同一请求正在处理中，请等待当前任务完成。", 409);
   }
 
-  return runAiTaskStreaming(created.task.id, requestId, emit);
+  const response = await runAiTaskStreaming(created.task.id, requestId, emit);
+  logAiPerf("stream_task.total", {
+    requestId,
+    taskId: created.task.id,
+    taskType: created.task.type,
+    taskStatus: response.task.status,
+    durationMs: getAiPerfNow() - startedAt
+  });
+  return response;
 }
 
 async function runAiTaskStreaming(
@@ -532,8 +683,12 @@ async function runAiTaskStreaming(
   requestId: string,
   emit: (event: AiTaskStreamEvent) => void | Promise<void>
 ) {
+  const startedAt = getAiPerfNow();
   const repository = getRepository();
-  let task = await repository.findAiTaskById(taskId);
+  let task = await measureAiPerf("run_stream.find_task", {
+    requestId,
+    taskId
+  }, () => repository.findAiTaskById(taskId));
 
   if (!task) {
     throw new ApiError("NOT_FOUND", "AI 任务不存在", 404);
@@ -558,31 +713,81 @@ async function runAiTaskStreaming(
 
   try {
     const now = new Date().toISOString();
+    const taskToRun = task;
 
-    task = await repository.updateAiTask(task.id, {
+    task = await measureAiPerf("run_stream.update_running", {
+      requestId,
+      taskId: taskToRun.id,
+      taskType: taskToRun.type,
+      shouldRestartRunningTask
+    }, () => repository.updateAiTask(taskToRun.id, {
       status: "RUNNING",
-      startedAt: shouldRestartRunningTask ? now : task.startedAt ?? now,
+      startedAt: shouldRestartRunningTask ? now : taskToRun.startedAt ?? now,
       errorCode: null,
       errorMessage: null,
       updatedAt: now
-    });
+    }));
     const runningTask = task;
 
     logAiTaskStatus(runningTask, "RUNNING", {
       requestId
     });
-    await recordAiTaskProgress(runningTask, {
+    const runningResponse = await measureAiPerf("run_stream.build_running_response", {
+      requestId,
+      taskId: runningTask.id,
+      taskType: runningTask.type,
+      responseMode: "stream_running"
+    }, () => buildAiTaskResponse(runningTask, {
+      result: null,
+      includeConversation: false,
+      includeMessages: false,
+      includeEvents: false,
+      includeCreditAccount: false,
+      perfLabel: "stream_running"
+    }));
+    await measureAiPerf("run_stream.emit_running_task", {
+      requestId,
+      taskId: runningTask.id,
+      taskType: runningTask.type,
+      durationBeforeEmitMs: getAiPerfNow() - startedAt
+    }, async () => {
+      await emit({
+        type: "task",
+        data: runningResponse
+      });
+    });
+    await measureAiPerf("run_stream.record_progress", {
+      requestId,
+      taskId: runningTask.id,
+      taskType: runningTask.type,
+      phase: "processing"
+    }, () => recordAiTaskProgress(runningTask, {
       phase: "processing",
       progressPercent: 35,
       statusMessage: "正在思考并生成结果。"
-    });
+    }));
 
     const taskConfig = getAiTaskConfig(runningTask.type);
-    const conversationContext = await buildProviderConversationContext(runningTask, taskConfig.maxTotalInputChars);
-    const providerAttachments = await buildProviderAttachmentsForTask(runningTask);
+    const conversationContext = await measureAiPerf("run_stream.build_conversation_context", {
+      requestId,
+      taskId: runningTask.id,
+      taskType: runningTask.type,
+      hasConversation: Boolean(runningTask.conversationId)
+    }, () => buildProviderConversationContext(runningTask, taskConfig.maxTotalInputChars));
+    const providerAttachments = await measureAiPerf("run_stream.build_attachments", {
+      requestId,
+      taskId: runningTask.id,
+      taskType: runningTask.type,
+      hasInputFile: Boolean(runningTask.inputFileId)
+    }, () => buildProviderAttachmentsForTask(runningTask));
     const providerDiagnostics = getAiProviderDiagnostics();
 
-    await appendRunEvent(runningTask, {
+    await measureAiPerf("run_stream.append_call_model_event", {
+      requestId,
+      taskId: runningTask.id,
+      taskType: runningTask.type,
+      attachmentCount: providerAttachments.length
+    }, () => appendRunEvent(runningTask, {
       type: "call_model_stream",
       status: "running",
       title: "Streaming model response",
@@ -593,23 +798,26 @@ async function runAiTaskStreaming(
         model: providerDiagnostics.model,
         visionAttachments: providerAttachments.length
       }
-    });
+    }));
 
-    await emit({
-      type: "task",
-      data: await buildAiTaskResponse(runningTask, {
-        result: null
-      })
+    logAiPerf("run_stream.before_provider", {
+      requestId,
+      taskId: runningTask.id,
+      taskType: runningTask.type,
+      durationMs: getAiPerfNow() - startedAt
     });
-
-    const providerStream = await runAiProviderStream(
+    const providerStream = await measureAiPerf("run_stream.provider_stream", {
+      requestId,
+      taskId: runningTask.id,
+      taskType: runningTask.type
+    }, () => runAiProviderStream(
       runningTask,
       conversationContext,
       {
         onDelta: emit
       },
       providerAttachments
-    );
+    ));
     const latestAfterProvider = await repository.findAiTaskById(runningTask.id);
 
     if (!latestAfterProvider) {
@@ -1270,29 +1478,93 @@ async function buildAiTaskResponse(
     result?: AiTaskResult | null;
     creditAccount?: Awaited<ReturnType<typeof getCreditAccountForUser>>;
     duplicated?: boolean;
+    includeConversation?: boolean;
+    includeMessages?: boolean;
+    includeEvents?: boolean;
+    includeCreditAccount?: boolean;
+    perfLabel?: string;
   } = {}
 ) {
-  const result = options.result === undefined ? await getRepository().findAiTaskResult(task.id) : options.result;
-  const conversation = task.conversationId ? await getRepository().findAiConversationById(task.conversationId) : null;
-  const messages = conversation
-    ? await getRepository().listAiMessages(conversation.id, {
+  const startedAt = getAiPerfNow();
+  const includeConversation = options.includeConversation ?? true;
+  const includeMessages = options.includeMessages ?? true;
+  const includeEvents = options.includeEvents ?? true;
+  const includeCreditAccount = options.includeCreditAccount ?? true;
+  const result = options.result === undefined
+    ? await measureAiPerf("build_task_response.find_result", {
+        taskId: task.id,
+        taskType: task.type,
+        label: options.perfLabel
+      }, () => getRepository().findAiTaskResult(task.id))
+    : options.result;
+  const conversation = includeConversation && task.conversationId
+    ? await measureAiPerf("build_task_response.find_conversation", {
+        taskId: task.id,
+        taskType: task.type,
+        conversationId: task.conversationId,
+        label: options.perfLabel
+      }, () => getRepository().findAiConversationById(task.conversationId!))
+    : null;
+  const messages = includeMessages && conversation
+    ? await measureAiPerf("build_task_response.list_messages", {
+        taskId: task.id,
+        taskType: task.type,
+        conversationId: conversation.id,
+        label: options.perfLabel
+      }, () => getRepository().listAiMessages(conversation.id, {
         ascending: true
-      })
+      }))
     : [];
-  const attachmentsByMessageId = conversation ? await buildMessageAttachmentsByMessageId(task.userId, messages) : new Map<string, AiMessageAttachmentSummary[]>();
-  const events = await getRepository().listAiRunEvents(task.id, {
-    limit: TASK_RESPONSE_EVENT_LIMIT
-  });
+  const attachmentsByMessageId = includeMessages && conversation
+    ? await measureAiPerf("build_task_response.build_attachments", {
+        taskId: task.id,
+        taskType: task.type,
+        messageCount: messages.length,
+        label: options.perfLabel
+      }, () => buildMessageAttachmentsByMessageId(task.userId, messages))
+    : new Map<string, AiMessageAttachmentSummary[]>();
+  const events = includeEvents
+    ? await measureAiPerf("build_task_response.list_events", {
+        taskId: task.id,
+        taskType: task.type,
+        limit: TASK_RESPONSE_EVENT_LIMIT,
+        label: options.perfLabel
+      }, () => getRepository().listAiRunEvents(task.id, {
+        limit: TASK_RESPONSE_EVENT_LIMIT
+      }))
+    : [];
+  const creditAccount = includeCreditAccount
+    ? options.creditAccount ?? await measureAiPerf("build_task_response.credit_account", {
+        taskId: task.id,
+        taskType: task.type,
+        label: options.perfLabel
+      }, () => getCreditAccountForUser(task.userId))
+    : undefined;
 
-  return {
+  const response = {
     task: toTaskResponse(task, result),
     result: result ? toResultResponse(result) : null,
-    creditAccount: options.creditAccount ?? await getCreditAccountForUser(task.userId),
+    creditAccount,
     duplicated: options.duplicated ?? false,
     conversation: conversation ? toConversationResponse(conversation) : null,
     messages: messages.map((message) => toMessageResponse(message, attachmentsByMessageId.get(message.id) ?? [])),
     events: events.map(toRunEventResponse)
   };
+  logAiPerf("build_task_response.total", {
+    taskId: task.id,
+    taskType: task.type,
+    taskStatus: task.status,
+    label: options.perfLabel,
+    messageCount: messages.length,
+    eventCount: events.length,
+    includeConversation,
+    includeMessages,
+    includeEvents,
+    includeCreditAccount,
+    hasResult: Boolean(result),
+    durationMs: getAiPerfNow() - startedAt
+  });
+  return response;
 }
 
 async function buildMessageAttachmentsByMessageId(userId: string, messages: AiMessage[]) {
@@ -1608,6 +1880,7 @@ async function appendRunEvent(
     createdAt?: string;
   }
 ) {
+  const startedAt = getAiPerfNow();
   const repository = getRepository();
   const latest = await repository.findLatestAiRunEvent(task.id);
   const normalized = {
@@ -1622,16 +1895,33 @@ async function appendRunEvent(
   };
 
   if (latest && isDuplicateRunEvent(latest, normalized)) {
+    logAiPerf("append_run_event", {
+      taskId: task.id,
+      taskType: task.type,
+      eventType: input.type,
+      eventStatus: input.status,
+      duplicated: true,
+      durationMs: getAiPerfNow() - startedAt
+    });
     return latest;
   }
 
-  return repository.createAiRunEvent({
+  const event = await repository.createAiRunEvent({
     taskId: task.id,
     conversationId: task.conversationId,
     userId: task.userId,
     seq: (latest?.seq ?? 0) + 1,
     ...normalized
   });
+  logAiPerf("append_run_event", {
+    taskId: task.id,
+    taskType: task.type,
+    eventType: input.type,
+    eventStatus: input.status,
+    duplicated: false,
+    durationMs: getAiPerfNow() - startedAt
+  });
+  return event;
 }
 
 async function appendInputFileRunEvents(task: AiTask, inputFileName: string | null, createdAt: string) {
@@ -1702,6 +1992,7 @@ async function appendInputFileRunEvents(task: AiTask, inputFileName: string | nu
 }
 
 async function recordAiTaskProgress(task: AiTask, update: AiTaskProgressUpdate) {
+  const startedAt = getAiPerfNow();
   const snapshot = setAiTaskProgress(task, update);
   const event = progressToRunEvent(task, snapshot);
 
@@ -1709,6 +2000,14 @@ async function recordAiTaskProgress(task: AiTask, update: AiTaskProgressUpdate) 
     await appendRunEvent(task, event);
   }
 
+  logAiPerf("record_task_progress", {
+    taskId: task.id,
+    taskType: task.type,
+    phase: snapshot.phase,
+    progressPercent: snapshot.progressPercent,
+    wroteEvent: Boolean(event),
+    durationMs: getAiPerfNow() - startedAt
+  });
   return snapshot;
 }
 

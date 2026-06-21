@@ -41,7 +41,7 @@ try {
   );
 
   const upload = await uploadFile(
-    "run-events-strategy.py",
+    "run-events-strategy.txt",
     [
       "def initialize(context):",
       "    g.stock = '000001.XSHE'",
@@ -108,6 +108,7 @@ try {
 async function uploadFile(name, content) {
   const formData = new FormData();
   formData.append("file", new Blob([content], { type: "text/plain;charset=utf-8" }), name);
+  formData.append("purpose", "code_analysis");
 
   return request("POST", "/api/v1/files", formData);
 }

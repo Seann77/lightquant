@@ -1,5 +1,6 @@
 import type { AiTask, CreditAccount, CreditLedger, CreditReservation, Pagination, RechargeOrder } from "@/server/domain";
 import { ApiError } from "@/server/http/api-response";
+import { getAiPerfNow, logAiPerf, measureAiPerf } from "@/server/ai/ai-perf";
 import { getRepository } from "@/server/repositories";
 
 const SIGNUP_BONUS_POINTS = 500;
@@ -61,30 +62,19 @@ export async function applyRechargeCredit(order: RechargeOrder, requestId: strin
 }
 
 export async function reserveCredits(input: { userId: string; taskId: string; amount: number }) {
+  const startedAt = getAiPerfNow();
   if (!Number.isInteger(input.amount) || input.amount <= 0) {
     throw new ApiError("VALIDATION_ERROR", "积分预占金额不正确", 400);
   }
 
   const repository = getRepository();
   const idempotencyKey = `ai_task_reserve:${input.taskId}`;
-  const existing = await repository.findCreditReservationByIdempotencyKey(idempotencyKey);
-
-  if (existing) {
-    return {
-      reservation: existing,
-      duplicated: true
-    };
-  }
-
   const now = new Date().toISOString();
-  const account = await repository.ensureCreditAccount(input.userId, now);
-  const activeReservedAmount = await repository.getActiveReservedAmount(input.userId);
 
-  if (account.balance - activeReservedAmount < input.amount) {
-    throw new ApiError("INSUFFICIENT_CREDITS", "积分余额不足，请先充值", 402);
-  }
-
-  const reservation = await repository.createCreditReservation({
+  const reservation = await measureAiPerf("credits.reserve.create_reservation", {
+    taskId: input.taskId,
+    amount: input.amount
+  }, () => repository.createCreditReservation({
     userId: input.userId,
     taskId: input.taskId,
     amount: input.amount,
@@ -93,11 +83,18 @@ export async function reserveCredits(input: { userId: string; taskId: string; am
     expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
     createdAt: now,
     updatedAt: now
+  }));
+  const duplicated = reservation.createdAt !== now;
+  logAiPerf("credits.reserve.total", {
+    taskId: input.taskId,
+    amount: input.amount,
+    duplicated,
+    durationMs: getAiPerfNow() - startedAt
   });
 
   return {
     reservation,
-    duplicated: false
+    duplicated
   };
 }
 

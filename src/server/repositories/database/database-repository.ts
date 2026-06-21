@@ -20,6 +20,7 @@ import type {
   UserLegalConsent
 } from "@/server/domain";
 import { ApiError } from "@/server/http/api-response";
+import { measureAiPerf } from "@/server/ai/ai-perf";
 import { getOrderExpiresAt, isOrderExpired } from "@/server/payments/payment-config";
 import { getPrismaClient } from "@/server/repositories/database/prisma-client";
 import type {
@@ -246,20 +247,42 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
   }
 
   async ensureCreditAccount(userId: string, now: string) {
-    const account = await this.db.creditAccount.upsert({
+    const existing = await measureAiPerf("repository.credit_account.ensure.find_existing", {}, () => this.db.creditAccount.findUnique({
       where: {
         userId
-      },
-      create: {
+      }
+    }));
+
+    if (existing) {
+      return toCreditAccount(existing);
+    }
+
+    const account = await measureAiPerf("repository.credit_account.ensure.create", {}, () => this.db.creditAccount.create({
+      data: {
         userId,
         balance: 0,
         totalEarned: 0,
         totalSpent: 0,
         version: 0,
         updatedAt: toDate(now)
-      },
-      update: {}
-    });
+      }
+    }).catch(async (error) => {
+      if (!isUniqueConstraintError(error)) {
+        throw error;
+      }
+
+      const racedAccount = await this.db.creditAccount.findUnique({
+        where: {
+          userId
+        }
+      });
+
+      if (!racedAccount) {
+        throw error;
+      }
+
+      return racedAccount;
+    }));
 
     return toCreditAccount(account);
   }
@@ -623,31 +646,36 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
   }
 
   async findAiTaskById(id: string) {
-    const task = await this.db.aiTask.findUnique({
+    const task = await measureAiPerf("repository.ai_task.find_by_id", {
+      taskId: id
+    }, () => this.db.aiTask.findUnique({
       where: {
         id
       }
-    });
+    }));
 
     return task ? toAiTask(task) : null;
   }
 
   async findAiTaskByClientRequestId(userId: string, clientRequestId: string) {
-    const task = await this.db.aiTask.findUnique({
+    const task = await measureAiPerf("repository.ai_task.find_by_client_request", {}, () => this.db.aiTask.findUnique({
       where: {
         userId_clientRequestId: {
           userId,
           clientRequestId
         }
       }
-    });
+    }));
 
     return task ? toAiTask(task) : null;
   }
 
   async createAiTask(input: CreateAiTaskInput) {
     try {
-      const task = await this.db.aiTask.create({
+      const task = await measureAiPerf("repository.ai_task.create", {
+        taskType: input.type,
+        conversationId: input.conversationId
+      }, () => this.db.aiTask.create({
         data: {
           userId: input.userId,
           conversationId: input.conversationId,
@@ -669,7 +697,7 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
           createdAt: toDate(input.createdAt),
           updatedAt: toDate(input.updatedAt)
         }
-      });
+      }));
 
       return toAiTask(task);
     } catch (error) {
@@ -686,7 +714,10 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
   }
 
   async updateAiTask(taskId: string, input: UpdateAiTaskInput) {
-    const task = await this.db.aiTask.update({
+    const task = await measureAiPerf("repository.ai_task.update", {
+      taskId,
+      nextStatus: input.status
+    }, () => this.db.aiTask.update({
       where: {
         id: taskId
       },
@@ -699,7 +730,7 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
         finishedAt: input.finishedAt === undefined ? undefined : input.finishedAt ? toDate(input.finishedAt) : null,
         updatedAt: toDate(input.updatedAt)
       }
-    });
+    }));
 
     return toAiTask(task);
   }
@@ -729,11 +760,13 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
   }
 
   async findAiTaskResult(taskId: string) {
-    const result = await this.db.aiTaskResult.findUnique({
+    const result = await measureAiPerf("repository.ai_task_result.find_by_task", {
+      taskId
+    }, () => this.db.aiTaskResult.findUnique({
       where: {
         taskId
       }
-    });
+    }));
 
     return result ? toAiTaskResult(result) : null;
   }
@@ -817,17 +850,21 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
   }
 
   async findAiConversationById(id: string) {
-    const conversation = await this.db.aiConversation.findUnique({
+    const conversation = await measureAiPerf("repository.ai_conversation.find_by_id", {
+      conversationId: id
+    }, () => this.db.aiConversation.findUnique({
       where: {
         id
       }
-    });
+    }));
 
     return conversation ? toAiConversation(conversation) : null;
   }
 
   async createAiConversation(input: CreateAiConversationInput) {
-    const conversation = await this.db.aiConversation.create({
+    const conversation = await measureAiPerf("repository.ai_conversation.create", {
+      mode: input.mode
+    }, () => this.db.aiConversation.create({
       data: {
         userId: input.userId,
         mode: input.mode,
@@ -840,13 +877,15 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
         createdAt: toDate(input.createdAt),
         updatedAt: toDate(input.updatedAt)
       }
-    });
+    }));
 
     return toAiConversation(conversation);
   }
 
   async updateAiConversation(conversationId: string, input: UpdateAiConversationInput) {
-    const conversation = await this.db.aiConversation.update({
+    const conversation = await measureAiPerf("repository.ai_conversation.update", {
+      conversationId
+    }, () => this.db.aiConversation.update({
       where: {
         id: conversationId
       },
@@ -859,7 +898,7 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
         lastMessageAt: input.lastMessageAt ? toDate(input.lastMessageAt) : undefined,
         updatedAt: toDate(input.updatedAt)
       }
-    });
+    }));
 
     return toAiConversation(conversation);
   }
@@ -948,7 +987,11 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
 
   async createAiMessage(input: CreateAiMessageInput) {
     try {
-      const message = await this.db.aiMessage.create({
+      const message = await measureAiPerf("repository.ai_message.create", {
+        conversationId: input.conversationId,
+        role: input.role,
+        hasTask: Boolean(input.taskId)
+      }, () => this.db.aiMessage.create({
         data: {
           conversationId: input.conversationId,
           userId: input.userId,
@@ -958,7 +1001,7 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
           contentJson: input.contentJson === null ? Prisma.JsonNull : toJsonObject(input.contentJson),
           createdAt: toDate(input.createdAt)
         }
-      });
+      }));
 
       return toAiMessage(message);
     } catch (error) {
@@ -1028,14 +1071,19 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
       : limit || options.ascending === false
         ? "desc"
         : "asc";
-    const records = await this.db.aiMessage.findMany({
+    const records = await measureAiPerf("repository.ai_message.list", {
+      conversationId,
+      limit: limit ?? null,
+      hasCursor: Boolean(cursor),
+      direction
+    }, () => this.db.aiMessage.findMany({
       where,
       orderBy: [
         { createdAt: orderDirection },
         { id: orderDirection }
       ],
       take: limit
-    });
+    }));
 
     const ordered = orderDirection === "desc" && options.ascending !== false ? [...records].reverse() : records;
 
@@ -1044,7 +1092,10 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
 
   async createAiMessageAttachment(input: CreateAiMessageAttachmentInput) {
     try {
-      const attachment = await this.db.aiMessageAttachment.create({
+      const attachment = await measureAiPerf("repository.ai_message_attachment.create", {
+        messageId: input.messageId,
+        conversationId: input.conversationId
+      }, () => this.db.aiMessageAttachment.create({
         data: {
           messageId: input.messageId,
           conversationId: input.conversationId,
@@ -1055,7 +1106,7 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
           caption: input.caption,
           createdAt: toDate(input.createdAt)
         }
-      });
+      }));
 
       return toAiMessageAttachment(attachment);
     } catch (error) {
@@ -1107,7 +1158,11 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
 
   async createAiRunEvent(input: CreateAiRunEventInput) {
     try {
-      const event = await this.db.aiRunEvent.create({
+      const event = await measureAiPerf("repository.ai_run_event.create", {
+        taskId: input.taskId,
+        eventType: input.type,
+        seq: input.seq
+      }, () => this.db.aiRunEvent.create({
         data: {
           taskId: input.taskId,
           conversationId: input.conversationId,
@@ -1122,7 +1177,7 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
           visibility: input.visibility,
           createdAt: toDate(input.createdAt)
         }
-      });
+      }));
 
       return toAiRunEvent(event);
     } catch (error) {
@@ -1147,7 +1202,11 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
 
   async listAiRunEvents(taskId: string, options: { afterSeq?: number; limit?: number } = {}) {
     const limit = options.limit && options.limit > 0 ? Math.min(options.limit, 200) : 100;
-    const events = await this.db.aiRunEvent.findMany({
+    const events = await measureAiPerf("repository.ai_run_event.list", {
+      taskId,
+      limit,
+      afterSeq: options.afterSeq ?? null
+    }, () => this.db.aiRunEvent.findMany({
       where: {
         taskId,
         seq: options.afterSeq === undefined
@@ -1161,20 +1220,22 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
         seq: "asc"
       },
       take: limit
-    });
+    }));
 
     return events.map(toAiRunEvent);
   }
 
   async findLatestAiRunEvent(taskId: string) {
-    const event = await this.db.aiRunEvent.findFirst({
+    const event = await measureAiPerf("repository.ai_run_event.find_latest", {
+      taskId
+    }, () => this.db.aiRunEvent.findFirst({
       where: {
         taskId
       },
       orderBy: {
         seq: "desc"
       }
-    });
+    }));
 
     return event ? toAiRunEvent(event) : null;
   }
@@ -1218,11 +1279,13 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
   }
 
   async findUploadedFileById(id: string) {
-    const uploadedFile = await this.db.uploadedFile.findUnique({
+    const uploadedFile = await measureAiPerf("repository.uploaded_file.find_by_id", {
+      fileId: id
+    }, () => this.db.uploadedFile.findUnique({
       where: {
         id
       }
-    });
+    }));
 
     return uploadedFile ? toUploadedFile(uploadedFile) : null;
   }
@@ -1474,11 +1537,11 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
   }
 
   async findCreditReservationByIdempotencyKey(idempotencyKey: string) {
-    const reservation = await this.db.creditReservation.findUnique({
+    const reservation = await measureAiPerf("repository.credit_reservation.find_by_idempotency", {}, () => this.db.creditReservation.findUnique({
       where: {
         idempotencyKey
       }
-    });
+    }));
 
     return reservation ? toCreditReservation(reservation) : null;
   }
@@ -1504,14 +1567,9 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
       return existing;
     }
 
-    await this.ensureCreditAccount(input.userId, input.createdAt);
-    await lockCreditAccount(this.db, input.userId);
-
-    const account = await this.db.creditAccount.findUniqueOrThrow({
-      where: {
-        userId: input.userId
-      }
-    });
+    const account = await measureAiPerf("repository.credit_account.lock_and_read", {
+      taskId: input.taskId
+    }, () => lockCreditAccount(this.db, input.userId, input.createdAt));
     const activeReserved = await this.getActiveReservedAmount(input.userId);
 
     if (account.balance - activeReserved < input.amount) {
@@ -1519,7 +1577,10 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
     }
 
     try {
-      const reservation = await this.db.creditReservation.create({
+      const reservation = await measureAiPerf("repository.credit_reservation.create", {
+        taskId: input.taskId,
+        amount: input.amount
+      }, () => this.db.creditReservation.create({
         data: {
           userId: input.userId,
           taskId: input.taskId,
@@ -1530,7 +1591,7 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
           createdAt: toDate(input.createdAt),
           updatedAt: toDate(input.updatedAt)
         }
-      });
+      }));
 
       return toCreditReservation(reservation);
     } catch (error) {
@@ -1561,7 +1622,7 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
   }
 
   async getActiveReservedAmount(userId: string) {
-    const result = await this.db.creditReservation.aggregate({
+    const result = await measureAiPerf("repository.credit_reservation.active_reserved", {}, () => this.db.creditReservation.aggregate({
       where: {
         userId,
         status: "RESERVED"
@@ -1569,14 +1630,49 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
       _sum: {
         amount: true
       }
-    });
+    }));
 
     return result._sum.amount ?? 0;
   }
 }
 
-async function lockCreditAccount(db: PrismaDb, userId: string) {
-  await db.$queryRaw(Prisma.sql`SELECT user_id FROM credit_accounts WHERE user_id = ${userId}::uuid FOR UPDATE`);
+async function lockCreditAccount(db: PrismaDb, userId: string, createdAt?: string) {
+  const rows = await db.$queryRaw<Array<{ balance: number }>>(
+    Prisma.sql`SELECT balance FROM credit_accounts WHERE user_id = ${userId}::uuid FOR UPDATE`
+  );
+
+  if (rows[0]) {
+    return {
+      balance: rows[0].balance
+    };
+  }
+
+  if (!createdAt) {
+    throw new ApiError("NOT_FOUND", "Credit account not found", 404);
+  }
+
+  try {
+    const account = await db.creditAccount.create({
+      data: {
+        userId,
+        balance: 0,
+        totalEarned: 0,
+        totalSpent: 0,
+        version: 0,
+        updatedAt: toDate(createdAt)
+      }
+    });
+
+    return {
+      balance: account.balance
+    };
+  } catch (error) {
+    if (!isUniqueConstraintError(error)) {
+      throw error;
+    }
+
+    return lockCreditAccount(db, userId);
+  }
 }
 
 function isRootPrismaClient(db: PrismaDb): db is PrismaClient {
