@@ -15,7 +15,7 @@ function openWechat() {
   window.dispatchEvent(new Event("lightquant:open-wechat"));
 }
 
-function MoreItemContent({ item }: { item: MoreItem }) {
+function MoreItemContent({ item, paymentFeatureEnabled = false }: { item: MoreItem; paymentFeatureEnabled?: boolean }) {
   if (item.variant === "points") {
     return (
       <div>
@@ -30,10 +30,12 @@ function MoreItemContent({ item }: { item: MoreItem }) {
             </li>
           ))}
         </ul>
-        <button className="mt-4 inline-flex items-center gap-2 text-sm font-extrabold text-[#0b63ff]" onClick={openRecharge} type="button">
-          前往充值中心
-          <ArrowRight aria-hidden="true" size={15} />
-        </button>
+        {paymentFeatureEnabled ? (
+          <button className="mt-4 inline-flex items-center gap-2 text-sm font-extrabold text-[#0b63ff]" onClick={openRecharge} type="button">
+            前往充值中心
+            <ArrowRight aria-hidden="true" size={15} />
+          </button>
+        ) : null}
       </div>
     );
   }
@@ -82,7 +84,7 @@ function getIcon(item: MoreItem) {
   return <BarChart3 aria-hidden="true" size={19} />;
 }
 
-export function MoreClient() {
+export function MoreClient({ paymentFeatureEnabled = false }: { paymentFeatureEnabled?: boolean }) {
   const [contactOpen, setContactOpen] = useState(false);
 
   return (
@@ -108,7 +110,7 @@ export function MoreClient() {
                 </div>
               </summary>
               <div className={`lq-faq-content ${item.variant === "danger" ? "is-danger" : ""}`}>
-                <MoreItemContent item={item} />
+                <MoreItemContent item={item} paymentFeatureEnabled={paymentFeatureEnabled} />
               </div>
             </details>
           ))}

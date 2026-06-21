@@ -1,5 +1,5 @@
 import type { PayChannel } from "@/server/domain";
-import { getPaymentMode, ServerConfigError } from "@/server/env";
+import { getPaymentMode, isPaymentFeatureEnabled, ServerConfigError } from "@/server/env";
 import { ApiError } from "@/server/http/api-response";
 
 export type PaymentMode = "mock" | "wechat" | "alipay";
@@ -79,6 +79,10 @@ export function getPaymentConfig(): PaymentConfig {
 }
 
 export function assertPayChannelAvailable(payChannel: PayChannel) {
+  if (!isPaymentFeatureEnabled()) {
+    throw new ApiError("PAYMENT_CONFIG_ERROR", "支付功能将于 2026-06-28 开放", 403);
+  }
+
   const config = getPaymentConfig();
 
   if (config.mode === "mock") {
@@ -110,6 +114,14 @@ export function assertMockPaymentAvailable() {
 }
 
 export function listPaymentChannelAvailability(): PaymentChannelAvailability[] {
+  if (!isPaymentFeatureEnabled()) {
+    return PAYMENT_CHANNELS.map((channel) => ({
+      ...channel,
+      enabled: false,
+      current: false
+    }));
+  }
+
   const config = getPaymentConfig();
 
   return PAYMENT_CHANNELS.map((channel) => ({

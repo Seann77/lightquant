@@ -11,6 +11,7 @@ type CreditActionPopoverProps = {
   onOpenStatement: () => void;
   onLogout: () => void;
   open: boolean;
+  paymentFeatureEnabled?: boolean;
 };
 
 export function CreditActionPopover({
@@ -21,7 +22,8 @@ export function CreditActionPopover({
   onOpenInvite,
   onOpenRecharge,
   onOpenStatement,
-  open
+  open,
+  paymentFeatureEnabled = false
 }: CreditActionPopoverProps) {
   if (!open) {
     return null;
@@ -48,15 +50,17 @@ export function CreditActionPopover({
             <p>会员期内使用不消耗积分</p>
           </div>
         ) : null}
-        <button
-          className="flex w-full items-center gap-sm rounded-lg px-sm py-sm text-left text-body-emphasis text-primary transition-colors hover:bg-primary-soft"
-          onClick={onOpenRecharge}
-          role="menuitem"
-          type="button"
-        >
-          <CreditCard aria-hidden="true" size={20} strokeWidth={1.8} />
-          充值积分
-        </button>
+        {paymentFeatureEnabled ? (
+          <button
+            className="flex w-full items-center gap-sm rounded-lg px-sm py-sm text-left text-body-emphasis text-primary transition-colors hover:bg-primary-soft"
+            onClick={onOpenRecharge}
+            role="menuitem"
+            type="button"
+          >
+            <CreditCard aria-hidden="true" size={20} strokeWidth={1.8} />
+            充值积分
+          </button>
+        ) : null}
         <button
           className="flex w-full items-center gap-sm rounded-lg px-sm py-sm text-left text-body-emphasis text-secondary transition-colors hover:bg-surface-container-low hover:text-primary"
           onClick={onOpenInvite}

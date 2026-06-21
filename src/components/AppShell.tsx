@@ -23,6 +23,7 @@ import {
 type AppShellProps = {
   children: ReactNode;
   initialCurrentUser?: CurrentUserData | null;
+  paymentFeatureEnabled?: boolean;
 };
 
 type NavItem = {
@@ -139,7 +140,7 @@ const RECENT_CONVERSATION_LIMIT = 20;
 const TASK_SWITCH_MIN_VISIBLE_MS = 220;
 const TASK_SWITCH_FALLBACK_MS = 30000;
 
-export function AppShell({ children, initialCurrentUser = null }: AppShellProps) {
+export function AppShell({ children, initialCurrentUser = null, paymentFeatureEnabled = false }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -339,6 +340,10 @@ export function AppShell({ children, initialCurrentUser = null }: AppShellProps)
     }
 
     function handleOpenRecharge() {
+      if (!paymentFeatureEnabled) {
+        return;
+      }
+
       if (isLoggedIn) {
         setRechargeOpen(true);
         return;
@@ -358,7 +363,7 @@ export function AppShell({ children, initialCurrentUser = null }: AppShellProps)
       window.removeEventListener("lightquant:open-wechat", handleOpenWechat);
       window.removeEventListener("lightquant:open-recharge", handleOpenRecharge);
     };
-  }, [isLoggedIn, refreshCurrentUser, refreshRecentConversations]);
+  }, [isLoggedIn, paymentFeatureEnabled, refreshCurrentUser, refreshRecentConversations]);
 
   function handleCreditStatusClick() {
     if (isLoggedIn) {
@@ -381,6 +386,10 @@ export function AppShell({ children, initialCurrentUser = null }: AppShellProps)
 
   function handleOpenRechargeFromMenu() {
     setCreditActionsOpen(false);
+    if (!paymentFeatureEnabled) {
+      return;
+    }
+
     setRechargeOpen(true);
   }
 
@@ -551,6 +560,7 @@ export function AppShell({ children, initialCurrentUser = null }: AppShellProps)
             onOpenRecharge={handleOpenRechargeFromMenu}
             onOpenStatement={handleOpenStatement}
             open={creditActionsOpen}
+            paymentFeatureEnabled={paymentFeatureEnabled}
           />
           <button
             aria-label={isLoggedIn ? "打开积分操作菜单" : "打开登录注册弹窗"}
@@ -608,7 +618,9 @@ export function AppShell({ children, initialCurrentUser = null }: AppShellProps)
 
       <LoginModal initialInviteCode={inviteCodeFromUrl} onClose={() => setLoginOpen(false)} onLoginSuccess={handleLoginSuccess} open={loginOpen} />
       <InviteFriendModal inviteCode={currentUser?.user.inviteCode} onClose={() => setInviteOpen(false)} open={inviteOpen && isLoggedIn} />
-      <RechargeModal onClose={() => setRechargeOpen(false)} onRechargeSuccess={refreshCurrentUser} open={rechargeOpen} points={userPoints} />
+      {paymentFeatureEnabled ? (
+        <RechargeModal onClose={() => setRechargeOpen(false)} onRechargeSuccess={refreshCurrentUser} open={rechargeOpen} points={userPoints} />
+      ) : null}
       <WechatQrModal onClose={() => setWechatOpen(false)} open={wechatOpen} />
     </div>
   );

@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { applyRechargeCredit } from "@/server/credits/credit-service";
 import type { OrderStatus, PayChannel, PaymentProvider, PaymentTransaction, RechargeOrder, RechargePlan } from "@/server/domain";
+import { isPaymentFeatureEnabled } from "@/server/env";
 import { ApiError } from "@/server/http/api-response";
 import { requireAdmin } from "@/server/admin/admin-auth";
 import { createPaymentAction } from "@/server/payments/payment-provider";
@@ -34,8 +35,16 @@ type MaintenanceInput = {
 };
 
 export async function listRechargePlans() {
-  const plans = await getRepository().listEnabledRechargePlans();
   const paymentChannels = listPaymentChannelAvailability();
+  if (!isPaymentFeatureEnabled()) {
+    return {
+      items: [],
+      paymentChannels,
+      defaultPayChannel: null
+    };
+  }
+
+  const plans = await getRepository().listEnabledRechargePlans();
   const defaultPayChannel = paymentChannels.find((channel) => channel.enabled)?.id ?? null;
 
   return {

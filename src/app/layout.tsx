@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import type { ReactNode } from "react";
 import { AppShell } from "@/components/AppShell";
 import { getOptionalCurrentUserProfile } from "@/server/auth/current-user";
+import { isPaymentFeatureEnabled } from "@/server/env";
 import "./globals.css";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +15,7 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const initialCurrentUser = await getOptionalCurrentUserProfile();
+  const paymentFeatureEnabled = isPaymentFeatureEnabled();
 
   return (
     <html lang="zh-CN">
@@ -35,7 +37,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       </head>
       <body className="font-sans antialiased">
         <Suspense fallback={null}>
-          <AppShell initialCurrentUser={initialCurrentUser}>{children}</AppShell>
+          <AppShell initialCurrentUser={initialCurrentUser} paymentFeatureEnabled={paymentFeatureEnabled}>{children}</AppShell>
         </Suspense>
       </body>
     </html>

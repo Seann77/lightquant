@@ -14,11 +14,11 @@ const requiredSnippets = [
     snippet: "LIGHTQUANT_DATA_MODE=database"
   },
   {
-    name: "aliyun sms provider default",
-    snippet: 'LIGHTQUANT_SMS_PROVIDER="${LIGHTQUANT_SMS_PROVIDER:-aliyun}"'
+    name: "tencent sms provider default",
+    snippet: 'LIGHTQUANT_SMS_PROVIDER="${LIGHTQUANT_SMS_PROVIDER:-tencent}"'
   },
   {
-    name: "aliyun sms provider passthrough",
+    name: "sms provider passthrough",
     snippet: "LIGHTQUANT_SMS_PROVIDER=${LIGHTQUANT_SMS_PROVIDER}"
   },
   {
@@ -42,6 +42,30 @@ const requiredSnippets = [
     snippet: "ALIYUN_DYPNS_TEMPLATE_CODE=${ALIYUN_DYPNS_TEMPLATE_CODE}"
   },
   {
+    name: "tencent secret id passthrough",
+    snippet: "TENCENTCLOUD_SECRET_ID=${TENCENTCLOUD_SECRET_ID}"
+  },
+  {
+    name: "tencent secret key passthrough",
+    snippet: "TENCENTCLOUD_SECRET_KEY=${TENCENTCLOUD_SECRET_KEY}"
+  },
+  {
+    name: "tencent sdk app id passthrough",
+    snippet: "TENCENT_SMS_SDK_APP_ID=${TENCENT_SMS_SDK_APP_ID}"
+  },
+  {
+    name: "tencent sms sign name passthrough",
+    snippet: "TENCENT_SMS_SIGN_NAME=${TENCENT_SMS_SIGN_NAME}"
+  },
+  {
+    name: "tencent sms template id passthrough",
+    snippet: "TENCENT_SMS_TEMPLATE_ID=${TENCENT_SMS_TEMPLATE_ID}"
+  },
+  {
+    name: "tencent sms param keys passthrough",
+    snippet: "TENCENT_SMS_TEMPLATE_PARAM_KEYS=${TENCENT_SMS_TEMPLATE_PARAM_KEYS}"
+  },
+  {
     name: "mock payment disabled",
     snippet: "PAYMENT_MOCK_ENABLED=false"
   },
@@ -50,8 +74,16 @@ const requiredSnippets = [
     snippet: 'LIGHTQUANT_PAYMENT_MODE="${LIGHTQUANT_PAYMENT_MODE:-wechat}"'
   },
   {
+    name: "payment feature disabled default",
+    snippet: 'PAYMENT_FEATURE_ENABLED="${PAYMENT_FEATURE_ENABLED:-false}"'
+  },
+  {
     name: "payment mode env passthrough",
     snippet: "LIGHTQUANT_PAYMENT_MODE=${LIGHTQUANT_PAYMENT_MODE}"
+  },
+  {
+    name: "payment feature passthrough",
+    snippet: "PAYMENT_FEATURE_ENABLED=${PAYMENT_FEATURE_ENABLED}"
   },
   {
     name: "alipay app id passthrough",
@@ -126,12 +158,24 @@ const requiredSnippets = [
     snippet: 'validate_choice LIGHTQUANT_PAYMENT_MODE "alipay,wechat"'
   },
   {
+    name: "payment feature flag validation",
+    snippet: 'validate_choice PAYMENT_FEATURE_ENABLED "true,false"'
+  },
+  {
     name: "production sms provider validation",
-    snippet: 'validate_choice LIGHTQUANT_SMS_PROVIDER "aliyun"'
+    snippet: 'validate_choice LIGHTQUANT_SMS_PROVIDER "aliyun,tencent"'
+  },
+  {
+    name: "sms provider conditional validation",
+    snippet: "validate_sms_provider_config"
   },
   {
     name: "single-line secret validation",
     snippet: "validate_no_newline LIGHTQUANT_AI_API_KEY"
+  },
+  {
+    name: "single-line tencent secret validation",
+    snippet: "validate_no_newline TENCENTCLOUD_SECRET_KEY"
   }
 ];
 
@@ -164,7 +208,14 @@ const requiredEnvAssignments = [
   "LIGHTQUANT_ALLOW_MOCK_SMS_IN_PRODUCTION=false",
   "ALIBABA_CLOUD_ACCESS_KEY_ID=${ALIBABA_CLOUD_ACCESS_KEY_ID}",
   "ALIBABA_CLOUD_ACCESS_KEY_SECRET=${ALIBABA_CLOUD_ACCESS_KEY_SECRET}",
+  "TENCENTCLOUD_SECRET_ID=${TENCENTCLOUD_SECRET_ID}",
+  "TENCENTCLOUD_SECRET_KEY=${TENCENTCLOUD_SECRET_KEY}",
+  "TENCENT_SMS_SDK_APP_ID=${TENCENT_SMS_SDK_APP_ID}",
+  "TENCENT_SMS_SIGN_NAME=${TENCENT_SMS_SIGN_NAME}",
+  "TENCENT_SMS_TEMPLATE_ID=${TENCENT_SMS_TEMPLATE_ID}",
+  "TENCENT_SMS_TEMPLATE_PARAM_KEYS=${TENCENT_SMS_TEMPLATE_PARAM_KEYS}",
   "LIGHTQUANT_PAYMENT_MODE=${LIGHTQUANT_PAYMENT_MODE}",
+  "PAYMENT_FEATURE_ENABLED=${PAYMENT_FEATURE_ENABLED}",
   "PAYMENT_MOCK_ENABLED=false",
   "PAYMENT_NOTIFY_BASE_URL=https://${APP_DOMAIN}",
   "PAYMENT_RETURN_BASE_URL=https://${APP_DOMAIN}",

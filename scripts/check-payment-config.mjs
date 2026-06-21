@@ -4,13 +4,14 @@ import { parse as parseDotenv } from "dotenv";
 loadEnvFile(".env");
 loadEnvFile(".env.local");
 
-const allowedModes = new Set(["mock", "alipay", "wechat"]);
-const mode = getRequestedMode();
 const nodeEnv = process.env.NODE_ENV || "development";
 const isProduction = nodeEnv === "production";
-const mockEnabled = process.env.PAYMENT_MOCK_ENABLED !== "false";
+const allowedModes = new Set(["mock", "alipay", "wechat"]);
 const errors = [];
 const warnings = [];
+const mode = getRequestedMode();
+const featureEnabled = readBoolean("PAYMENT_FEATURE_ENABLED", !isProduction);
+const mockEnabled = process.env.PAYMENT_MOCK_ENABLED !== "false";
 
 if (!allowedModes.has(mode)) {
   errors.push(`LIGHTQUANT_PAYMENT_MODE must be one of: ${Array.from(allowedModes).join(", ")}`);
@@ -30,6 +31,7 @@ const result = {
   mode,
   nodeEnv,
   production: isProduction,
+  featureEnabled,
   mockEnabled,
   orderExpireMinutes: readPositiveInteger("PAYMENT_ORDER_EXPIRE_MINUTES", 30),
   notifyBaseUrl: describeUrl("PAYMENT_NOTIFY_BASE_URL"),
@@ -45,7 +47,9 @@ const result = {
   nextActions: []
 };
 
-if (mode === "mock") {
+if (!featureEnabled) {
+  warnings.push("PAYMENT_FEATURE_ENABLED is false; recharge entry points and order creation should remain hidden until the feature is opened.");
+} else if (mode === "mock") {
   if (!mockEnabled) {
     errors.push("PAYMENT_MOCK_ENABLED is false, so mock payment cannot be used.");
   }
@@ -255,6 +259,25 @@ function readPositiveInteger(name, fallback) {
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
 }
 
+function readBoolean(name, fallback) {
+  const value = normalize(process.env[name]).toLowerCase();
+
+  if (!value) {
+    return fallback;
+  }
+
+  if (["true", "1", "yes", "on"].includes(value)) {
+    return true;
+  }
+
+  if (["false", "0", "no", "off"].includes(value)) {
+    return false;
+  }
+
+  warnings.push(`${name} should be true or false; using ${fallback ? "true" : "false"} for this check.`);
+  return fallback;
+}
+
 function hasEnv(name) {
   return Boolean(normalize(process.env[name]));
 }
@@ -265,6 +288,10 @@ function normalize(value) {
 
 function getNextActions() {
   if (errors.length === 0) {
+    if (!featureEnabled) {
+      return ["Payment feature is hidden. Set PAYMENT_FEATURE_ENABLED=true and complete provider credentials before opening recharge on 2026-06-28."];
+    }
+
     if (mode === "mock") {
       return ["Mock payment configuration is usable for local development only."];
     }

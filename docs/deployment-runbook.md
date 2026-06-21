@@ -17,7 +17,7 @@ APP_DOMAIN=admin.example.com \
 REPO_URL=https://github.com/your-name/lightquant.git \
 ADMIN_PHONE=13800138000 \
 LIGHTQUANT_AI_API_KEY=your_mimo_key \
-LIGHTQUANT_PAYMENT_MODE=alipay \
+PAYMENT_FEATURE_ENABLED=false \
 bash deploy/ubuntu-one-click-deploy.sh
 ```
 
@@ -30,8 +30,8 @@ bash deploy/ubuntu-one-click-deploy.sh
 - `APP_DOMAIN` 只能包含字母、数字、点和连字符，不能包含路径、端口或空格。
 - `APP_PORT` 必须是 `1-65535` 范围内的整数。
 - `DB_NAME`、`DB_USER` 必须是安全的 PostgreSQL 标识符，只能使用字母、数字和下划线，且不能以数字开头。
-- `LIGHTQUANT_PAYMENT_MODE` 生产部署只允许 `alipay` 或 `wechat`，不会允许 `mock`。
-- `LIGHTQUANT_SMS_PROVIDER` 生产部署只允许 `aliyun`。
+- `LIGHTQUANT_PAYMENT_MODE` 生产部署只允许 `alipay` 或 `wechat`，不会允许 `mock`；`PAYMENT_FEATURE_ENABLED=false` 时不会展示充值入口，也不会创建充值订单。
+- `LIGHTQUANT_SMS_PROVIDER` 生产部署允许 `tencent` 或 `aliyun`；当前正式环境默认使用 `tencent`。
 - 支付、短信、模型等密钥变量必须以单行形式传入；PEM 换行请使用字面量 `\n`，不要直接传多行内容。
 
 ## 当前默认生产配置
@@ -42,6 +42,7 @@ bash deploy/ubuntu-one-click-deploy.sh
 NODE_ENV=production
 LIGHTQUANT_DATA_MODE=database
 LIGHTQUANT_PAYMENT_MODE=wechat
+PAYMENT_FEATURE_ENABLED=false
 PAYMENT_MOCK_ENABLED=false
 LIGHTQUANT_AI_PROVIDER=openai_compatible
 LIGHTQUANT_AI_BASE_URL=https://api.xiaomimimo.com/v1
@@ -53,22 +54,26 @@ LIGHTQUANT_ALLOW_MOCK_AI_IN_PRODUCTION=false
 
 ## 短信变量
 
-生产环境默认使用 Aliyun SMS，不允许自动落回 mock SMS。执行部署脚本前需要配置：
+生产环境默认使用 Tencent Cloud SMS，不允许自动落回 mock SMS。执行部署脚本前需要配置：
 
 ```bash
-LIGHTQUANT_SMS_PROVIDER=aliyun
-ALIBABA_CLOUD_ACCESS_KEY_ID=
-ALIBABA_CLOUD_ACCESS_KEY_SECRET=
-ALIYUN_DYPNS_ENDPOINT=dypnsapi.aliyuncs.com
-ALIYUN_DYPNS_COUNTRY_CODE=86
-ALIYUN_DYPNS_SIGN_NAME=
-ALIYUN_DYPNS_TEMPLATE_CODE=100001
-ALIYUN_DYPNS_VALID_TIME=300
-ALIYUN_DYPNS_INTERVAL=60
-ALIYUN_DYPNS_CODE_LENGTH=6
+LIGHTQUANT_SMS_PROVIDER=tencent
+TENCENTCLOUD_SECRET_ID=
+TENCENTCLOUD_SECRET_KEY=
+TENCENT_SMS_SDK_APP_ID=
+TENCENT_SMS_SIGN_NAME=
+TENCENT_SMS_TEMPLATE_ID=
+TENCENT_SMS_TEMPLATE_PARAM_KEYS=code,minutes
+TENCENT_SMS_REGION=ap-guangzhou
+TENCENT_SMS_ENDPOINT=sms.tencentcloudapi.com
+TENCENT_SMS_COUNTRY_CODE=86
+TENCENT_SMS_VALID_TIME=300
+TENCENT_SMS_CODE_LENGTH=6
 ```
 
 如果短信密钥或签名模板缺失，生产登录发码会返回稳定配置错误，不会暴露密钥或内部堆栈。
+
+如果需要显式切换到 Aliyun SMS，可设置 `LIGHTQUANT_SMS_PROVIDER=aliyun`，并提供 `ALIBABA_CLOUD_ACCESS_KEY_ID`、`ALIBABA_CLOUD_ACCESS_KEY_SECRET`、`ALIYUN_DYPNS_SIGN_NAME`、`ALIYUN_DYPNS_TEMPLATE_CODE` 等阿里云短信变量。
 
 ## 支付变量
 
@@ -76,6 +81,8 @@ ALIYUN_DYPNS_CODE_LENGTH=6
 
 - `alipay`
 - `wechat`
+
+`PAYMENT_FEATURE_ENABLED=false` 时，充值入口和创建充值订单接口保持关闭，6 月 28 日开放前不需要提供支付宝或微信支付商户参数。需要开放支付时，再设置 `PAYMENT_FEATURE_ENABLED=true` 并补齐对应渠道配置。
 
 脚本默认值为 `wechat`，也可以在执行脚本前通过环境变量覆盖。对应渠道的商户变量会原样写入服务端 `.env`，例如：
 

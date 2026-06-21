@@ -193,6 +193,10 @@ export function isMockPaymentEnabled() {
   return process.env.PAYMENT_MOCK_ENABLED !== "false";
 }
 
+export function isPaymentFeatureEnabled() {
+  return getBoolean(process.env.PAYMENT_FEATURE_ENABLED, process.env.NODE_ENV !== "production");
+}
+
 export function getAiProviderMode(): AiProviderMode {
   const provider = process.env.LIGHTQUANT_AI_PROVIDER ?? (process.env.NODE_ENV === "production" ? "deepseek" : "mock");
 

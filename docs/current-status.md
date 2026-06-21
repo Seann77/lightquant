@@ -22,7 +22,7 @@
 
 - 支付宝/微信真实商户回调仍需按真实渠道环境继续联调。
 - 微信 Native 已有 provider 与签名/notify 骨架，但尚未完成真实商户端到端支付验收。
-- mock SMS 仍可用于本地测试；生产短信需使用已配置的 Aliyun SMS provider。
+- mock SMS 仍可用于本地测试；生产短信需使用已配置的 Tencent Cloud SMS provider。
 - 没有队列/Worker，AI 任务当前仍由服务端进程内异步 runner 执行；该能力适合 MVP，不等同于生产级持久队列。
 - 文件内容当前保存到数据库；后续可迁移到 Supabase Storage 或对象存储。
 - 没有退款、发票、后台手动补偿、审计日志、用户可见的任务重试/取消。
