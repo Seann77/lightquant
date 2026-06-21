@@ -10,6 +10,7 @@ import { getAiPerfNow, logAiPerf, measureAiPerf } from "@/server/ai/ai-perf";
 import { getAiModelName, getAiProviderMode, getAiSupportsVision, getAiTaskTimeoutMs } from "@/server/env";
 import { getUploadedImageDataUrl, inferUploadedFileKind } from "@/server/files/file-service";
 import type { AiProviderAttachment, AiProviderStreamDelta } from "@/server/ai/providers/types";
+import { normalizeStrategyFinalAnswerMarkdown } from "@/lib/ai/strategy-result-format";
 
 type CreateAiTaskRequest = {
   type: string;
@@ -931,13 +932,20 @@ async function runAiTaskStreaming(
       creditAccount: completed.credit.account,
       duplicated: false
     });
+    const parsedResult = toResultResponse(completed.result);
+    const finalAnswerMarkdown = completed.task.type === "strategy_generation"
+      ? normalizeStrategyFinalAnswerMarkdown({
+        finalAnswerMarkdown: providerStream.finalAnswerMarkdown,
+        result: parsedResult
+      }) || providerStream.finalAnswerMarkdown
+      : providerStream.finalAnswerMarkdown;
 
     await emit({
       type: "done",
       data: response,
       visibleThinking: providerStream.visibleThinking,
-      finalAnswerMarkdown: providerStream.finalAnswerMarkdown,
-      parsedResult: toResultResponse(completed.result)
+      finalAnswerMarkdown,
+      parsedResult
     });
 
     return response;
@@ -2371,9 +2379,15 @@ async function createAssistantMessageForTask(
   }
 
   const repository = getRepository();
-  const finalAnswerMarkdown = streamContent?.finalAnswerMarkdown?.trim() || null;
   const visibleThinking = streamContent?.visibleThinking?.trim() || null;
   const parsedResult = streamContent?.parsedResult ?? toResultResponse(result);
+  const rawFinalAnswerMarkdown = streamContent?.finalAnswerMarkdown?.trim() || null;
+  const finalAnswerMarkdown = task.type === "strategy_generation"
+    ? normalizeStrategyFinalAnswerMarkdown({
+      finalAnswerMarkdown: rawFinalAnswerMarkdown,
+      result: parsedResult
+    }) || rawFinalAnswerMarkdown
+    : rawFinalAnswerMarkdown;
 
   await repository.createAiMessage({
     conversationId: task.conversationId,

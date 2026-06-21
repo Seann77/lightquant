@@ -21,6 +21,7 @@ import {
 
 type AppShellProps = {
   children: ReactNode;
+  initialCurrentUser?: CurrentUserData | null;
 };
 
 type NavItem = {
@@ -123,11 +124,11 @@ const RECENT_CONVERSATION_LIMIT = 20;
 const TASK_SWITCH_MIN_VISIBLE_MS = 220;
 const TASK_SWITCH_FALLBACK_MS = 30000;
 
-export function AppShell({ children }: AppShellProps) {
+export function AppShell({ children, initialCurrentUser = null }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [currentUser, setCurrentUser] = useState<CurrentUserData | null>(null);
+  const [currentUser, setCurrentUser] = useState<CurrentUserData | null>(() => initialCurrentUser);
   const [creditActionsOpen, setCreditActionsOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(() => searchParams.get("login") === "1");
   const [rechargeOpen, setRechargeOpen] = useState(false);
@@ -163,11 +164,18 @@ export function AppShell({ children }: AppShellProps) {
       const response = await fetch("/api/v1/me", {
         cache: "no-store"
       });
-      const payload = (await response.json()) as ApiResponse<CurrentUserData>;
+      const payload = (await response.json().catch(() => null)) as ApiResponse<CurrentUserData> | null;
 
-      setCurrentUser(payload.success ? payload.data : null);
+      if (payload?.success) {
+        setCurrentUser(payload.data);
+        return;
+      }
+
+      if (response.status === 401 || (payload && !payload.success && payload.error.code === "UNAUTHORIZED")) {
+        setCurrentUser(null);
+      }
     } catch {
-      setCurrentUser(null);
+      // Preserve the server-injected user on transient network failures.
     }
   }, []);
 

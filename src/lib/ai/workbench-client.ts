@@ -1,4 +1,5 @@
 import type { UploadedCodeFile } from "@/lib/file-upload";
+import { formatStrategyResultAsMarkdown } from "@/lib/ai/strategy-result-format";
 import type {
   AiConversationData,
   AiConversationMessagesData,
@@ -911,15 +912,7 @@ export function getAiTaskStreamingContent(data: AiTaskData | null | undefined, t
 
 export function formatAiTaskResultAsMarkdown(result: NonNullable<AiTaskData["result"]>, taskType: WorkbenchTaskType | string | null | undefined) {
   if (taskType === "strategy_generation") {
-    return [
-      "## 结论摘要",
-      result.explanation?.trim() || "已完成策略处理。",
-      "",
-      "## 策略代码",
-      result.generatedCode?.trim()
-        ? `\`\`\`python\n${result.generatedCode.trim()}\n\`\`\``
-        : "暂无可直接运行的策略代码。"
-    ].join("\n");
+    return formatStrategyResultAsMarkdown(result);
   }
 
   if (taskType === "code_analysis") {

@@ -2,14 +2,19 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import type { ReactNode } from "react";
 import { AppShell } from "@/components/AppShell";
+import { getOptionalCurrentUserProfile } from "@/server/auth/current-user";
 import "./globals.css";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "LightQuant 轻量化",
   description: "面向量化初学者的 AI 策略助手静态前台页面"
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const initialCurrentUser = await getOptionalCurrentUserProfile();
+
   return (
     <html lang="zh-CN">
       <head>
@@ -30,7 +35,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body className="font-sans antialiased">
         <Suspense fallback={null}>
-          <AppShell>{children}</AppShell>
+          <AppShell initialCurrentUser={initialCurrentUser}>{children}</AppShell>
         </Suspense>
       </body>
     </html>

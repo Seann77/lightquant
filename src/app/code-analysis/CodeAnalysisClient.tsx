@@ -60,7 +60,8 @@ export function CodeAnalysisClient() {
   const activeAnalysisTaskStatus = data?.task.status ?? null;
   const activeAnalysisTaskRunning = activeAnalysisTaskStatus === "PENDING" || activeAnalysisTaskStatus === "RUNNING";
   const analysisBusy = loading || activeAnalysisTaskRunning;
-  const elapsedSeconds = useElapsedSeconds(analysisBusy);
+  const analysisStartedAt = data?.task.startedAt ?? data?.task.progress?.startedAt ?? data?.task.createdAt ?? undefined;
+  const elapsedSeconds = useElapsedSeconds(analysisBusy, analysisStartedAt);
 
   const activeAnalysisConversationId = data?.conversation?.id ?? data?.task.conversationId ?? conversationIdFromUrl;
 
@@ -486,7 +487,7 @@ function isAbortError(error: unknown) {
   return error instanceof Error && error.name === "AbortError";
 }
 
-function useElapsedSeconds(active: boolean) {
+function useElapsedSeconds(active: boolean, startedAt?: string) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
@@ -495,14 +496,15 @@ function useElapsedSeconds(active: boolean) {
       return;
     }
 
-    setElapsedSeconds(0);
-    const startedAt = Date.now();
+    const startedAtMs = startedAt ? new Date(startedAt).getTime() : Date.now();
+    const safeStartedAt = Number.isFinite(startedAtMs) ? startedAtMs : Date.now();
+    setElapsedSeconds(Math.max(0, Math.floor((Date.now() - safeStartedAt) / 1000)));
     const timer = window.setInterval(() => {
-      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+      setElapsedSeconds(Math.max(0, Math.floor((Date.now() - safeStartedAt) / 1000)));
     }, 1000);
 
     return () => window.clearInterval(timer);
-  }, [active]);
+  }, [active, startedAt]);
 
   return elapsedSeconds;
 }

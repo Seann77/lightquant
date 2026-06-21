@@ -1,5 +1,6 @@
 import type { AiTask, AiTaskScopeStatus } from "@/server/domain";
 import type { AiProviderInput, AiProviderResult } from "@/server/ai/providers/types";
+import { formatStrategyResultAsMarkdown, normalizeStrategyFinalAnswerMarkdown } from "@/lib/ai/strategy-result-format";
 
 type MarkdownSectionKey = "summary" | "code" | "notes" | "risks" | "overview" | "tradingLogic" | "parameters" | "suggestions";
 
@@ -32,7 +33,7 @@ type MarkdownContract = {
 const STRATEGY_CONTRACT: MarkdownContract = {
   keys: ["summary", "code"],
   titles: {
-    summary: "结论摘要",
+    summary: "结论概述",
     code: "策略代码"
   }
 };
@@ -135,6 +136,14 @@ export function normalizeMarkdown(markdown: string, task: Pick<AiTask, "type">) 
   const sections = splitMarkdownSections(trimmed);
 
   if (task.type === "strategy_generation") {
+    const strategyMarkdown = normalizeStrategyFinalAnswerMarkdown({
+      finalAnswerMarkdown: trimmed
+    });
+
+    if (strategyMarkdown && strategyMarkdown !== trimmed) {
+      return strategyMarkdown;
+    }
+
     return buildNormalizedMarkdown(trimmed, sections, STRATEGY_CONTRACT, task);
   }
 
@@ -150,15 +159,7 @@ export function formatProviderResultAsMarkdown(
   task: Pick<AiTask, "type">
 ) {
   if (task.type === "strategy_generation") {
-    return [
-      `## ${STRATEGY_CONTRACT.titles.summary}`,
-      result.explanation?.trim() || "已完成策略处理。",
-      "",
-      `## ${STRATEGY_CONTRACT.titles.code}`,
-      result.generatedCode?.trim()
-        ? `\`\`\`python\n${result.generatedCode.trim()}\n\`\`\``
-        : "暂无可直接运行的策略代码。"
-    ].join("\n");
+    return formatStrategyResultAsMarkdown(result);
   }
 
   if (task.type === "code_analysis") {

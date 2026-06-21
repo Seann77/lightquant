@@ -17,6 +17,7 @@ import {
   Trash2
 } from "lucide-react";
 import { getFileUploadFriendlyError, getUploadAccept, getUploadButtonLabel, uploadCodeFile, type UploadedCodeFile } from "@/lib/file-upload";
+import { normalizeStrategyFinalAnswerMarkdown } from "@/lib/ai/strategy-result-format";
 import { chatPlatformOptions, convertPlatforms } from "@/lib/mock-data";
 import { PlatformDropdown } from "@/components/ui/PlatformDropdown";
 import { AssistantThinkingMessage, type AssistantThinkingStatus } from "@/components/ai/AssistantThinkingMessage";
@@ -1587,16 +1588,20 @@ function StrategyMessageBubble({ elapsedSeconds, message }: { elapsedSeconds?: n
   const streamContent = getMessageStreamingContent(message, result, "strategy_generation");
   const thinkingStatus: AssistantThinkingStatus = status === "failed" ? "failed" : status === "succeeded" ? "completed" : message.localStatus === "pending" ? "thinking" : "idle";
   const failureMessage = error?.message ?? task?.errorMessage ?? message.content;
+  const finalAnswerMarkdown = normalizeStrategyFinalAnswerMarkdown({
+    finalAnswerMarkdown: streamContent.finalAnswerMarkdown,
+    result
+  }) || streamContent.finalAnswerMarkdown;
 
   return (
     <div className="lq-assistant-row">
       <div className={`lq-assistant-message ${status === "failed" ? "is-error" : ""}`}>
         {status === "failed" ? (
           <StrategyFailureMessage message={failureMessage} title={task?.status === "CANCELLED" ? "任务已取消" : "生成失败"} />
-        ) : streamContent.finalAnswerMarkdown || streamContent.visibleThinking || result ? (
+        ) : finalAnswerMarkdown || streamContent.visibleThinking || result ? (
           <AssistantThinkingMessage
             error={null}
-            finalAnswerMarkdown={streamContent.finalAnswerMarkdown}
+            finalAnswerMarkdown={finalAnswerMarkdown}
             status={thinkingStatus}
             thinking={streamContent.visibleThinking}
           />
@@ -1628,7 +1633,13 @@ function StrategyJobBubble({
   const failed = job.status === "failed";
   const canceled = job.status === "canceled";
   const completed = job.status === "completed";
-  const finalAnswerMarkdown = job.finalAnswerMarkdown || (job.result ? formatAiTaskResultAsMarkdown(job.result, "strategy_generation") : "");
+  const rawFinalAnswerMarkdown = job.finalAnswerMarkdown || (job.result ? formatAiTaskResultAsMarkdown(job.result, "strategy_generation") : "");
+  const finalAnswerMarkdown = job.status === "streaming"
+    ? rawFinalAnswerMarkdown
+    : normalizeStrategyFinalAnswerMarkdown({
+      finalAnswerMarkdown: rawFinalAnswerMarkdown,
+      result: job.result
+    }) || rawFinalAnswerMarkdown;
   const thinkingStatus: AssistantThinkingStatus = failed || canceled ? "failed" : completed ? "completed" : job.status === "streaming" ? "answering" : "thinking";
   const visibleThinking = job.visibleThinking?.trim() ?? "";
   const visibleError = failed || canceled ? job.error ?? null : null;
@@ -1787,7 +1798,13 @@ function createStrategyJobFromTask(
   const createdAt = task.createdAt ?? input.previous?.createdAt ?? new Date().toISOString();
   const resultText = input.result ? [input.result.explanation, input.result.generatedCode, input.result.migrationNotes].filter(Boolean).join("\n\n") : undefined;
   const visibleThinking = preserveStreamBuffer(input.visibleThinking, input.previous?.visibleThinking);
-  const finalAnswerMarkdown = preserveStreamBuffer(input.finalAnswerMarkdown, input.previous?.finalAnswerMarkdown);
+  const preservedFinalAnswerMarkdown = preserveStreamBuffer(input.finalAnswerMarkdown, input.previous?.finalAnswerMarkdown);
+  const finalAnswerMarkdown = status === "completed"
+    ? normalizeStrategyFinalAnswerMarkdown({
+      finalAnswerMarkdown: preservedFinalAnswerMarkdown,
+      result: input.result ?? input.previous?.result
+    }) || preservedFinalAnswerMarkdown
+    : preservedFinalAnswerMarkdown;
 
   return {
     id: task.id,
