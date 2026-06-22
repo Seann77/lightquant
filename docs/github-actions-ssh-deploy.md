@@ -1,6 +1,6 @@
 # LightQuant GitHub Actions + 腾讯云 CVM 部署指南
 
-本文适用于当前阶段：只有一台腾讯云服务器，正式环境已经部署在 `lightquant.cloud`，需要在同一台服务器上增加测试环境，并让 GitHub push 后自动部署。
+本文适用于当前阶段：只有一台腾讯云服务器，正式环境已经部署在 `lightquant.cloud`，需要在同一台服务器上增加测试环境，并让测试环境 GitHub push 后自动部署；正式环境采用手动一键部署，避免推送代码时误碰线上。
 
 ## 目标结构
 
@@ -139,7 +139,7 @@ git checkout staging
 git push origin staging
 ```
 
-也可以在 GitHub 仓库 `Actions -> LightQuant SSH Deploy -> Run workflow` 中手动选择 `staging`。
+也可以在 GitHub 仓库 `Actions -> LightQuant SSH Deploy -> Run workflow` 中手动选择 `staging`，但必须从 `staging` 分支触发。
 
 部署完成后，在服务器上检查：
 
@@ -219,7 +219,7 @@ LIGHTQUANT_AI_MODEL=mimo-v2.5-pro
 LIGHTQUANT_AI_API_KEY=
 ```
 
-`prod.deploy.env` 未准备好之前，不要手动触发 `production` workflow，也不要把未验证的改动推到 `master`。
+`prod.deploy.env` 未准备好之前，不要手动触发 `production` workflow，也不要把未验证的改动合入 `master`。
 
 ## 6. 后续发布节奏
 
@@ -250,6 +250,8 @@ git pull --ff-only origin master
 git merge --no-ff staging
 git push origin master
 ```
+
+推送 `master` 不会自动部署正式环境。确认要上线后，到 GitHub 仓库 `Actions -> LightQuant SSH Deploy -> Run workflow`，选择 `master` 分支和 `production` target 后手动运行。
 
 ## 7. 常用排查命令
 
