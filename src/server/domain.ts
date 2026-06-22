@@ -49,6 +49,8 @@ export type SmsCodeRecord = {
   expiresAt: string;
   usedAt: string | null;
   requestIp: string | null;
+  failedAttempts: number;
+  lastFailedAt: string | null;
   createdAt: string;
 };
 

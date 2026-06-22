@@ -1,0 +1,143 @@
+name: LightQuant SSH Deploy
+
+on:
+  push:
+    branches:
+      - staging
+      - master
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Deployment target
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+        default: staging
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lightquant-deploy-${{ github.event_name == 'workflow_dispatch' && inputs.target || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      SERVER_HOST: ${{ secrets.TENCENT_CVM_HOST }}
+      SERVER_PORT: ${{ secrets.TENCENT_CVM_PORT || '22' }}
+      SERVER_USER: ${{ secrets.TENCENT_CVM_USER }}
+      SSH_PRIVATE_KEY: ${{ secrets.TENCENT_CVM_SSH_KEY }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Resolve deployment target
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            target="${{ inputs.target }}"
+          elif [[ "${GITHUB_REF_NAME}" == "master" ]]; then
+            target="production"
+          else
+            target="staging"
+          fi
+
+          if [[ "$target" == "production" && "${GITHUB_REF_NAME}" != "master" ]]; then
+            echo "Production deploys must run from master." >&2
+            exit 1
+          fi
+
+          if [[ "$target" == "production" ]]; then
+            echo "DEPLOY_ENV_FILE=/etc/lightquant/prod.deploy.env" >> "$GITHUB_ENV"
+            echo "DEPLOY_TARGET=production" >> "$GITHUB_ENV"
+          else
+            echo "DEPLOY_ENV_FILE=/etc/lightquant/staging.deploy.env" >> "$GITHUB_ENV"
+            echo "DEPLOY_TARGET=staging" >> "$GITHUB_ENV"
+          fi
+
+          echo "REMOTE_PACKAGE=/tmp/lightquant-source-${GITHUB_SHA}.tar.gz" >> "$GITHUB_ENV"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Run repository checks
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          npm ci
+          npm run check:quick
+
+      - name: Pack source
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git archive --format=tar.gz --output lightquant-source.tar.gz HEAD
+
+      - name: Configure SSH
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          if [[ -z "${SERVER_HOST}" || -z "${SERVER_USER}" || -z "${SSH_PRIVATE_KEY}" ]]; then
+            echo "Missing one of TENCENT_CVM_HOST, TENCENT_CVM_USER, TENCENT_CVM_SSH_KEY." >&2
+            exit 1
+          fi
+
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${SSH_PRIVATE_KEY}" > ~/.ssh/tencent_cvm_key
+          chmod 600 ~/.ssh/tencent_cvm_key
+          ssh-keyscan -p "${SERVER_PORT}" -H "${SERVER_HOST}" >> ~/.ssh/known_hosts
+
+      - name: Upload source package
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          scp -P "${SERVER_PORT}" -i ~/.ssh/tencent_cvm_key lightquant-source.tar.gz \
+            "${SERVER_USER}@${SERVER_HOST}:${REMOTE_PACKAGE}"
+
+      - name: Deploy on Tencent CVM
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          ssh -p "${SERVER_PORT}" -i ~/.ssh/tencent_cvm_key \
+            "${SERVER_USER}@${SERVER_HOST}" \
+            "DEPLOY_ENV_FILE='${DEPLOY_ENV_FILE}' REMOTE_PACKAGE='${REMOTE_PACKAGE}' bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+
+          if [[ ! -f "$DEPLOY_ENV_FILE" ]]; then
+            echo "Missing deploy env file: $DEPLOY_ENV_FILE" >&2
+            exit 1
+          fi
+
+          source_dir="$(mktemp -d /tmp/lightquant-source.XXXXXX)"
+          cleanup() {
+            rm -rf "$source_dir"
+            rm -f "$REMOTE_PACKAGE"
+          }
+          trap cleanup EXIT
+
+          tar -xzf "$REMOTE_PACKAGE" -C "$source_dir"
+
+          set -a
+          # shellcheck source=/dev/null
+          source "$DEPLOY_ENV_FILE"
+          set +a
+
+          LOCAL_SOURCE_DIR="$source_dir" bash "$source_dir/deploy/ubuntu-one-click-deploy.sh"
+
+          curl -fsS "http://127.0.0.1:${APP_PORT}/" >/dev/null
+          echo "LightQuant ${APP_NAME} deploy finished on ${APP_PORT}."
+          REMOTE

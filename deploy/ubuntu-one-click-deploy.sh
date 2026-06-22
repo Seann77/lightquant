@@ -20,6 +20,7 @@ APP_PORT="${APP_PORT:-3000}"
 APP_DOMAIN="${APP_DOMAIN:-}"
 REPO_URL="${REPO_URL:-}"
 REPO_BRANCH="${REPO_BRANCH:-master}"
+LOCAL_SOURCE_DIR="${LOCAL_SOURCE_DIR:-}"
 ADMIN_PHONE="${ADMIN_PHONE:-}"
 LIGHTQUANT_SMS_PROVIDER="${LIGHTQUANT_SMS_PROVIDER:-tencent}"
 ALIBABA_CLOUD_ACCESS_KEY_ID="${ALIBABA_CLOUD_ACCESS_KEY_ID:-}"
@@ -266,7 +267,7 @@ validate_sms_provider_config() {
 
 install_system_packages() {
   run_sudo apt-get update
-  run_sudo apt-get install -y ca-certificates curl git nginx postgresql postgresql-contrib apache2-utils openssl
+  run_sudo apt-get install -y ca-certificates curl git nginx postgresql postgresql-contrib apache2-utils openssl rsync
 
   if ! need_command node || [[ "$(node -v | sed 's/^v//' | cut -d. -f1)" != "$NODE_MAJOR" ]]; then
     curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | run_sudo bash -
@@ -310,6 +311,26 @@ SQL
 prepare_source() {
   run_sudo mkdir -p "$(dirname "$APP_DIR")"
   run_sudo chown -R "${USER:-root}:${USER:-root}" "$(dirname "$APP_DIR")"
+
+  if [[ -n "$LOCAL_SOURCE_DIR" ]]; then
+    if [[ ! -f "$LOCAL_SOURCE_DIR/package.json" ]]; then
+      echo "LOCAL_SOURCE_DIR must point to a LightQuant source directory containing package.json." >&2
+      exit 1
+    fi
+
+    run_sudo mkdir -p "$APP_DIR"
+    run_sudo chown -R "${USER:-root}:${USER:-root}" "$APP_DIR"
+    rsync -a --delete \
+      --exclude ".git/" \
+      --exclude ".env" \
+      --exclude ".env.local" \
+      --exclude ".deploy-secrets" \
+      --exclude ".lightquant/" \
+      --exclude ".next/" \
+      --exclude "node_modules/" \
+      "$LOCAL_SOURCE_DIR"/ "$APP_DIR"/
+    return
+  fi
 
   if [[ -d "$APP_DIR/.git" ]]; then
     git -C "$APP_DIR" fetch --all --prune

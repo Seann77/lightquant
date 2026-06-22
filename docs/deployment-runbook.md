@@ -23,6 +23,15 @@ bash deploy/ubuntu-one-click-deploy.sh
 
 如果不想把 `LIGHTQUANT_AI_API_KEY` 放在命令行里，也可以不传该变量，脚本会交互式隐藏输入。留空时部署仍可继续，但真实 AI 调用会在配置补齐前返回 `AI_PROVIDER_CONFIG_ERROR`。
 
+如果服务器无法访问 GitHub，可以上传源码包并从本地目录部署：
+
+```bash
+mkdir -p ~/lightquant-src
+tar -xzf ~/lightquant-source.tar.gz -C ~/lightquant-src
+cd ~/lightquant-src
+LOCAL_SOURCE_DIR="$PWD" bash deploy/ubuntu-one-click-deploy.sh
+```
+
 ## 输入预检查
 
 脚本会在安装系统包和写入配置前做轻量校验，尽量让错误早一点、清楚一点暴露出来：

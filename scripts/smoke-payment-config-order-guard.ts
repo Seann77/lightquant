@@ -1,3 +1,5 @@
+export {};
+
 const userId = "smoke-payment-config-order-guard-user";
 
 process.env.LIGHTQUANT_DATA_MODE = "mock";

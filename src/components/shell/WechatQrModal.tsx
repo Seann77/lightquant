@@ -1,6 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import { MaterialIcon } from "@/components/ui/MaterialIcon";
+
+const WECHAT_GROUP_QR_SRC = "/lightquant/lightquant-wechat-group-20260628.png";
 
 type WechatQrModalProps = {
   open: boolean;
@@ -36,23 +39,19 @@ export function WechatQrModal({ onClose, open }: WechatQrModalProps) {
           <p className="mt-xs text-caption-md text-secondary">扫码加入 LightQuant 量化学习交流群，获取功能更新与使用支持。</p>
         </div>
 
-        <div className="mx-auto flex h-52 w-52 items-center justify-center rounded-xl border border-outline-variant bg-surface-container-low p-md">
-          <div className="grid h-full w-full grid-cols-5 grid-rows-5 gap-1 rounded bg-paper p-2">
-            {Array.from({ length: 25 }).map((_, index) => {
-              const filled = [0, 1, 2, 4, 5, 7, 10, 11, 12, 14, 16, 18, 19, 20, 22, 24].includes(index);
-
-              return (
-                <span
-                  className={`rounded-sm ${filled ? "bg-ink" : "bg-surface-container"}`}
-                  key={index}
-                />
-              );
-            })}
-          </div>
+        <div className="mx-auto flex w-full max-w-[264px] items-center justify-center rounded-xl border border-outline-variant bg-surface-container-low p-sm">
+          <Image
+            alt="LightQuant 微信群二维码"
+            className="h-auto w-full max-w-[240px] rounded-lg bg-paper"
+            height={669}
+            sizes="(max-width: 420px) 68vw, 240px"
+            src={WECHAT_GROUP_QR_SRC}
+            width={669}
+          />
         </div>
 
         <div className="mt-lg rounded bg-cloud px-sm py-sm text-caption-sm text-graphite">
-          当前为前端静态占位二维码，后续替换为真实微信群二维码图片。
+          微信群二维码有效期至 2026-06-28，过期后我们会更新。
         </div>
       </div>
     </div>

@@ -204,17 +204,21 @@ model UserLegalConsent {
 }
 
 model SmsCode {
-  id        String    @id @default(uuid()) @db.Uuid
-  phone     String    @db.VarChar(20)
-  scene     SmsScene
-  codeHash  String?   @map("code_hash") @db.VarChar(255)
-  mockCode  String?   @map("mock_code") @db.VarChar(32)
-  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
-  usedAt    DateTime? @map("used_at") @db.Timestamptz(3)
-  requestIp String?   @map("request_ip") @db.VarChar(80)
-  createdAt DateTime  @map("created_at") @db.Timestamptz(3)
+  id             String    @id @default(uuid()) @db.Uuid
+  phone          String    @db.VarChar(20)
+  scene          SmsScene
+  codeHash       String?   @map("code_hash") @db.VarChar(255)
+  mockCode       String?   @map("mock_code") @db.VarChar(32)
+  expiresAt      DateTime  @map("expires_at") @db.Timestamptz(3)
+  usedAt         DateTime? @map("used_at") @db.Timestamptz(3)
+  requestIp      String?   @map("request_ip") @db.VarChar(80)
+  failedAttempts Int       @default(0) @map("failed_attempts")
+  lastFailedAt   DateTime? @map("last_failed_at") @db.Timestamptz(3)
+  createdAt      DateTime  @map("created_at") @db.Timestamptz(3)
 
   @@index([phone, scene, expiresAt])
+  @@index([phone, scene, createdAt])
+  @@index([requestIp, createdAt])
   @@map("sms_codes")
 }
 

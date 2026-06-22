@@ -48,6 +48,7 @@
     "smoke:payment:expired-duplicate": "tsx scripts/smoke-payment-expired-duplicate.ts",
     "smoke:payment:expired-notify": "tsx scripts/smoke-payment-expired-notify.ts",
     "smoke:payment:regression": "node scripts/smoke-payment-regression.mjs",
+    "smoke:auth:sms-rate-limit": "tsx scripts/smoke-auth-sms-rate-limit.ts",
     "smoke:ui:pages": "node scripts/smoke-ui-pages-local.mjs",
     "smoke:ai:config-check": "node scripts/smoke-ai-config-check.mjs",
     "smoke:ai:local": "node scripts/smoke-ai-async-local.mjs",
