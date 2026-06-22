@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - staging
-      - master
   workflow_dispatch:
     inputs:
       target:
@@ -14,7 +13,7 @@ on:
         options:
           - staging
           - production
-        default: staging
+        default: production
 
 permissions:
   contents: read
@@ -52,7 +51,12 @@ jobs:
           fi
 
           if [[ "$target" == "production" && "${GITHUB_REF_NAME}" != "master" ]]; then
-            echo "Production deploys must run from master." >&2
+            echo "Production deploys must be triggered manually from master." >&2
+            exit 1
+          fi
+
+          if [[ "$target" == "staging" && "${GITHUB_REF_NAME}" != "staging" ]]; then
+            echo "Staging deploys must run from staging." >&2
             exit 1
           fi
 
