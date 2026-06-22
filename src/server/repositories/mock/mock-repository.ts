@@ -131,11 +131,25 @@ export class MockLightQuantRepository implements LightQuantRepository {
     const record: SmsCodeRecord = {
       id: randomUUID(),
       ...input,
-      usedAt: null
+      usedAt: null,
+      failedAttempts: 0,
+      lastFailedAt: null
     };
 
     this.smsCodes.set(record.id, record);
     return record;
+  }
+
+  async countSmsCodesByPhoneSceneSince(phone: string, scene: SmsCodeRecord["scene"], since: string) {
+    return [...this.smsCodes.values()]
+      .filter((item) => item.phone === phone && item.scene === scene && item.createdAt >= since)
+      .length;
+  }
+
+  async countSmsCodesByRequestIpSince(requestIp: string, since: string) {
+    return [...this.smsCodes.values()]
+      .filter((item) => item.requestIp === requestIp && item.createdAt >= since)
+      .length;
   }
 
   async findSmsCodeForVerification(phone: string, scene: SmsCodeRecord["scene"], code: string, now: string) {
@@ -151,6 +165,24 @@ export class MockLightQuantRepository implements LightQuantRepository {
     return [...this.smsCodes.values()]
       .filter((item) => item.phone === phone && item.scene === scene && !item.usedAt && item.expiresAt > now)
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0] ?? null;
+  }
+
+  async markSmsCodeVerificationFailed(input: { id: string; failedAt: string; resetBefore: string }) {
+    const record = this.smsCodes.get(input.id);
+
+    if (!record) {
+      return null;
+    }
+
+    const shouldReset = !record.lastFailedAt || record.lastFailedAt <= input.resetBefore;
+    const updated = {
+      ...record,
+      failedAttempts: shouldReset ? 1 : record.failedAttempts + 1,
+      lastFailedAt: input.failedAt
+    };
+
+    this.smsCodes.set(input.id, updated);
+    return updated;
   }
 
   async markSmsCodeUsed(id: string, usedAt: string) {

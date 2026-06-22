@@ -1,6 +1,6 @@
 import { createHash, randomInt, randomUUID } from "crypto";
 import type { SmsCodeRecord, SmsScene, User } from "@/server/domain";
-import { getAliyunSmsConfig, getAuthSecret, getSmsProviderMode, getTencentSmsConfig, shouldExposeMockSmsCode } from "@/server/env";
+import { getAliyunSmsConfig, getAuthSecret, getSmsProviderMode, getTencentSmsConfig } from "@/server/env";
 import { applyInviteBonus, ensureSignupBonus, INVITE_BONUS_POINTS, toCreditAccountResponse } from "@/server/credits/credit-service";
 import { checkAliyunSmsCode, sendAliyunSmsCode } from "@/server/auth/aliyun-sms-provider";
 import { sendTencentSmsCode } from "@/server/auth/tencent-sms-provider";
@@ -15,7 +15,15 @@ const CURRENT_AGREEMENT_VERSION = "2026-06-09";
 const CURRENT_PRIVACY_VERSION = "2026-06-09";
 const ALIYUN_SMS_CODE_HASH_PREFIX = "aliyun:";
 const TENCENT_SMS_CODE_HASH_PREFIX = "tencent:";
+const SMS_RATE_LIMIT_MESSAGE = "发送过于频繁，请稍后再试";
 const INVALID_SMS_CODE_MESSAGE = "验证码不正确或已过期";
+const SMS_SEND_COOLDOWN_MS = 60 * 1000;
+const SMS_PHONE_DAILY_LIMIT = 10;
+const SMS_IP_HOURLY_LIMIT = 30;
+const SMS_VERIFY_FAILURE_LIMIT = 5;
+const SMS_VERIFY_FAILURE_LOCK_MS = 5 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
 type InviteRewardResponse = {
   granted: boolean;
   inviterUserId: string | null;
@@ -36,6 +44,13 @@ export async function requestSmsCode(input: { phone: string; scene?: SmsScene; r
   const now = new Date();
   const repository = getRepository();
   const provider = getSmsProviderMode();
+  await assertSmsSendAllowed({
+    repository,
+    phone,
+    scene,
+    requestIp: input.requestIp,
+    now
+  });
 
   if (provider === "aliyun") {
     const outId = createAliyunSmsOutId();
@@ -100,8 +115,7 @@ export async function requestSmsCode(input: { phone: string; scene?: SmsScene; r
   return {
     phone: record.phone,
     scene: record.scene,
-    expiresAt: record.expiresAt,
-    mockCode: shouldExposeMockSmsCode() ? MOCK_SMS_CODE : undefined
+    expiresAt: record.expiresAt
   };
 }
 
@@ -121,12 +135,35 @@ export async function loginWithSmsCode(input: {
   const phone = normalizePhone(input.phone);
   const code = normalizeSmsCode(input.code);
   const smsProvider = getSmsProviderMode();
-  const verifiedAliyunSmsCode = smsProvider === "aliyun" ? await verifyAliyunLoginSmsCode(phone, code) : null;
-  const verifiedTencentSmsCode = smsProvider === "tencent" ? await verifyTencentLoginSmsCode(phone, code) : null;
+  const repository = getRepository();
+  const now = new Date().toISOString();
+  const latestSmsCode = await repository.findLatestSmsCodeForVerification(phone, "login", now);
+  assertSmsVerificationAllowed(latestSmsCode, now);
+
+  let verifiedSmsCode: SmsCodeRecord | null = null;
+
+  try {
+    verifiedSmsCode =
+      smsProvider === "aliyun"
+        ? await verifyAliyunLoginSmsCode(phone, code, latestSmsCode)
+        : smsProvider === "tencent"
+          ? await verifyTencentLoginSmsCode(phone, code, latestSmsCode)
+          : await repository.findSmsCodeForVerification(phone, "login", code, now);
+  } catch (error) {
+    if (isInvalidSmsCodeError(error)) {
+      await recordSmsVerificationFailure(latestSmsCode, now);
+    }
+
+    throw error;
+  }
+
+  if (!verifiedSmsCode) {
+    await recordSmsVerificationFailure(latestSmsCode, now);
+    throw new ApiError("VALIDATION_ERROR", INVALID_SMS_CODE_MESSAGE, 400);
+  }
 
   return withRepositoryTransaction(async () => {
     const repository = getRepository();
-    const now = new Date().toISOString();
     const smsCode =
       smsProvider === "aliyun"
         ? await repository.findLatestSmsCodeForVerification(phone, "login", now)
@@ -134,11 +171,7 @@ export async function loginWithSmsCode(input: {
           ? await repository.findLatestSmsCodeForVerification(phone, "login", now)
         : await repository.findSmsCodeForVerification(phone, "login", code, now);
 
-    if (
-      !smsCode ||
-      (verifiedAliyunSmsCode && smsCode.id !== verifiedAliyunSmsCode.id) ||
-      (verifiedTencentSmsCode && smsCode.id !== verifiedTencentSmsCode.id)
-    ) {
+    if (!smsCode || smsCode.id !== verifiedSmsCode.id) {
       throw new ApiError("VALIDATION_ERROR", INVALID_SMS_CODE_MESSAGE, 400);
     }
 
@@ -188,10 +221,66 @@ export async function loginWithSmsCode(input: {
   });
 }
 
-async function verifyAliyunLoginSmsCode(phone: string, code: string) {
-  const repository = getRepository();
-  const now = new Date().toISOString();
-  const smsCode = await repository.findLatestSmsCodeForVerification(phone, "login", now);
+async function assertSmsSendAllowed(input: {
+  repository: ReturnType<typeof getRepository>;
+  phone: string;
+  scene: SmsScene;
+  requestIp: string | null;
+  now: Date;
+}) {
+  const nowMs = input.now.getTime();
+  const cooldownSince = new Date(nowMs - SMS_SEND_COOLDOWN_MS).toISOString();
+  const daySince = new Date(nowMs - DAY_MS).toISOString();
+  const hourSince = new Date(nowMs - HOUR_MS).toISOString();
+  const [recentPhoneCount, dailyPhoneCount, hourlyIpCount] = await Promise.all([
+    input.repository.countSmsCodesByPhoneSceneSince(input.phone, input.scene, cooldownSince),
+    input.repository.countSmsCodesByPhoneSceneSince(input.phone, input.scene, daySince),
+    input.requestIp ? input.repository.countSmsCodesByRequestIpSince(input.requestIp, hourSince) : Promise.resolve(0)
+  ]);
+
+  if (
+    recentPhoneCount > 0 ||
+    dailyPhoneCount >= SMS_PHONE_DAILY_LIMIT ||
+    hourlyIpCount >= SMS_IP_HOURLY_LIMIT
+  ) {
+    throw createSmsRateLimitError();
+  }
+}
+
+function assertSmsVerificationAllowed(smsCode: SmsCodeRecord | null, now: string) {
+  if (!smsCode?.lastFailedAt || smsCode.failedAttempts < SMS_VERIFY_FAILURE_LIMIT) {
+    return;
+  }
+
+  const lastFailedAtMs = new Date(smsCode.lastFailedAt).getTime();
+  const nowMs = new Date(now).getTime();
+
+  if (Number.isFinite(lastFailedAtMs) && nowMs - lastFailedAtMs < SMS_VERIFY_FAILURE_LOCK_MS) {
+    throw createSmsRateLimitError();
+  }
+}
+
+async function recordSmsVerificationFailure(smsCode: SmsCodeRecord | null, failedAt: string) {
+  if (!smsCode) {
+    return;
+  }
+
+  await getRepository().markSmsCodeVerificationFailed({
+    id: smsCode.id,
+    failedAt,
+    resetBefore: new Date(new Date(failedAt).getTime() - SMS_VERIFY_FAILURE_LOCK_MS).toISOString()
+  });
+}
+
+function createSmsRateLimitError() {
+  return new ApiError("RATE_LIMITED", SMS_RATE_LIMIT_MESSAGE, 429);
+}
+
+function isInvalidSmsCodeError(error: unknown) {
+  return error instanceof ApiError && error.code === "VALIDATION_ERROR" && error.message === INVALID_SMS_CODE_MESSAGE;
+}
+
+async function verifyAliyunLoginSmsCode(phone: string, code: string, smsCode: SmsCodeRecord | null) {
   const outId = smsCode ? getAliyunSmsCodeOutId(smsCode) : null;
 
   if (!smsCode || !outId) {
@@ -211,11 +300,7 @@ async function verifyAliyunLoginSmsCode(phone: string, code: string) {
   return smsCode;
 }
 
-async function verifyTencentLoginSmsCode(phone: string, code: string) {
-  const repository = getRepository();
-  const now = new Date().toISOString();
-  const smsCode = await repository.findLatestSmsCodeForVerification(phone, "login", now);
-
+async function verifyTencentLoginSmsCode(phone: string, code: string, smsCode: SmsCodeRecord | null) {
   if (!smsCode || smsCode.codeHash !== createTencentSmsCodeHash(phone, code)) {
     throw new ApiError("VALIDATION_ERROR", INVALID_SMS_CODE_MESSAGE, 400);
   }
@@ -307,7 +392,7 @@ function normalizePhone(phone: string) {
   const value = phone.trim();
 
   if (!PHONE_PATTERN.test(value)) {
-    throw new ApiError("VALIDATION_ERROR", "请输入有效的手机号", 400);
+    throw new ApiError("VALIDATION_ERROR", "请输入有效手机号", 400);
   }
 
   return value;
@@ -317,7 +402,7 @@ function normalizeSmsCode(code: string) {
   const value = code.trim();
 
   if (!/^\d{6}$/.test(value)) {
-    throw new ApiError("VALIDATION_ERROR", "请输入 6 位验证码", 400);
+    throw new ApiError("VALIDATION_ERROR", INVALID_SMS_CODE_MESSAGE, 400);
   }
 
   return value;

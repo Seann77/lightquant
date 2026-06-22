@@ -125,7 +125,7 @@ LIGHTQUANT_AI_API_KEY=
 
 ```bash
 sudo chmod 600 /etc/lightquant/staging.deploy.env
-sudo chown root:root /etc/lightquant/staging.deploy.env
+sudo chown ubuntu:ubuntu /etc/lightquant/staging.deploy.env
 ```
 
 测试环境建议先不解析公网域名，所以 `ENABLE_SSL=false`。如果后续要让外部内测用户访问，再单独配置 `staging.lightquant.cloud`、HTTPS 和访问保护。
@@ -174,7 +174,7 @@ sudo cat /var/www/lightquant/.deploy-secrets
 ```bash
 sudo nano /etc/lightquant/prod.deploy.env
 sudo chmod 600 /etc/lightquant/prod.deploy.env
-sudo chown root:root /etc/lightquant/prod.deploy.env
+sudo chown ubuntu:ubuntu /etc/lightquant/prod.deploy.env
 ```
 
 正式环境模板：

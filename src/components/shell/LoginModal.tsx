@@ -69,6 +69,8 @@ export function LoginModal({ initialInviteCode, onClose, onLoginSuccess, open }:
   const [legalError, setLegalError] = useState("");
   const [sendingCode, setSendingCode] = useState(false);
   const [loggingIn, setLoggingIn] = useState(false);
+  const [codeCooldownSeconds, setCodeCooldownSeconds] = useState(0);
+  const [hasSentCode, setHasSentCode] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -83,11 +85,33 @@ export function LoginModal({ initialInviteCode, onClose, onLoginSuccess, open }:
     }
   }, [initialInviteCode, open]);
 
+  useEffect(() => {
+    if (codeCooldownSeconds <= 0) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setCodeCooldownSeconds((current) => Math.max(0, current - 1));
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [codeCooldownSeconds]);
+
   if (!open) {
     return null;
   }
 
   async function handleSendCode() {
+    if (sendingCode || codeCooldownSeconds > 0) {
+      return;
+    }
+
+    if (!isValidPhone(phone)) {
+      setError("请输入有效手机号");
+      setMessage("");
+      return;
+    }
+
     setSendingCode(true);
     setError("");
     setMessage("");
@@ -103,14 +127,16 @@ export function LoginModal({ initialInviteCode, onClose, onLoginSuccess, open }:
           scene: "login"
         })
       });
-      const payload = (await response.json()) as ApiResponse<{ expiresAt: string; mockCode?: string }>;
+      const payload = (await response.json()) as ApiResponse<{ expiresAt: string }>;
 
       if (!payload.success) {
         setError(payload.error.message);
         return;
       }
 
-      setMessage(payload.data.mockCode ? `验证码已生成：${payload.data.mockCode}` : "验证码已发送，请注意查收");
+      setHasSentCode(true);
+      setCodeCooldownSeconds(60);
+      setMessage("验证码已发送，请注意查收");
     } catch {
       setError("验证码发送失败，请稍后再试");
     } finally {
@@ -217,8 +243,8 @@ export function LoginModal({ initialInviteCode, onClose, onLoginSuccess, open }:
                   value={code}
                 />
               </span>
-              <button className="lq-code-button" disabled={sendingCode} onClick={handleSendCode} type="button">
-                {sendingCode ? "发送中" : "获取验证码"}
+              <button className="lq-code-button" disabled={sendingCode || codeCooldownSeconds > 0} onClick={handleSendCode} type="button">
+                {getCodeButtonText({ codeCooldownSeconds, hasSentCode, sendingCode })}
               </button>
             </div>
           </div>
@@ -282,6 +308,30 @@ export function LoginModal({ initialInviteCode, onClose, onLoginSuccess, open }:
 
 function normalizeInviteCode(value: string) {
   return value.trim().toUpperCase();
+}
+
+function isValidPhone(value: string) {
+  return /^1[3-9]\d{9}$/.test(value.trim());
+}
+
+function getCodeButtonText({
+  codeCooldownSeconds,
+  hasSentCode,
+  sendingCode
+}: {
+  codeCooldownSeconds: number;
+  hasSentCode: boolean;
+  sendingCode: boolean;
+}) {
+  if (sendingCode) {
+    return "发送中...";
+  }
+
+  if (codeCooldownSeconds > 0) {
+    return `重新发送 ${codeCooldownSeconds}s`;
+  }
+
+  return hasSentCode ? "重新获取" : "获取验证码";
 }
 
 function readInviteCodeFromLocation() {

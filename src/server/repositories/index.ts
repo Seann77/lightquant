@@ -54,6 +54,9 @@ function isRepositoryShapeCurrent(repository: LightQuantRepository) {
     typeof repository.findActiveMembershipForUser === "function" &&
     typeof repository.upsertUserMembership === "function" &&
     typeof repository.countAiTasksForUserSince === "function" &&
-    typeof repository.countActiveAiTasksForUser === "function"
+    typeof repository.countActiveAiTasksForUser === "function" &&
+    typeof repository.countSmsCodesByPhoneSceneSince === "function" &&
+    typeof repository.countSmsCodesByRequestIpSince === "function" &&
+    typeof repository.markSmsCodeVerificationFailed === "function"
   );
 }

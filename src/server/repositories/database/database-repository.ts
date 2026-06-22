@@ -91,6 +91,29 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
     return toSmsCode(record);
   }
 
+  async countSmsCodesByPhoneSceneSince(phone: string, scene: SmsCodeRecord["scene"], since: string) {
+    return this.db.smsCode.count({
+      where: {
+        phone,
+        scene,
+        createdAt: {
+          gte: toDate(since)
+        }
+      }
+    });
+  }
+
+  async countSmsCodesByRequestIpSince(requestIp: string, since: string) {
+    return this.db.smsCode.count({
+      where: {
+        requestIp,
+        createdAt: {
+          gte: toDate(since)
+        }
+      }
+    });
+  }
+
   async findSmsCodeForVerification(phone: string, scene: SmsCodeRecord["scene"], code: string, now: string) {
     const record = await this.db.smsCode.findFirst({
       where: {
@@ -133,6 +156,33 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
     });
 
     return record ? toSmsCode(record) : null;
+  }
+
+  async markSmsCodeVerificationFailed(input: { id: string; failedAt: string; resetBefore: string }) {
+    const current = await this.db.smsCode.findUnique({
+      where: {
+        id: input.id
+      }
+    });
+
+    if (!current) {
+      return null;
+    }
+
+    const resetBefore = toDate(input.resetBefore);
+    const failedAt = toDate(input.failedAt);
+    const shouldReset = !current.lastFailedAt || current.lastFailedAt <= resetBefore;
+    const record = await this.db.smsCode.update({
+      where: {
+        id: input.id
+      },
+      data: {
+        failedAttempts: shouldReset ? 1 : current.failedAttempts + 1,
+        lastFailedAt: failedAt
+      }
+    });
+
+    return toSmsCode(record);
   }
 
   async markSmsCodeUsed(id: string, usedAt: string) {
@@ -1843,6 +1893,8 @@ function toSmsCode(record: {
   expiresAt: Date;
   usedAt: Date | null;
   requestIp: string | null;
+  failedAttempts: number;
+  lastFailedAt: Date | null;
   createdAt: Date;
 }): SmsCodeRecord {
   return {
@@ -1854,6 +1906,8 @@ function toSmsCode(record: {
     expiresAt: toIso(record.expiresAt),
     usedAt: record.usedAt ? toIso(record.usedAt) : null,
     requestIp: record.requestIp,
+    failedAttempts: record.failedAttempts,
+    lastFailedAt: record.lastFailedAt ? toIso(record.lastFailedAt) : null,
     createdAt: toIso(record.createdAt)
   };
 }

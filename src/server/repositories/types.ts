@@ -82,6 +82,12 @@ export type CreateSmsCodeInput = {
   createdAt: string;
 };
 
+export type SmsCodeFailureUpdateInput = {
+  id: string;
+  failedAt: string;
+  resetBefore: string;
+};
+
 export type CreateUserInput = {
   phone: string;
   displayName: string;
@@ -416,8 +422,11 @@ export type AdminUploadedFilePage = {
 
 export interface LightQuantRepository {
   createSmsCode(input: CreateSmsCodeInput): Promise<SmsCodeRecord>;
+  countSmsCodesByPhoneSceneSince(phone: string, scene: SmsScene, since: string): Promise<number>;
+  countSmsCodesByRequestIpSince(requestIp: string, since: string): Promise<number>;
   findSmsCodeForVerification(phone: string, scene: SmsScene, code: string, now: string): Promise<SmsCodeRecord | null>;
   findLatestSmsCodeForVerification(phone: string, scene: SmsScene, now: string): Promise<SmsCodeRecord | null>;
+  markSmsCodeVerificationFailed(input: SmsCodeFailureUpdateInput): Promise<SmsCodeRecord | null>;
   markSmsCodeUsed(id: string, usedAt: string): Promise<void>;
   findUserById(id: string): Promise<User | null>;
   findUserByPhone(phone: string): Promise<User | null>;
