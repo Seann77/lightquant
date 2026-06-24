@@ -2,6 +2,23 @@
 
 本文适用于当前阶段：只有一台腾讯云服务器，正式环境已经部署在 `lightquant.cloud`，需要在同一台服务器上增加测试环境，并让测试环境 GitHub push 后自动部署；正式环境采用手动一键部署，避免推送代码时误碰线上。
 
+## 第一阶段后台优化发布约束
+
+当前正式域名是 `https://lightquant.cloud`，正式后台入口本阶段先使用 `https://lightquant.cloud/admin`。后续可以规划 `admin.lightquant.cloud`，但第一阶段不要求拆分后台域名。
+
+第一阶段只整理上线前基线和后台写保护，不实现总览页改造、补积分、积分流水、订单增强、留言反馈或模型配置页面。真实短信已具备，生产继续使用 Tencent SMS；真实支付仍在建设中，生产保持 `PAYMENT_FEATURE_ENABLED=false`。
+
+后台写操作开关在测试和正式环境默认都应保持关闭：
+
+```bash
+ADMIN_WRITE_ENABLED=false
+ADMIN_MODEL_CONFIG_WRITE_ENABLED=false
+```
+
+后续补积分、模型配置切换、密钥更新等写操作上线前，必须在对应环境显式打开开关并完成验收。正式环境仍然通过 GitHub Actions 手动选择 `production` target 发布，不允许 push `master` 自动发布正式。
+
+如果不希望后台出现浏览器的服务器账号密码弹窗，在对应的 `/etc/lightquant/*.deploy.env` 中设置 `BASIC_AUTH_ENABLED=false`。关闭后，后台只依赖网站登录态和 `ADMIN_PHONE_WHITELIST` 管理员手机号白名单保护。
+
 ## 目标结构
 
 | 环境 | Git 分支 | 目录 | 端口 | 数据库 | 访问方式 |
@@ -9,7 +26,7 @@
 | 测试环境 | `staging` | `/var/www/lightquant-staging` | `3010` | `lightquant_staging` | 优先用 SSH tunnel |
 | 正式环境 | `master` | `/var/www/lightquant` | `3000` | 当前正式库 | `https://lightquant.cloud` |
 
-测试环境和正式环境必须使用不同的 `APP_NAME`、`APP_DIR`、`APP_PORT`、`DB_NAME`、`DB_USER`、`AUTH_SECRET`、`BASIC_AUTH_PASSWORD`。
+测试环境和正式环境必须使用不同的 `APP_NAME`、`APP_DIR`、`APP_PORT`、`DB_NAME`、`DB_USER`、`AUTH_SECRET`。如果启用 Basic Auth，也必须使用不同的 `BASIC_AUTH_PASSWORD`。
 
 ## 1. 准备 staging 分支
 
@@ -96,6 +113,7 @@ DB_NAME=lightquant_staging
 DB_USER=lightquant_staging
 DB_PASSWORD=上面生成的数据库密码
 AUTH_SECRET=上面生成的base64长密钥
+BASIC_AUTH_ENABLED=false
 BASIC_AUTH_USER=admin
 BASIC_AUTH_PASSWORD=上面生成的basic-auth密码
 
@@ -115,6 +133,8 @@ TENCENT_SMS_CODE_LENGTH=6
 LIGHTQUANT_PAYMENT_MODE=wechat
 PAYMENT_FEATURE_ENABLED=false
 PAYMENT_ORDER_EXPIRE_MINUTES=30
+ADMIN_WRITE_ENABLED=false
+ADMIN_MODEL_CONFIG_WRITE_ENABLED=false
 
 LIGHTQUANT_AI_BASE_URL=https://api.xiaomimimo.com/v1
 LIGHTQUANT_AI_MODEL=mimo-v2.5-pro
@@ -194,6 +214,7 @@ DB_NAME=当前正式数据库名
 DB_USER=当前正式数据库用户
 DB_PASSWORD=当前正式数据库密码
 AUTH_SECRET=当前正式AUTH_SECRET
+BASIC_AUTH_ENABLED=false
 BASIC_AUTH_USER=当前BasicAuth用户
 BASIC_AUTH_PASSWORD=当前BasicAuth密码
 
@@ -213,13 +234,15 @@ TENCENT_SMS_CODE_LENGTH=6
 LIGHTQUANT_PAYMENT_MODE=wechat
 PAYMENT_FEATURE_ENABLED=false
 PAYMENT_ORDER_EXPIRE_MINUTES=30
+ADMIN_WRITE_ENABLED=false
+ADMIN_MODEL_CONFIG_WRITE_ENABLED=false
 
 LIGHTQUANT_AI_BASE_URL=https://api.xiaomimimo.com/v1
 LIGHTQUANT_AI_MODEL=mimo-v2.5-pro
 LIGHTQUANT_AI_API_KEY=
 ```
 
-`prod.deploy.env` 未准备好之前，不要手动触发 `production` workflow，也不要把未验证的改动合入 `master`。
+`prod.deploy.env` 未准备好之前，不要手动触发 `production` workflow，也不要把未验证的改动合入 `master`。正式发布前建议先备份生产数据库，再执行 GitHub Actions 手动 `production` 发布；发布后运行 smoke 验收，确认 `https://lightquant.cloud`、`https://lightquant.cloud/admin`、短信登录、支付关闭和后台写开关关闭状态符合预期。
 
 ## 6. 后续发布节奏
 
