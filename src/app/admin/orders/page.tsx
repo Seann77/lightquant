@@ -15,17 +15,46 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams?:
 
   const params = await readSearchParams(searchParams);
   const page = numberParam(params, "page", 1);
+  const phone = stringParam(params, "phone");
   const status = stringParam(params, "status");
-  const data = await listAdminOrders({ page, pageSize: 20, status });
+  const createdFrom = stringParam(params, "createdFrom");
+  const createdTo = stringParam(params, "createdTo");
+  const data = await listAdminOrders({ page, pageSize: 20, phone, status, createdFrom, createdTo });
+  const query = buildOrdersQuery({ phone, status, createdFrom, createdTo });
 
   return (
     <AdminShell active="orders" adminPhone={context.user.phone}>
       <form className="mb-md flex flex-wrap gap-sm" method="get">
+        <input
+          className="h-10 rounded-md border border-steel/50 bg-paper px-sm text-body-md outline-none focus:border-primary"
+          defaultValue={phone}
+          name="phone"
+          placeholder="搜索手机号"
+        />
         <select className="h-10 rounded-md border border-steel/50 bg-paper px-sm text-body-md outline-none focus:border-primary" defaultValue={status ?? ""} name="status">
           {statuses.map((item) => <option key={item} value={item}>{item || "全部状态"}</option>)}
         </select>
+        <input
+          className="h-10 rounded-md border border-steel/50 bg-paper px-sm text-body-md outline-none focus:border-primary"
+          defaultValue={createdFrom}
+          name="createdFrom"
+          type="date"
+        />
+        <input
+          className="h-10 rounded-md border border-steel/50 bg-paper px-sm text-body-md outline-none focus:border-primary"
+          defaultValue={createdTo}
+          name="createdTo"
+          type="date"
+        />
         <button className="h-10 rounded-md bg-primary px-md text-button-md text-on-primary" type="submit">筛选</button>
       </form>
+
+      <section className="mb-md grid gap-sm sm:grid-cols-2 xl:grid-cols-4">
+        <SummaryCard label="当前筛选订单数" value={data.summary.filteredOrders.toLocaleString("zh-CN")} />
+        <SummaryCard label="当前筛选订单金额" value={formatMoney(data.summary.filteredOrderAmountCents)} />
+        <SummaryCard label="当前筛选已支付订单数" value={data.summary.filteredPaidOrders.toLocaleString("zh-CN")} />
+        <SummaryCard label="当前筛选已支付金额" value={formatMoney(data.summary.filteredPaidOrderAmountCents)} />
+      </section>
 
       <AdminTable>
         <thead>
@@ -51,11 +80,14 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams?:
         <tbody>
           {data.items.map((order) => (
             <tr key={order.id}>
-              <Td>{order.orderNo}</Td>
+              <Td>{shortText(order.orderNo, 22)}</Td>
               <Td>{order.userPhone}</Td>
-              <Td>{order.planName}</Td>
+              <Td>{shortText(order.planName, 20)}</Td>
               <Td>{formatMoney(order.amountCents)}</Td>
-              <Td>{order.totalPoints} ({order.points}+{order.bonusPoints})</Td>
+              <Td>
+                <div>{order.totalPoints}</div>
+                <div className="text-caption-sm text-outline">{order.points}+{order.bonusPoints}</div>
+              </Td>
               <Td>{order.payChannel}</Td>
               <Td>{order.paymentActionType}</Td>
               <Td><StatusPill tone={statusTone(order.status)}>{order.status}</StatusPill></Td>
@@ -76,9 +108,32 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams?:
         </tbody>
       </AdminTable>
 
-      <Pagination page={data.page} totalPages={data.totalPages} href={(nextPage) => `/admin/orders?page=${nextPage}${status ? `&status=${encodeURIComponent(status)}` : ""}`} />
+      <Pagination page={data.page} totalPages={data.totalPages} href={(nextPage) => `/admin/orders?page=${nextPage}${query}`} />
     </AdminShell>
   );
+}
+
+function SummaryCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-steel/40 bg-paper px-md py-sm shadow-sm">
+      <div className="text-caption-sm text-secondary">{label}</div>
+      <div className="mt-xxs text-title-md font-semibold text-ink">{value}</div>
+    </div>
+  );
+}
+
+function buildOrdersQuery(input: { phone?: string; status?: string; createdFrom?: string; createdTo?: string }) {
+  const params = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(input)) {
+    if (value) {
+      params.set(key, value);
+    }
+  }
+
+  const query = params.toString();
+
+  return query ? `&${query}` : "";
 }
 
 function EmptyRow({ colSpan }: { colSpan: number }) {

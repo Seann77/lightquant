@@ -7,6 +7,8 @@ import type {
   AiMessageAttachmentSummary,
   AiRunEvent,
   AiTaskResult,
+  AiModelProfile,
+  ContactRequest,
   CreditAccount,
   CreditLedger,
   CreditReservation,
@@ -23,15 +25,24 @@ import { ApiError } from "@/server/http/api-response";
 import { getOrderExpiresAt, isOrderExpired } from "@/server/payments/payment-config";
 import type {
   AiTaskPage,
+  AdminCreditLedgerFilters,
+  AdminCreditLedgerPage,
+  AdminContactRequestFilters,
+  AdminContactRequestPage,
   AdminAiTaskPage,
+  AdminOrderFilters,
   AdminOrderPage,
   AdminOverview,
   AdminUploadedFilePage,
+  AdminUserFilters,
   AdminUserPage,
   AiConversationPagination,
   AiMessageListOptions,
   AppliedCreditLedger,
+  ApplyAdminCreditAdjustmentInput,
   ApplyCreditLedgerInput,
+  CreateAdminAuditLogInput,
+  CreateContactRequestInput,
   CreateAiTaskInput,
   CreateAiConversationInput,
   CreateAiMessageAttachmentInput,
@@ -47,6 +58,7 @@ import type {
   CreateUserInput,
   LedgerPage,
   LightQuantRepository,
+  SetActiveAiModelProfileInput,
   UpsertUserMembershipInput,
   UpdateAiConversationInput,
   UpdateAiTaskInput
@@ -123,9 +135,13 @@ export class MockLightQuantRepository implements LightQuantRepository {
   private readonly aiMessageAttachments = new Map<string, AiMessageAttachment>();
   private readonly aiRunEvents = new Map<string, AiRunEvent>();
   private readonly uploadedFiles = new Map<string, UploadedFile>();
+  private readonly contactRequests = new Map<string, ContactRequest>();
+  private readonly aiModelProfiles = new Map<string, AiModelProfile>();
+  private activeAiModelProfileId: string | null = null;
   private readonly creditReservations = new Map<string, CreditReservation>();
   private readonly creditReservationsByIdempotencyKey = new Map<string, string>();
   private readonly creditReservationsByTaskId = new Map<string, string>();
+  private readonly adminAuditLogs = new Map<string, CreateAdminAuditLogInput & { id: string }>();
 
   async createSmsCode(input: CreateSmsCodeInput) {
     const record: SmsCodeRecord = {
@@ -244,6 +260,28 @@ export class MockLightQuantRepository implements LightQuantRepository {
     return consent;
   }
 
+  async createContactRequest(input: CreateContactRequestInput) {
+    const request: ContactRequest = {
+      id: randomUUID(),
+      ...input
+    };
+
+    this.contactRequests.set(request.id, request);
+    return request;
+  }
+
+  async countContactRequestsByUserSince(userId: string, since: string) {
+    return [...this.contactRequests.values()]
+      .filter((request) => request.userId === userId && request.createdAt >= since)
+      .length;
+  }
+
+  async countContactRequestsByRequestIpSince(requestIp: string, since: string) {
+    return [...this.contactRequests.values()]
+      .filter((request) => request.requestIp === requestIp && request.createdAt >= since)
+      .length;
+  }
+
   async updateUserLastLogin(userId: string, lastLoginAt: string) {
     const user = this.users.get(userId);
 
@@ -258,6 +296,30 @@ export class MockLightQuantRepository implements LightQuantRepository {
 
     this.users.set(userId, updated);
     return updated;
+  }
+
+  async listAiModelProfiles() {
+    return [...this.aiModelProfiles.values()]
+      .sort((left, right) => Number(right.enabled) - Number(left.enabled) || right.updatedAt.localeCompare(left.updatedAt));
+  }
+
+  async findAiModelProfileById(profileId: string) {
+    return this.aiModelProfiles.get(profileId) ?? null;
+  }
+
+  async getActiveAiModelProfile() {
+    return this.activeAiModelProfileId ? this.aiModelProfiles.get(this.activeAiModelProfileId) ?? null : null;
+  }
+
+  async setActiveAiModelProfile(input: SetActiveAiModelProfileInput) {
+    const profile = this.aiModelProfiles.get(input.profileId);
+
+    if (!profile) {
+      throw new ApiError("NOT_FOUND", "模型配置不存在", 404);
+    }
+
+    this.activeAiModelProfileId = profile.id;
+    return profile;
   }
 
   async findActiveMembershipForUser(userId: string, type: UserMembership["type"], at: string) {
@@ -367,6 +429,29 @@ export class MockLightQuantRepository implements LightQuantRepository {
       ledger,
       duplicated: false
     };
+  }
+
+  async applyAdminCreditAdjustment(input: ApplyAdminCreditAdjustmentInput): Promise<AppliedCreditLedger> {
+    const result = await this.applyCreditLedger(input.ledger);
+    await this.createAdminAuditLog({
+      ...input.audit,
+      metadata: {
+        ...input.audit.metadata,
+        creditLedgerId: result.ledger.id,
+        duplicated: result.duplicated
+      }
+    });
+
+    return result;
+  }
+
+  async createAdminAuditLog(input: CreateAdminAuditLogInput) {
+    const id = randomUUID();
+
+    this.adminAuditLogs.set(id, {
+      id,
+      ...input
+    });
   }
 
   async listCreditLedger(userId: string, pagination: { page: number; pageSize: number }): Promise<LedgerPage> {
@@ -847,8 +932,9 @@ export class MockLightQuantRepository implements LightQuantRepository {
 
   async getAdminOverview(todayStart: string): Promise<AdminOverview> {
     const todayAiTasks = [...this.aiTasks.values()].filter((task) => task.createdAt >= todayStart);
-    const todayOrders = [...this.orders.values()].filter((order) => order.createdAt >= todayStart);
-    const todayRiskFiles = [...this.uploadedFiles.values()].filter((file) => file.createdAt >= todayStart && file.scanStatus !== "PASSED");
+    const paidOrders = [...this.orders.values()].filter((order) => order.status === "PAID");
+    const todayPaidOrders = paidOrders.filter((order) => order.createdAt >= todayStart);
+    const paidUsers = new Set(paidOrders.map((order) => order.userId)).size;
     const todayTokens = todayAiTasks.reduce((total, task) => {
       const result = this.aiTaskResults.get(task.id);
       return total + (result?.tokenUsage.totalTokens ?? 0);
@@ -858,30 +944,26 @@ export class MockLightQuantRepository implements LightQuantRepository {
     return {
       totals: {
         users: this.users.size,
+        paidUsers,
+        paidConversionRate: this.users.size > 0 ? paidUsers / this.users.size : 0,
         creditBalance: creditAccounts.reduce((total, account) => total + account.balance, 0),
         creditEarned: creditAccounts.reduce((total, account) => total + account.totalEarned, 0),
         creditSpent: creditAccounts.reduce((total, account) => total + account.totalSpent, 0),
         todayAiTasks: todayAiTasks.length,
         todayAiTokens: todayTokens,
-        todayOrders: todayOrders.length,
-        todayRiskFiles: todayRiskFiles.length
-      },
-      recentFailedAiTasks: [...this.aiTasks.values()]
-        .filter((task) => task.status === "FAILED")
-        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
-        .slice(0, 5)
-        .map((task) => toAdminAiTaskItem(task, this.users, this.aiTaskResults)),
-      recentRiskFiles: [...this.uploadedFiles.values()]
-        .filter((file) => file.scanStatus !== "PASSED")
-        .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
-        .slice(0, 5)
-        .map((file) => toAdminUploadedFileItem(file, this.users))
+        todayPaidOrders: todayPaidOrders.length,
+        todayPaidOrderAmountCents: todayPaidOrders.reduce((total, order) => total + order.amountCents, 0),
+        paidOrders: paidOrders.length,
+        paidOrderAmountCents: paidOrders.reduce((total, order) => total + order.amountCents, 0)
+      }
     };
   }
 
-  async listAdminUsers(pagination: { page: number; pageSize: number }, filters: { phone?: string }): Promise<AdminUserPage> {
+  async listAdminUsers(pagination: { page: number; pageSize: number }, filters: AdminUserFilters): Promise<AdminUserPage> {
     const items = [...this.users.values()]
       .filter((user) => (filters.phone ? user.phone.includes(filters.phone) : true))
+      .filter((user) => (filters.createdFrom ? user.createdAt >= filters.createdFrom : true))
+      .filter((user) => (filters.createdTo ? user.createdAt < filters.createdTo : true))
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
     const start = (pagination.page - 1) * pagination.pageSize;
 
@@ -891,15 +973,55 @@ export class MockLightQuantRepository implements LightQuantRepository {
     };
   }
 
-  async listAdminOrders(pagination: { page: number; pageSize: number }, filters: { status?: RechargeOrder["status"] }): Promise<AdminOrderPage> {
-    const items = [...this.orders.values()]
-      .filter((order) => (filters.status ? order.status === filters.status : true))
+  async listAdminCreditLedger(pagination: { page: number; pageSize: number }, filters: AdminCreditLedgerFilters): Promise<AdminCreditLedgerPage> {
+    const items = [...this.creditLedger.values()]
+      .filter((ledger) => (filters.type ? ledger.type === filters.type : true))
+      .filter((ledger) => (filters.direction ? ledger.direction === filters.direction : true))
+      .filter((ledger) => (filters.createdFrom ? ledger.createdAt >= filters.createdFrom : true))
+      .filter((ledger) => (filters.createdTo ? ledger.createdAt < filters.createdTo : true))
+      .filter((ledger) => {
+        if (!filters.phone) {
+          return true;
+        }
+
+        return (this.users.get(ledger.userId)?.phone ?? "").includes(filters.phone);
+      })
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
     const start = (pagination.page - 1) * pagination.pageSize;
 
     return {
-      items: items.slice(start, start + pagination.pageSize).map((order) => toAdminOrderItem(order, this.users, this.rechargePlans, this.paymentTransactions)),
+      items: items.slice(start, start + pagination.pageSize).map((ledger) => toAdminCreditLedgerItem(ledger, this.users)),
       total: items.length
+    };
+  }
+
+  async listAdminOrders(pagination: { page: number; pageSize: number }, filters: AdminOrderFilters): Promise<AdminOrderPage> {
+    const items = [...this.orders.values()]
+      .filter((order) => {
+        if (!filters.phone) {
+          return true;
+        }
+
+        return (this.users.get(order.userId)?.phone ?? "").includes(filters.phone);
+      })
+      .filter((order) => (filters.status ? order.status === filters.status : true))
+      .filter((order) => (filters.createdFrom ? order.createdAt >= filters.createdFrom : true))
+      .filter((order) => (filters.createdTo ? order.createdAt < filters.createdTo : true))
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+    const paidItems = filters.status && filters.status !== "PAID"
+      ? []
+      : items.filter((order) => order.status === "PAID");
+    const start = (pagination.page - 1) * pagination.pageSize;
+
+    return {
+      items: items.slice(start, start + pagination.pageSize).map((order) => toAdminOrderItem(order, this.users, this.rechargePlans, this.paymentTransactions)),
+      total: items.length,
+      summary: {
+        filteredOrders: items.length,
+        filteredOrderAmountCents: sumOrderAmountCents(items),
+        filteredPaidOrders: paidItems.length,
+        filteredPaidOrderAmountCents: sumOrderAmountCents(paidItems)
+      }
     };
   }
 
@@ -924,6 +1046,31 @@ export class MockLightQuantRepository implements LightQuantRepository {
 
     return {
       items: items.slice(start, start + pagination.pageSize).map((file) => toAdminUploadedFileItem(file, this.users)),
+      total: items.length
+    };
+  }
+
+  async listAdminContactRequests(pagination: { page: number; pageSize: number }, filters: AdminContactRequestFilters): Promise<AdminContactRequestPage> {
+    const items = [...this.contactRequests.values()]
+      .filter((request) => (filters.contactMethod ? request.contactMethod === filters.contactMethod : true))
+      .filter((request) => (filters.category ? request.category === filters.category : true))
+      .filter((request) => (filters.source ? request.source.includes(filters.source) : true))
+      .filter((request) => (filters.createdFrom ? request.createdAt >= filters.createdFrom : true))
+      .filter((request) => (filters.createdTo ? request.createdAt < filters.createdTo : true))
+      .filter((request) => {
+        if (!filters.keyword) {
+          return true;
+        }
+
+        return [request.userPhone, request.contactValue, request.name]
+          .filter(Boolean)
+          .some((value) => value?.includes(filters.keyword ?? ""));
+      })
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+    const start = (pagination.page - 1) * pagination.pageSize;
+
+    return {
+      items: items.slice(start, start + pagination.pageSize).map(toAdminContactRequestItem),
       total: items.length
     };
   }
@@ -1027,6 +1174,35 @@ function toAdminUserItem(user: User, creditAccounts: Map<string, CreditAccount>,
   };
 }
 
+function toAdminCreditLedgerItem(ledger: CreditLedger, users: Map<string, User>): AdminCreditLedgerPage["items"][number] {
+  return {
+    id: ledger.id,
+    userPhone: users.get(ledger.userId)?.phone ?? "",
+    direction: ledger.direction,
+    type: ledger.type,
+    amount: ledger.amount,
+    balanceAfter: ledger.balanceAfter,
+    sourceType: ledger.sourceType,
+    sourceId: ledger.sourceId,
+    remark: ledger.remark,
+    createdAt: ledger.createdAt
+  };
+}
+
+function toAdminContactRequestItem(request: ContactRequest): AdminContactRequestPage["items"][number] {
+  return {
+    id: request.id,
+    userPhone: request.userPhone,
+    name: request.name,
+    contactMethod: request.contactMethod,
+    contactValue: request.contactValue,
+    category: request.category,
+    message: request.message,
+    source: request.source,
+    createdAt: request.createdAt
+  };
+}
+
 function toAdminOrderItem(order: RechargeOrder, users: Map<string, User>, plans: Map<string, RechargePlan>, transactions: Map<string, PaymentTransaction>): AdminOrderPage["items"][number] {
   const latestTransaction = [...transactions.values()]
     .filter((transaction) => transaction.orderId === order.id)
@@ -1054,6 +1230,10 @@ function toAdminOrderItem(order: RechargeOrder, users: Map<string, User>, plans:
     latestPaymentProviderTradeNo: latestTransaction?.providerTradeNo ?? null,
     latestPaymentFailedReason: latestTransaction?.failedReason ?? null
   };
+}
+
+function sumOrderAmountCents(orders: RechargeOrder[]) {
+  return orders.reduce((total, order) => total + order.amountCents, 0);
 }
 
 function toPaymentActionType(payChannel: RechargeOrder["payChannel"]): AdminOrderPage["items"][number]["paymentActionType"] {

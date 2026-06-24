@@ -58,6 +58,7 @@
     "smoke:files:local": "node scripts/smoke-files-local.mjs",
     "smoke:files:image": "node scripts/smoke-files-image-local.mjs",
     "smoke:admin:local": "node scripts/smoke-admin-local.mjs",
+    "smoke:contact:local": "tsx scripts/smoke-contact-requests-local.ts",
     "smoke:local:regression": "node scripts/smoke-local-regression.mjs",
     "smoke:database:local": "node scripts/smoke-database-flow-local.mjs"
   },

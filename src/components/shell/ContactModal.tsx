@@ -129,8 +129,8 @@ export function ContactModal({ onClose, open }: ContactModalProps) {
 
       setSuccessMessage(result.message);
       setForm(initialForm);
-    } catch {
-      setErrorMessage("提交失败，请稍后重试");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "提交失败，请稍后重试");
     } finally {
       setSubmitting(false);
     }
