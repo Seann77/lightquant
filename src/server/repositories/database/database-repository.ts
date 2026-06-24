@@ -8,6 +8,8 @@ import type {
   AiMessageAttachmentSummary,
   AiRunEvent,
   AiTaskResult,
+  AiModelProfile,
+  ContactRequest,
   CreditAccount,
   CreditLedger,
   CreditReservation,
@@ -26,15 +28,24 @@ import { getOrderExpiresAt, isOrderExpired } from "@/server/payments/payment-con
 import { getPrismaClient } from "@/server/repositories/database/prisma-client";
 import type {
   AiTaskPage,
+  AdminCreditLedgerFilters,
+  AdminCreditLedgerPage,
+  AdminContactRequestFilters,
+  AdminContactRequestPage,
   AdminAiTaskPage,
+  AdminOrderFilters,
   AdminOrderPage,
   AdminOverview,
   AdminUploadedFilePage,
+  AdminUserFilters,
   AdminUserPage,
   AiConversationPagination,
   AiMessageListOptions,
   AppliedCreditLedger,
+  ApplyAdminCreditAdjustmentInput,
   ApplyCreditLedgerInput,
+  CreateAdminAuditLogInput,
+  CreateContactRequestInput,
   CreateAiTaskInput,
   CreateAiConversationInput,
   CreateAiMessageAttachmentInput,
@@ -50,6 +61,7 @@ import type {
   CreateUserInput,
   LedgerPage,
   LightQuantRepository,
+  SetActiveAiModelProfileInput,
   UpsertUserMembershipInput,
   UpdateAiConversationInput,
   UpdateAiTaskInput
@@ -275,6 +287,49 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
     return toUserLegalConsent(consent);
   }
 
+  async createContactRequest(input: CreateContactRequestInput) {
+    const request = await this.db.contactRequest.create({
+      data: {
+        userId: input.userId,
+        userPhone: input.userPhone,
+        name: input.name,
+        contactMethod: input.contactMethod,
+        contactValue: input.contactValue,
+        category: input.category,
+        message: input.message,
+        source: input.source,
+        requestIp: input.requestIp,
+        userAgent: input.userAgent,
+        createdAt: toDate(input.createdAt),
+        updatedAt: toDate(input.updatedAt)
+      }
+    });
+
+    return toContactRequest(request);
+  }
+
+  async countContactRequestsByUserSince(userId: string, since: string) {
+    return this.db.contactRequest.count({
+      where: {
+        userId,
+        createdAt: {
+          gte: toDate(since)
+        }
+      }
+    });
+  }
+
+  async countContactRequestsByRequestIpSince(requestIp: string, since: string) {
+    return this.db.contactRequest.count({
+      where: {
+        requestIp,
+        createdAt: {
+          gte: toDate(since)
+        }
+      }
+    });
+  }
+
   async updateUserLastLogin(userId: string, lastLoginAt: string) {
     const user = await this.db.user.update({
       where: {
@@ -286,6 +341,73 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
     });
 
     return toUser(user);
+  }
+
+  async listAiModelProfiles() {
+    const profiles = await this.db.aiModelProfile.findMany({
+      orderBy: [
+        {
+          enabled: "desc"
+        },
+        {
+          updatedAt: "desc"
+        }
+      ]
+    });
+
+    return profiles.map(toAiModelProfile);
+  }
+
+  async findAiModelProfileById(profileId: string) {
+    const profile = await this.db.aiModelProfile.findUnique({
+      where: {
+        id: profileId
+      }
+    });
+
+    return profile ? toAiModelProfile(profile) : null;
+  }
+
+  async getActiveAiModelProfile() {
+    const active = await this.db.aiModelActiveProfile.findUnique({
+      where: {
+        id: "active"
+      },
+      include: {
+        profile: true
+      }
+    });
+
+    return active?.profile ? toAiModelProfile(active.profile) : null;
+  }
+
+  async setActiveAiModelProfile(input: SetActiveAiModelProfileInput) {
+    const profile = await this.db.aiModelProfile.findUnique({
+      where: {
+        id: input.profileId
+      }
+    });
+
+    if (!profile) {
+      throw new ApiError("NOT_FOUND", "模型配置不存在", 404);
+    }
+
+    await this.db.aiModelActiveProfile.upsert({
+      where: {
+        id: "active"
+      },
+      create: {
+        id: "active",
+        profileId: input.profileId,
+        updatedAt: toDate(input.updatedAt)
+      },
+      update: {
+        profileId: input.profileId,
+        updatedAt: toDate(input.updatedAt)
+      }
+    });
+
+    return toAiModelProfile(profile);
   }
 
   async findActiveMembershipForUser(userId: string, type: UserMembership["type"], at: string) {
@@ -394,6 +516,39 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
 
   async applyCreditLedger(input: ApplyCreditLedgerInput): Promise<AppliedCreditLedger> {
     return this.withTransaction(async (repository) => repository.applyCreditLedgerInTransaction(input));
+  }
+
+  async applyAdminCreditAdjustment(input: ApplyAdminCreditAdjustmentInput): Promise<AppliedCreditLedger> {
+    return this.withTransaction(async (repository) => {
+      const result = await repository.applyCreditLedgerInTransaction(input.ledger);
+      await repository.createAdminAuditLog({
+        ...input.audit,
+        metadata: {
+          ...input.audit.metadata,
+          creditLedgerId: result.ledger.id,
+          duplicated: result.duplicated
+        }
+      });
+
+      return result;
+    });
+  }
+
+  async createAdminAuditLog(input: CreateAdminAuditLogInput) {
+    await this.db.adminAuditLog.create({
+      data: {
+        adminUserId: input.adminUserId,
+        adminPhone: input.adminPhone,
+        action: input.action,
+        targetType: input.targetType,
+        targetId: input.targetId,
+        summary: input.summary,
+        metadata: toJsonObject(input.metadata),
+        requestId: input.requestId,
+        requestIp: input.requestIp,
+        createdAt: toDate(input.createdAt)
+      }
+    });
   }
 
   private async applyCreditLedgerInTransaction(input: ApplyCreditLedgerInput): Promise<AppliedCreditLedger> {
@@ -1439,15 +1594,23 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
     const todayStartDate = toDate(todayStart);
     const [
       users,
+      paidUserOrders,
       creditTotals,
       todayAiTasks,
-      todayOrders,
-      todayRiskFiles,
       todayResults,
-      recentFailedTasks,
-      recentRiskFiles
+      todayPaidOrderTotals,
+      paidOrderTotals
     ] = await Promise.all([
       this.db.user.count(),
+      this.db.rechargeOrder.findMany({
+        where: {
+          status: "PAID"
+        },
+        distinct: ["userId"],
+        select: {
+          userId: true
+        }
+      }),
       this.db.creditAccount.aggregate({
         _sum: {
           balance: true,
@@ -1459,23 +1622,6 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
         where: {
           createdAt: {
             gte: todayStartDate
-          }
-        }
-      }),
-      this.db.rechargeOrder.count({
-        where: {
-          createdAt: {
-            gte: todayStartDate
-          }
-        }
-      }),
-      this.db.uploadedFile.count({
-        where: {
-          createdAt: {
-            gte: todayStartDate
-          },
-          scanStatus: {
-            in: ["WARNING", "BLOCKED"]
           }
         }
       }),
@@ -1491,56 +1637,63 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
           tokenUsage: true
         }
       }),
-      this.db.aiTask.findMany({
+      this.db.rechargeOrder.aggregate({
         where: {
-          status: "FAILED"
-        },
-        include: {
-          user: true,
-          result: true
-        },
-        orderBy: {
-          updatedAt: "desc"
-        },
-        take: 5
-      }),
-      this.db.uploadedFile.findMany({
-        where: {
-          scanStatus: {
-            in: ["WARNING", "BLOCKED"]
+          status: "PAID",
+          createdAt: {
+            gte: todayStartDate
           }
         },
-        include: {
-          user: true
+        _count: {
+          id: true
         },
-        orderBy: {
-          createdAt: "desc"
+        _sum: {
+          amountCents: true
+        }
+      }),
+      this.db.rechargeOrder.aggregate({
+        where: {
+          status: "PAID"
         },
-        take: 5
+        _count: {
+          id: true
+        },
+        _sum: {
+          amountCents: true
+        }
       })
     ]);
+    const paidUsers = paidUserOrders.length;
 
     return {
       totals: {
         users,
+        paidUsers,
+        paidConversionRate: users > 0 ? paidUsers / users : 0,
         creditBalance: creditTotals._sum.balance ?? 0,
         creditEarned: creditTotals._sum.totalEarned ?? 0,
         creditSpent: creditTotals._sum.totalSpent ?? 0,
         todayAiTasks,
         todayAiTokens: todayResults.reduce((total, item) => total + toTokenUsage(item.tokenUsage).totalTokens, 0),
-        todayOrders,
-        todayRiskFiles
-      },
-      recentFailedAiTasks: recentFailedTasks.map(toAdminAiTaskItem),
-      recentRiskFiles: recentRiskFiles.map(toAdminUploadedFileItem)
+        todayPaidOrders: todayPaidOrderTotals._count.id,
+        todayPaidOrderAmountCents: todayPaidOrderTotals._sum.amountCents ?? 0,
+        paidOrders: paidOrderTotals._count.id,
+        paidOrderAmountCents: paidOrderTotals._sum.amountCents ?? 0
+      }
     };
   }
 
-  async listAdminUsers(pagination: { page: number; pageSize: number }, filters: { phone?: string }): Promise<AdminUserPage> {
+  async listAdminUsers(pagination: { page: number; pageSize: number }, filters: AdminUserFilters): Promise<AdminUserPage> {
     const where = {
       phone: filters.phone
         ? {
             contains: filters.phone
+          }
+        : undefined,
+      createdAt: filters.createdFrom || filters.createdTo
+        ? {
+            gte: filters.createdFrom ? toDate(filters.createdFrom) : undefined,
+            lt: filters.createdTo ? toDate(filters.createdTo) : undefined
           }
         : undefined
     };
@@ -1573,11 +1726,75 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
     };
   }
 
-  async listAdminOrders(pagination: { page: number; pageSize: number }, filters: { status?: RechargeOrder["status"] }): Promise<AdminOrderPage> {
+  async listAdminCreditLedger(pagination: { page: number; pageSize: number }, filters: AdminCreditLedgerFilters): Promise<AdminCreditLedgerPage> {
     const where = {
-      status: filters.status
+      type: filters.type,
+      direction: filters.direction,
+      createdAt: filters.createdFrom || filters.createdTo
+        ? {
+            gte: filters.createdFrom ? toDate(filters.createdFrom) : undefined,
+            lt: filters.createdTo ? toDate(filters.createdTo) : undefined
+          }
+        : undefined,
+      user: filters.phone
+        ? {
+            phone: {
+              contains: filters.phone
+            }
+          }
+        : undefined
     };
     const [items, total] = await Promise.all([
+      this.db.creditLedger.findMany({
+        where,
+        include: {
+          user: {
+            select: {
+              phone: true
+            }
+          }
+        },
+        orderBy: {
+          createdAt: "desc"
+        },
+        skip: (pagination.page - 1) * pagination.pageSize,
+        take: pagination.pageSize
+      }),
+      this.db.creditLedger.count({
+        where
+      })
+    ]);
+
+    return {
+      items: items.map(toAdminCreditLedgerItem),
+      total
+    };
+  }
+
+  async listAdminOrders(pagination: { page: number; pageSize: number }, filters: AdminOrderFilters): Promise<AdminOrderPage> {
+    const where: Prisma.RechargeOrderWhereInput = {
+      status: filters.status,
+      createdAt: filters.createdFrom || filters.createdTo
+        ? {
+            gte: filters.createdFrom ? toDate(filters.createdFrom) : undefined,
+            lt: filters.createdTo ? toDate(filters.createdTo) : undefined
+          }
+        : undefined,
+      user: filters.phone
+        ? {
+            phone: {
+              contains: filters.phone
+            }
+          }
+        : undefined
+    };
+    const paidWhere: Prisma.RechargeOrderWhereInput | null = filters.status && filters.status !== "PAID"
+      ? null
+      : {
+          ...where,
+          status: "PAID"
+        };
+    const [items, totals, paidTotals] = await Promise.all([
       this.db.rechargeOrder.findMany({
         where,
         include: {
@@ -1596,14 +1813,37 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
         skip: (pagination.page - 1) * pagination.pageSize,
         take: pagination.pageSize
       }),
-      this.db.rechargeOrder.count({
-        where
-      })
+      this.db.rechargeOrder.aggregate({
+        where,
+        _count: {
+          id: true
+        },
+        _sum: {
+          amountCents: true
+        }
+      }),
+      paidWhere
+        ? this.db.rechargeOrder.aggregate({
+            where: paidWhere,
+            _count: {
+              id: true
+            },
+            _sum: {
+              amountCents: true
+            }
+          })
+        : Promise.resolve(null)
     ]);
 
     return {
       items: items.map(toAdminOrderItem),
-      total
+      total: totals._count.id,
+      summary: {
+        filteredOrders: totals._count.id,
+        filteredOrderAmountCents: totals._sum.amountCents ?? 0,
+        filteredPaidOrders: paidTotals?._count.id ?? 0,
+        filteredPaidOrderAmountCents: paidTotals?._sum.amountCents ?? 0
+      }
     };
   }
 
@@ -1659,6 +1899,61 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
 
     return {
       items: items.map(toAdminUploadedFileItem),
+      total
+    };
+  }
+
+  async listAdminContactRequests(pagination: { page: number; pageSize: number }, filters: AdminContactRequestFilters): Promise<AdminContactRequestPage> {
+    const where: Prisma.ContactRequestWhereInput = {
+      contactMethod: filters.contactMethod,
+      category: filters.category,
+      source: filters.source
+        ? {
+            contains: filters.source
+          }
+        : undefined,
+      createdAt: filters.createdFrom || filters.createdTo
+        ? {
+            gte: filters.createdFrom ? toDate(filters.createdFrom) : undefined,
+            lt: filters.createdTo ? toDate(filters.createdTo) : undefined
+          }
+        : undefined,
+      OR: filters.keyword
+        ? [
+            {
+              userPhone: {
+                contains: filters.keyword
+              }
+            },
+            {
+              contactValue: {
+                contains: filters.keyword
+              }
+            },
+            {
+              name: {
+                contains: filters.keyword
+              }
+            }
+          ]
+        : undefined
+    };
+    const [items, total] = await Promise.all([
+      this.db.contactRequest.findMany({
+        where,
+        orderBy: {
+          createdAt: "desc"
+        },
+        skip: (pagination.page - 1) * pagination.pageSize,
+        take: pagination.pageSize
+      }),
+      this.db.contactRequest.count({
+        where
+      })
+    ]);
+
+    return {
+      items: items.map(toAdminContactRequestItem),
       total
     };
   }
@@ -1855,6 +2150,64 @@ function toUserLegalConsent(consent: {
     requestIp: consent.requestIp,
     userAgent: consent.userAgent,
     source: consent.source
+  };
+}
+
+function toContactRequest(request: {
+  id: string;
+  userId: string | null;
+  userPhone: string | null;
+  name: string;
+  contactMethod: string;
+  contactValue: string;
+  category: string;
+  message: string;
+  source: string;
+  requestIp: string | null;
+  userAgent: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}): ContactRequest {
+  return {
+    id: request.id,
+    userId: request.userId,
+    userPhone: request.userPhone,
+    name: request.name,
+    contactMethod: request.contactMethod as ContactRequest["contactMethod"],
+    contactValue: request.contactValue,
+    category: request.category as ContactRequest["category"],
+    message: request.message,
+    source: request.source,
+    requestIp: request.requestIp,
+    userAgent: request.userAgent,
+    createdAt: toIso(request.createdAt),
+    updatedAt: toIso(request.updatedAt)
+  };
+}
+
+function toAiModelProfile(profile: {
+  id: string;
+  name: string;
+  provider: string;
+  baseUrl: string;
+  model: string;
+  supportsVision: boolean;
+  apiKeyEnvName: string | null;
+  enabled: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}): AiModelProfile {
+  return {
+    id: profile.id,
+    name: profile.name,
+    provider: profile.provider as AiModelProfile["provider"],
+    baseUrl: profile.baseUrl,
+    model: profile.model,
+    supportsVision: profile.supportsVision,
+    apiKeyEnvName: profile.apiKeyEnvName,
+    enabled: profile.enabled,
+    createdAt: toIso(profile.createdAt),
+    updatedAt: toIso(profile.updatedAt)
   };
 }
 
@@ -2144,6 +2497,34 @@ function toAdminUserItem(user: {
   };
 }
 
+function toAdminCreditLedgerItem(ledger: {
+  id: string;
+  direction: CreditLedger["direction"];
+  type: CreditLedger["type"];
+  amount: number;
+  balanceAfter: number;
+  sourceType: string;
+  sourceId: string;
+  remark: string;
+  createdAt: Date;
+  user: {
+    phone: string;
+  };
+}): AdminCreditLedgerPage["items"][number] {
+  return {
+    id: ledger.id,
+    userPhone: ledger.user.phone,
+    direction: ledger.direction,
+    type: ledger.type,
+    amount: ledger.amount,
+    balanceAfter: ledger.balanceAfter,
+    sourceType: ledger.sourceType,
+    sourceId: ledger.sourceId,
+    remark: ledger.remark,
+    createdAt: toIso(ledger.createdAt)
+  };
+}
+
 function toAdminOrderItem(order: {
   id: string;
   orderNo: string;
@@ -2265,6 +2646,30 @@ function toAdminUploadedFileItem(file: {
     scanStatus: file.scanStatus,
     riskFlags: toStringArray(file.riskFlags),
     createdAt: toIso(file.createdAt)
+  };
+}
+
+function toAdminContactRequestItem(request: {
+  id: string;
+  userPhone: string | null;
+  name: string;
+  contactMethod: string;
+  contactValue: string;
+  category: string;
+  message: string;
+  source: string;
+  createdAt: Date;
+}): AdminContactRequestPage["items"][number] {
+  return {
+    id: request.id,
+    userPhone: request.userPhone,
+    name: request.name,
+    contactMethod: request.contactMethod as AdminContactRequestPage["items"][number]["contactMethod"],
+    contactValue: request.contactValue,
+    category: request.category as AdminContactRequestPage["items"][number]["category"],
+    message: request.message,
+    source: request.source,
+    createdAt: toIso(request.createdAt)
   };
 }
 
