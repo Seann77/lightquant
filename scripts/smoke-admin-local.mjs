@@ -164,6 +164,45 @@ try {
       }
     });
 
+    const blockedProfileCreate = await adminClient.requestJson("POST", "/api/v1/admin/model-config/profiles", {
+      name: "smoke blocked profile",
+      provider: "openai_compatible",
+      baseUrl: "https://example.com/v1",
+      model: "smoke-model",
+      supportsVision: false,
+      enabled: false,
+      apiKeyEnvName: "LIGHTQUANT_AI_API_KEY",
+      apiKeySecretId: null
+    });
+
+    assertFailure("admin-model-profile-create-write-disabled", blockedProfileCreate, "FORBIDDEN");
+
+    checks.push({
+      endpoint: "/api/v1/admin/model-config/profiles",
+      status: blockedProfileCreate.status,
+      success: blockedProfileCreate.json.success,
+      shape: {
+        writeGuard: blockedProfileCreate.json.error.code
+      }
+    });
+
+    const blockedSecretWrite = await adminClient.requestJson("POST", "/api/v1/admin/model-config/secrets", {
+      name: "smoke blocked key",
+      provider: "openai_compatible",
+      apiKey: "blocked-smoke-key"
+    });
+
+    assertFailure("admin-model-secret-write-disabled", blockedSecretWrite, "FORBIDDEN");
+
+    checks.push({
+      endpoint: "/api/v1/admin/model-config/secrets",
+      status: blockedSecretWrite.status,
+      success: blockedSecretWrite.json.success,
+      shape: {
+        writeGuard: blockedSecretWrite.json.error.code
+      }
+    });
+
     result.admin = {
       phoneMasked: maskPhone(adminPhone),
       checks
@@ -433,10 +472,12 @@ function summarizeAdminResponse(endpoint, data) {
     return {
       currentKeys: Object.keys(data.current ?? {}).sort(),
       profilesIsArray: Array.isArray(data.profiles),
+      secretsIsArray: Array.isArray(data.secrets),
       keyStatusesIsArray: Array.isArray(data.keyStatuses),
       writeGuards: {
         adminWriteEnabled: typeof data.writeGuards?.adminWriteEnabled,
-        modelConfigWriteEnabled: typeof data.writeGuards?.modelConfigWriteEnabled
+        modelConfigWriteEnabled: typeof data.writeGuards?.modelConfigWriteEnabled,
+        configEncryptionConfigured: typeof data.writeGuards?.configEncryptionConfigured
       }
     };
   }
@@ -540,7 +581,7 @@ function assertAdminModelConfigShape(data) {
     throw new Error("admin-model-config expected object");
   }
 
-  for (const field of ["current", "profiles", "keyStatuses", "writeGuards"]) {
+  for (const field of ["current", "profiles", "secrets", "keyStatuses", "writeGuards"]) {
     if (!(field in data)) {
       throw new Error(`admin-model-config expected ${field}`);
     }
@@ -554,11 +595,15 @@ function assertAdminModelConfigShape(data) {
     throw new Error("admin-model-config expected current safe booleans");
   }
 
-  if (!Array.isArray(data.profiles) || !Array.isArray(data.keyStatuses)) {
-    throw new Error("admin-model-config expected profiles/keyStatuses arrays");
+  if (!Array.isArray(data.profiles) || !Array.isArray(data.secrets) || !Array.isArray(data.keyStatuses)) {
+    throw new Error("admin-model-config expected profiles/secrets/keyStatuses arrays");
   }
 
-  if (typeof data.writeGuards.adminWriteEnabled !== "boolean" || typeof data.writeGuards.modelConfigWriteEnabled !== "boolean") {
+  if (
+    typeof data.writeGuards.adminWriteEnabled !== "boolean" ||
+    typeof data.writeGuards.modelConfigWriteEnabled !== "boolean" ||
+    typeof data.writeGuards.configEncryptionConfigured !== "boolean"
+  ) {
     throw new Error("admin-model-config expected write guard booleans");
   }
 }

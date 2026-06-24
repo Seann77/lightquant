@@ -51,7 +51,18 @@ export type AiModelProfile = {
   model: string;
   supportsVision: boolean;
   apiKeyEnvName: string | null;
+  apiKeySecretId: string | null;
   enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AiModelSecret = {
+  id: string;
+  name: string;
+  provider: AiModelProvider | null;
+  encryptedValue: string;
+  keyHint: string | null;
   createdAt: string;
   updatedAt: string;
 };

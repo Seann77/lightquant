@@ -27,6 +27,7 @@ import {
   CopyCodeButton,
   getCodeConversionTabContent,
   isCodeConversionCodeTab,
+  getStrategyResponseTitle,
   parseCodeConversionMarkdown
 } from "@/components/ai/WorkbenchResultViews";
 import {
@@ -600,7 +601,7 @@ function StrategyModeContent() {
             conversationId: data.task.conversationId ?? responseConversationId,
             role: "assistant",
             taskId: data.task.id,
-            content: result.explanation || "已完成策略生成。",
+            content: result.explanation || "已完成策略处理。",
             contentJson: {
               task: data.task,
               result,
@@ -1609,6 +1610,7 @@ function StrategyMessageBubble({ elapsedSeconds, message }: { elapsedSeconds?: n
             billingLabel={billingTag?.label}
             billingWaived={billingTag?.waived}
             error={null}
+            finalTitle={getStrategyResponseTitle(result)}
             finalAnswerMarkdown={finalAnswerMarkdown}
             status={thinkingStatus}
             thinking={streamContent.visibleThinking}
@@ -1677,6 +1679,7 @@ function StrategyJobBubble({
           billingLabel={billingTag?.label}
           billingWaived={billingTag?.waived}
           error={null}
+          finalTitle={getStrategyResponseTitle(job.result ?? null)}
           finalAnswerMarkdown={finalAnswerMarkdown}
           status={thinkingStatus}
           thinking={visibleThinking || runningFallback}
@@ -2084,8 +2087,10 @@ function getBillingTag(billing: AiTaskData["billing"] | null | undefined, task: 
 function getMessageStreamingContent(message: AiMessageData, result: AiTaskData["result"] | null, taskType: WorkbenchTaskType) {
   const contentJson = readRecord(message.contentJson);
   const visibleThinking = readNullableString(contentJson?.visibleThinking) ?? "";
+  const messageContent = message.content.trim();
   const finalAnswerMarkdown = readNullableString(contentJson?.finalAnswerMarkdown)
-    ?? (result ? formatAiTaskResultAsMarkdown(result, taskType) : message.content.includes("## ") ? message.content : "");
+    ?? readNullableString(result?.reportJson?.finalAnswerMarkdown)
+    ?? (result ? formatAiTaskResultAsMarkdown(result, taskType) : taskType === "strategy_generation" ? messageContent : message.content.includes("## ") ? message.content : "");
 
   return {
     visibleThinking,

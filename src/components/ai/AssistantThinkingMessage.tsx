@@ -16,6 +16,7 @@ type AssistantThinkingMessageProps = {
   defaultThinkingExpanded?: boolean;
   billingLabel?: string | null;
   billingWaived?: boolean;
+  finalTitle?: string;
 };
 
 type ThinkingCollapseProps = {
@@ -29,6 +30,7 @@ type StreamProps = {
   streaming?: boolean;
   billingLabel?: string | null;
   billingWaived?: boolean;
+  title?: string;
 };
 
 type MarkdownBlock =
@@ -46,7 +48,8 @@ export function AssistantThinkingMessage({
   tone = "light",
   defaultThinkingExpanded,
   billingLabel,
-  billingWaived = false
+  billingWaived = false,
+  finalTitle = "最终结果"
 }: AssistantThinkingMessageProps) {
   const displayThinking = thinking.trim();
   const hasFinal = Boolean(finalAnswerMarkdown.trim());
@@ -64,7 +67,7 @@ export function AssistantThinkingMessage({
       <div className="lq-thinking-message-body">
         {displayThinking ? <ThinkingCollapse defaultExpanded={defaultThinkingExpanded} status={status} thinking={displayThinking} /> : null}
         {hasFinal ? (
-          <FinalAnswerStream billingLabel={billingLabel} billingWaived={billingWaived} streaming={status === "answering"} text={finalAnswerMarkdown} />
+          <FinalAnswerStream billingLabel={billingLabel} billingWaived={billingWaived} streaming={status === "answering"} text={finalAnswerMarkdown} title={finalTitle} />
         ) : null}
         {error ? <div className="lq-thinking-error">{error}</div> : null}
       </div>
@@ -119,11 +122,11 @@ export function ThinkingStream({ text }: StreamProps) {
   return <pre className="lq-thinking-stream">{text}</pre>;
 }
 
-export function FinalAnswerStream({ text, streaming = false, billingLabel, billingWaived = false }: StreamProps) {
+export function FinalAnswerStream({ text, streaming = false, billingLabel, billingWaived = false, title = "最终结果" }: StreamProps) {
   return (
     <section className="lq-final-section">
       <div className="lq-final-title">
-        <span>最终结果：</span>
+        <span>{title}：</span>
         {streaming ? <em>正在输出</em> : null}
         {billingLabel ? (
           <span className={`lq-cost-tag ${billingWaived ? "is-waived" : ""}`.trim()}>{billingLabel}</span>

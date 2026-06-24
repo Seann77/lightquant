@@ -900,11 +900,12 @@ export function getAiTaskStreamingContent(data: AiTaskData | null | undefined, t
   const directThinking = readNullableString(data?.visibleThinking);
   const directFinal = readNullableString(data?.finalAnswerMarkdown);
   const directParsed = data?.parsedResult ?? null;
+  const directParsedFinal = directParsed ? formatAiTaskResultAsMarkdown(directParsed, data?.task.type as WorkbenchTaskType) : "";
 
   if (directThinking || directFinal || directParsed) {
     return {
       visibleThinking: directThinking ?? "",
-      finalAnswerMarkdown: directFinal ?? "",
+      finalAnswerMarkdown: directFinal ?? directParsedFinal,
       parsedResult: directParsed
     };
   }
@@ -924,10 +925,18 @@ export function getAiTaskStreamingContent(data: AiTaskData | null | undefined, t
     }
 
     const contentJson = readRecord(message.contentJson);
-    const finalAnswerMarkdown = readNullableString(contentJson?.finalAnswerMarkdown)
-      ?? (message.content.includes("## ") ? message.content : "");
     const visibleThinking = readNullableString(contentJson?.visibleThinking) ?? "";
     const parsedResult = readAiTaskResult(contentJson?.parsedResult) ?? readAiTaskResult(contentJson?.result);
+    const taskSnapshot = readTaskSnapshot(contentJson?.task);
+    const taskType = taskSnapshot?.type ?? data?.task.type ?? null;
+    const messageContent = message.content.trim();
+    const messageMarkdown = taskType === "strategy_generation"
+      ? messageContent
+      : message.content.includes("## ") ? message.content : "";
+    const restoredFinalAnswerMarkdown = readNullableString(contentJson?.finalAnswerMarkdown)
+      ?? readNullableString(parsedResult?.reportJson?.finalAnswerMarkdown)
+      ?? messageMarkdown;
+    const finalAnswerMarkdown = restoredFinalAnswerMarkdown || (parsedResult ? formatAiTaskResultAsMarkdown(parsedResult, taskType) : "");
 
     if (finalAnswerMarkdown || visibleThinking || parsedResult) {
       return {

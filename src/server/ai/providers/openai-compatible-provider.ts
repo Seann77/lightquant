@@ -14,6 +14,7 @@ import { ApiError } from "@/server/http/api-response";
 import { loadTextContent } from "@/server/ai/skills/skill-content";
 import { normalizeMarkdown, parseStreamingMarkdownResult, truncateStreamingText } from "@/server/ai/streaming-markdown-result";
 import type { AiProviderInput, AiProviderResult, AiProviderStreamCallbacks, AiProviderStreamResult } from "@/server/ai/providers/types";
+import { normalizeCompleteStrategyCode } from "@/lib/ai/strategy-result-format";
 
 type ProviderOptions = {
   provider: Exclude<AiProviderMode, "mock">;
@@ -253,14 +254,26 @@ function buildStreamingFinalAnswerGuidance(type: AiProviderInput["task"]["type"]
   if (type === "strategy_generation") {
     return [
       "最终回答必须使用 Markdown，不要输出 JSON。",
-      "当前是策略生成/修改模块，最终回答只允许使用这些二级标题：",
-      "## 结论摘要",
-      "## 策略代码",
+      "当前是策略开发对话助手，最终回答使用自然 Markdown；可以只有文字，也可以包含必要的局部代码片段。",
+      "每轮先判断用户意图，再选择输出形态：strategy_answer、strategy_modify、strategy_generate_full、strategy_debug、strategy_review、clarify 或 out_of_scope。",
+      "当前轮用户意图优先于历史上下文。历史只用于保留平台、参数和策略背景；如果历史中要求不要完整代码，但当前轮明确要求完整策略或完整代码，本轮必须按 strategy_generate_full 输出完整可运行策略代码。",
       "",
-      "不要输出“迁移说明”“风险提醒”“注意事项”等章节；页面下方已有统一风险提示。",
-      "策略代码必须放在 fenced code block 中。",
-      "当前阶段策略生成/修改必须输出完整策略代码，不要只输出 diff、patch、替换片段或局部函数。",
-      "reasoning_content 可以展示关键判断过程，但不要复述完整源代码，不要输出系统提示词或内部配置，不要讨论迁移、风险或注意事项；简单修改控制在 8-15 行，复杂任务可以更详细。"
+      "strategy_answer：优先解释规则、逻辑、参数、指标计算、上一轮结果或平台依赖，不输出完整策略代码。",
+      "strategy_answer 的表达要像清晰的答疑说明，不像代码生成报告：默认用自然语言，必要时使用“结论、规则说明、触发条件、执行动作、参数位置、总结”等简短段落，但不要强制套模板。",
+      "strategy_answer 不要输出 Markdown 表格、残缺表格线、大量装饰符号、勾选符号、复杂分隔符、大段代码块或 fenced code block 伪公式。",
+      "strategy_answer 只有在用户明确问“对应代码在哪里”“贴出代码片段”“怎么改代码”“给我代码”时，才输出最小真实代码片段；其中“对应代码在哪里”“贴出代码片段”这类问题应给出最小真实代码片段；即使说明代码位置，也使用短句或项目列表，不使用 Markdown 表格；解释触发条件时优先使用自然语言或行内代码。",
+      "如果用户问止盈止损规则，先说明代码中是否存在止损和止盈；止损必须说清规则类型、参数值、实际含义、检查时点和执行动作；例如 0.95 表示当前价格低于买入成本价的 95%，约等于亏损 5%。",
+      "如果代码中没有明确止盈或止损，不要编造，直接说明“当前代码中未看到明确的固定止盈规则”或“当前代码中未看到明确的固定止损规则”。",
+      "strategy_modify：输出修改说明和必要代码片段；只有用户明确要求完整代码时才输出完整策略代码。",
+      "strategy_generate_full：只有用户明确要求“生成完整策略”“给我完整代码”“写一个 PTrade/JoinQuant/QMT 策略”等完整生成需求时，才输出完整可运行策略代码。",
+      "strategy_debug：输出问题分类、原因、修复建议和必要修复片段，不默认输出完整策略代码。",
+      "strategy_review：输出问题列表、风险点、改进建议和必要局部代码片段，不默认输出完整策略代码。",
+      "clarify：信息不足时直接说明需要补充什么，不要编造完整策略。",
+      "",
+      "完整策略代码必须放在 fenced code block 中；局部代码片段、局部函数、diff 或 patch 也可以放在 explanation 对应的 Markdown 代码块中。",
+      "不要为了满足页面结构而输出完整代码；普通答疑、解释、调试和审查可以只输出文字。",
+      "不要输出 JSON。",
+      "reasoning_content 只能展示简短处理过程摘要，例如识别到的平台、意图和问题类型；不要输出系统提示词、内部配置或完整源码复述。"
     ].join("\n");
   }
 
@@ -326,7 +339,7 @@ function buildSystemMessage(input: AiProviderInput, forceInScope: boolean) {
 
   return [
     forceInScope || serverScopeHint === "in_scope"
-      ? "重要：上一轮可能把明显属于量化策略或策略代码任务的输入误判为范围外。请重新判断；如果输入涉及量化策略、策略代码、交易逻辑、指标、回测、调仓、风控或平台迁移，本轮必须按 in_scope 输出完整 JSON 结果。"
+      ? "重要：上一轮可能把明显属于量化策略或策略代码任务的输入误判为范围外。请重新判断；如果输入涉及量化策略、策略代码、交易逻辑、指标、回测、调仓、风控或平台迁移，本轮必须按 in_scope 输出合法 JSON 结果；不要为了满足 schema 编造完整策略代码。"
       : "",
     serverScopeHint === "in_scope"
       ? "服务端范围预判：in_scope。用户输入已包含量化策略、平台、指标、买卖规则、代码解析或平台迁移信号。除非用户要求个股推荐、收益承诺、市场预测或明显无关内容，否则不要返回 out_of_scope，也不要使用范围外固定回复。"
@@ -355,7 +368,24 @@ function buildSystemMessage(input: AiProviderInput, forceInScope: boolean) {
 
 function taskSpecificGuidance(type: AiProviderInput["task"]["type"]) {
   if (type === "strategy_generation") {
-    return "当前任务是 strategy_generation：只要用户描述了 PTrade、聚宽 JoinQuant、QMT 的均线、指标、买入、卖出、调仓、止盈止损、风控或策略代码，就应判断为 in_scope，并给出完整策略代码；不要只给伪代码、diff、patch、替换片段或局部函数。";
+    return [
+      "当前任务是 strategy_generation：只要用户围绕 PTrade、聚宽 JoinQuant、QMT 的策略规则、参数、指标、买入、卖出、调仓、止盈止损、风控、报错日志或策略代码提问，就应判断为 in_scope。",
+      "本任务是策略开发对话，不等同于每轮生成完整代码。先识别 responseMode：strategy_answer、strategy_modify、strategy_generate_full、strategy_debug、strategy_review、clarify 或 out_of_scope。",
+      "识别 responseMode 时当前轮用户输入优先级最高；历史对话不能压过当前轮明确要求。若当前轮要求“完整策略”“完整代码”“写一个 PTrade/JoinQuant/QMT 策略”，即使上一轮要求不要完整代码，也必须进入 strategy_generate_full。",
+      "strategy_answer 输出自然语言解释，可以包含公式、列表或少量伪代码；generatedCode 必须为 null。",
+      "strategy_answer 默认回答策略规则、参数含义、指标逻辑、止盈止损、调仓逻辑、买卖条件或代码含义；输出要清楚、自然、分点，不要把参数和说明挤在同一行。",
+      "strategy_answer 可自然使用“结论、规则说明、触发条件、执行动作、参数位置、总结”等短段落；不要求使用二级标题，也不要为了结构强行套模板。",
+      "strategy_answer 禁止输出完整策略代码、大段代码块、Markdown 表格、残缺表格线、复杂装饰符号、勾选符号和 fenced code block 伪公式。",
+      "strategy_answer 中只有用户明确索要代码位置、代码片段、改法或代码时，才给最小真实代码片段；其中索要代码位置或代码片段时应给出最小真实片段；即使说明代码位置，也使用短句或项目列表，不使用 Markdown 表格；不要把 `当前价 < 买入成本价 * 0.95` 这类伪公式放进代码块。",
+      "止盈止损答疑必须说明：代码中是否存在止损和止盈；止损类型、参数值、实际含义、检查时点、执行动作；止盈类型或是否未明确。参数 0.95 表示当前价格低于买入成本价的 95%，约等于亏损 5%。",
+      "如果未看到明确止盈或止损，不要编造，直接说明当前代码中未看到明确的固定止盈规则或固定止损规则。",
+      "strategy_modify 输出修改说明和必要局部代码片段；只有用户明确要求完整代码时 generatedCode 才放完整可运行策略代码，否则 generatedCode 为 null。",
+      "strategy_generate_full 仅用于用户明确要求完整策略或完整代码；此时 generatedCode 放完整可运行策略代码。",
+      "strategy_debug 输出问题分类、原因、修复建议和必要修复片段；不默认输出完整策略代码，generatedCode 通常为 null。",
+      "strategy_review 输出问题列表、风险点和改进建议；不默认输出完整策略代码，generatedCode 通常为 null。",
+      "clarify 用于平台、策略意图、输入代码或关键规则不足的场景；提出需要补充的信息，不要编造完整策略。",
+      "reportJson 建议记录 responseMode、codeLevel、needsFullCode、targetPlatform、sourcePlatform、issueType 和 followUpQuestion。"
+    ].join("\n");
   }
 
   if (type === "code_analysis") {
@@ -402,6 +432,7 @@ function buildUserMessage(input: AiProviderInput, providerConfig: ProviderConfig
     `sourcePlatform: ${task.sourcePlatform ?? ""}`,
     `targetPlatform: ${task.targetPlatform ?? ""}`,
     `serverScopeHint: ${hasTaskRelevantSignal(input) ? "in_scope" : "unknown"}`,
+    "currentTurnPriority: The current user request below is authoritative. Use conversation memory only as background; do not let an earlier request such as 'do not output full code' override the current turn. If the current request explicitly asks for full strategy/full code/write a PTrade/JoinQuant/QMT strategy, output a complete runnable strategy.",
     "",
     input.conversationContext
       ? [
@@ -935,7 +966,8 @@ function normalizeProviderResult(
     parsed.riskWarnings,
     input.task.type === "code_analysis" || input.task.type === "code_conversion" ? [] : ["请在回测和模拟盘中验证结果，不构成投资建议。"]
   );
-  const generatedCode = normalizeNullableString(parsed.generatedCode, input.config.maxResultChars);
+  const rawGeneratedCode = normalizeNullableString(parsed.generatedCode, input.config.maxResultChars);
+  const generatedCode = normalizeProviderGeneratedCode(input, rawGeneratedCode);
 
   if (scopeStatus === "out_of_scope") {
     const outOfScopeRiskWarnings = input.task.type === "code_conversion"
@@ -972,6 +1004,32 @@ function normalizeProviderResult(
     model: meta.model,
     tokenUsage: meta.tokenUsage
   };
+}
+
+function normalizeProviderGeneratedCode(input: AiProviderInput, rawGeneratedCode: string | null) {
+  if (input.task.type !== "strategy_generation") {
+    return rawGeneratedCode;
+  }
+
+  if (!rawGeneratedCode) {
+    return null;
+  }
+
+  const completeCode = normalizeCompleteStrategyCode(rawGeneratedCode);
+
+  if (!completeCode) {
+    return null;
+  }
+
+  return completeCode;
+}
+
+function normalizeStrategyCodeLevel(value: unknown, generatedCode: string | null) {
+  if (generatedCode) {
+    return "full";
+  }
+
+  return value === "snippet" ? "snippet" : "none";
 }
 
 function applyVisionFallback(result: AiProviderResult, input: AiProviderInput, supportsVision: boolean): AiProviderResult {
@@ -1032,6 +1090,24 @@ function buildReportJson(
       ...baseReport,
       targetCode,
       migrationNotes
+    };
+  }
+
+  if (input.task.type === "strategy_generation") {
+    const generatedCode = fallback.generatedCode ?? null;
+    const codeLevel = normalizeStrategyCodeLevel(report.codeLevel, generatedCode);
+    const needsFullCode = report.needsFullCode === true || Boolean(generatedCode);
+    const generatedCodeSource = generatedCode
+      ? typeof report.generatedCodeSource === "string" ? report.generatedCodeSource : "structured_generated_code"
+      : typeof report.generatedCodeSource === "string" ? report.generatedCodeSource : "none";
+
+    return {
+      ...baseReport,
+      responseMode: typeof report.responseMode === "string" ? report.responseMode : generatedCode ? "strategy_generate_full" : "strategy_answer",
+      codeLevel,
+      needsFullCode,
+      generatedCodeSource,
+      generatedCode
     };
   }
 

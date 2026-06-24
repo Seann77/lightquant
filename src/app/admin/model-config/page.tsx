@@ -1,7 +1,7 @@
 import { getAdminModelConfig } from "@/server/admin/model-config-service";
-import { AdminLoginRequired, AdminShell, AdminTable, Td, Th } from "@/app/admin/AdminShell";
+import { AdminLoginRequired, AdminShell } from "@/app/admin/AdminShell";
 import { getAdminPageContext } from "@/app/admin/admin-page";
-import { ModelProfileSwitcher } from "@/app/admin/model-config/ModelProfileSwitcher";
+import { ModelConfigCenter } from "@/app/admin/model-config/ModelConfigCenter";
 
 export const dynamic = "force-dynamic";
 
@@ -23,22 +23,25 @@ export default async function AdminModelConfigPage() {
             <div>
               <h2 className="text-body-emphasis text-ink">当前生效配置</h2>
               <p className="mt-xxs text-caption-md text-secondary">
-                来源：{data.current.source === "env" ? "环境变量" : "数据库覆盖"}
+                实际运行来源：{data.current.source === "env" ? "环境变量" : "数据库 Profile"}
               </p>
             </div>
             <span className={`rounded-full px-xs py-[2px] text-caption-sm ${data.current.configValid ? "bg-emerald-50 text-emerald-700" : "bg-error-container/30 text-bloom-deep"}`}>
               {data.current.configValid ? "配置可用" : "配置异常"}
             </span>
           </div>
+
           <div className="mt-md grid gap-sm md:grid-cols-2 xl:grid-cols-4">
+            <Metric label="Profile" value={data.current.activeProfileName ?? "环境变量"} />
             <Metric label="Provider" value={data.current.provider} />
             <Metric label="Base URL" value={data.current.baseUrlHost} />
             <Metric label="Model" value={data.current.model} />
             <Metric label="Vision" value={data.current.supportsVision ? "支持" : "不支持"} />
-            <Metric label="AI API Key" value={data.current.apiKeyConfigured ? "已配置" : "未配置"} />
-            <Metric label="写操作开关" value={data.writeGuards.modelConfigWriteEnabled ? "已开启" : "未开启"} />
-            <Metric label="Active Profile" value={data.current.activeProfileName ?? "来自环境变量"} />
+            <Metric label="API Key" value={data.current.apiKeyConfigured ? "已配置" : "未配置"} />
+            <Metric label="Key 来源" value={formatKeySource(data.current.apiKeySource)} />
+            <Metric label="写开关" value={writeDisabled ? "未开启" : "已开启"} />
           </div>
+
           {data.current.errorHint ? (
             <div className="mt-sm rounded-md border border-amber-200 bg-amber-50 px-sm py-xs text-caption-md text-amber-900">
               {data.current.errorHint}
@@ -48,40 +51,17 @@ export default async function AdminModelConfigPage() {
 
         {writeDisabled ? (
           <div className="rounded-md border border-steel/40 bg-surface-container-low px-md py-sm text-caption-md text-secondary">
-            模型配置写操作未开启。只读查看可用，切换 active profile 需要同时开启 ADMIN_WRITE_ENABLED 和 ADMIN_MODEL_CONFIG_WRITE_ENABLED。
+            模型配置写操作未开启。当前页面只读；新增、编辑、启用、停用、切换 Profile 和写入 API Key 都需要同时开启 ADMIN_WRITE_ENABLED 与 ADMIN_MODEL_CONFIG_WRITE_ENABLED。
           </div>
         ) : null}
 
-        <section>
-          <h2 className="mb-sm text-body-emphasis text-ink">模型配置</h2>
-          <ModelProfileSwitcher disabled={writeDisabled} profiles={data.profiles} />
-        </section>
+        {!data.writeGuards.configEncryptionConfigured ? (
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-md py-sm text-caption-md text-amber-900">
+            未配置 CONFIG_ENCRYPTION_KEY 或 APP_CONFIG_ENCRYPTION_KEY。环境变量回退仍可用，但后台不能写入数据库模型 API Key。
+          </div>
+        ) : null}
 
-        <section>
-          <h2 className="mb-sm text-body-emphasis text-ink">密钥状态</h2>
-          <AdminTable>
-            <thead>
-              <tr>
-                <Th>配置项</Th>
-                <Th>是否配置</Th>
-                <Th>格式状态</Th>
-                <Th>来源</Th>
-                <Th>提示</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.keyStatuses.map((item) => (
-                <tr key={item.name}>
-                  <Td>{item.name}</Td>
-                  <Td>{item.configured ? "是" : "否"}</Td>
-                  <Td>{formatSecretFormat(item.formatValid)}</Td>
-                  <Td>{item.source}</Td>
-                  <Td>{item.hint}</Td>
-                </tr>
-              ))}
-            </tbody>
-          </AdminTable>
-        </section>
+        <ModelConfigCenter data={data} />
       </div>
     </AdminShell>
   );
@@ -96,10 +76,14 @@ function Metric({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-function formatSecretFormat(value: boolean | "unknown") {
-  if (value === "unknown") {
-    return "未知";
+function formatKeySource(value: "database secret" | "env" | "none") {
+  if (value === "database secret") {
+    return "数据库加密 Key";
   }
 
-  return value ? "通过" : "未通过";
+  if (value === "env") {
+    return "环境变量";
+  }
+
+  return "-";
 }

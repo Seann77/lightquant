@@ -1,6 +1,12 @@
 import type { AiTask, AiTaskScopeStatus } from "@/server/domain";
 import type { AiProviderInput, AiProviderResult } from "@/server/ai/providers/types";
-import { formatStrategyResultAsMarkdown, normalizeStrategyFinalAnswerMarkdown } from "@/lib/ai/strategy-result-format";
+import {
+  extractCompleteStrategyCodeFromMarkdown,
+  formatStrategyResultAsMarkdown,
+  looksLikeCompleteStrategyCode,
+  normalizeStrategyFinalAnswerMarkdown,
+  type StrategyCodeLevel
+} from "@/lib/ai/strategy-result-format";
 
 type MarkdownSectionKey = "summary" | "code" | "notes" | "risks" | "overview" | "tradingLogic" | "parameters" | "suggestions";
 
@@ -19,6 +25,13 @@ type CodeAnalysisReport = {
   suggestions: ReportItem[];
 };
 
+type StrategyStreamingMeta = {
+  responseMode: "strategy_answer" | "strategy_modify" | "strategy_generate_full" | "strategy_debug" | "strategy_review" | "clarify" | "out_of_scope";
+  codeLevel: StrategyCodeLevel;
+  needsFullCode: boolean;
+  generatedCodeSource: "none" | "markdown_code_section" | "structured_generated_code";
+};
+
 type MarkdownSection = {
   key: MarkdownSectionKey;
   title: string;
@@ -28,14 +41,6 @@ type MarkdownSection = {
 type MarkdownContract = {
   keys: MarkdownSectionKey[];
   titles: Partial<Record<MarkdownSectionKey, string>>;
-};
-
-const STRATEGY_CONTRACT: MarkdownContract = {
-  keys: ["summary", "code"],
-  titles: {
-    summary: "结论概述",
-    code: "策略代码"
-  }
 };
 
 const CONVERSION_CONTRACT: MarkdownContract = {
@@ -86,15 +91,30 @@ export function parseStreamingMarkdownResult(input: AiProviderInput, markdown: s
   const scopeStatus = inferScopeStatus(summary, `${rawMarkdown}\n${finalAnswerMarkdown}`);
 
   if (input.task.type === "strategy_generation") {
-    const codeSection = getSectionContent(sections, "code");
-    const generatedCode = extractGeneratedCode(codeSection || finalAnswerMarkdown);
-    const explanation = truncateResultText(summary, input.config.maxResultChars);
+    const strictCodeExtraction = extractCompleteStrategyCodeFromMarkdown(finalAnswerMarkdown);
+    const looseFullCode = !strictCodeExtraction.code && (
+      isFullStrategyRequest(input.task.prompt?.toLowerCase() ?? "")
+      || isDominantCompleteStrategyCodeBlock(finalAnswerMarkdown)
+    )
+      ? extractCompleteStrategyCodeFromAnyFence(finalAnswerMarkdown)
+      : null;
+    const codeExtraction = looseFullCode
+      ? {
+          code: looseFullCode,
+          codeLevel: "full" as const,
+          generatedCodeSource: "markdown_code_section" as const
+        }
+      : strictCodeExtraction;
+    const generatedCode = scopeStatus === "out_of_scope" ? null : codeExtraction.code;
+    const explanation = truncateResultText(buildStrategyExplanation(finalAnswerMarkdown, sections), input.config.maxResultChars);
+    const strategyMeta = buildStrategyStreamingMeta(input, scopeStatus, finalAnswerMarkdown, codeExtraction.codeLevel, codeExtraction.generatedCodeSource);
 
     return buildProviderResult(input, scopeStatus, finalAnswerMarkdown, sections, {
       explanation: scopeStatus === "out_of_scope" ? input.skill.outOfScopeResponse : explanation,
-      generatedCode: scopeStatus === "out_of_scope" ? null : generatedCode,
+      generatedCode,
       migrationNotes: null,
-      riskWarnings: []
+      riskWarnings: [],
+      strategyMeta
     });
   }
 
@@ -140,11 +160,7 @@ export function normalizeMarkdown(markdown: string, task: Pick<AiTask, "type">) 
       finalAnswerMarkdown: trimmed
     });
 
-    if (strategyMarkdown && strategyMarkdown !== trimmed) {
-      return strategyMarkdown;
-    }
-
-    return buildNormalizedMarkdown(trimmed, sections, STRATEGY_CONTRACT, task);
+    return strategyMarkdown || trimmed;
   }
 
   if (task.type === "code_analysis") {
@@ -225,6 +241,7 @@ function buildProviderResult(
     migrationNotes: string | null;
     riskWarnings: string[];
     analysisReport?: CodeAnalysisReport;
+    strategyMeta?: StrategyStreamingMeta;
   }
 ): AiProviderResult {
   return {
@@ -381,6 +398,168 @@ function inferScopeStatus(summary: string, markdown: string): AiTaskScopeStatus 
   return "in_scope";
 }
 
+function buildStrategyExplanation(markdown: string, sections: MarkdownSection[]) {
+  const summarySection = getSectionContent(sections, "summary");
+  const source = summarySection || markdown;
+  const explanation = stripMarkdownNoise(removeCodeFences(source));
+
+  return explanation || null;
+}
+
+function buildStrategyStreamingMeta(
+  input: AiProviderInput,
+  scopeStatus: AiTaskScopeStatus,
+  markdown: string,
+  codeLevel: StrategyCodeLevel,
+  generatedCodeSource: StrategyStreamingMeta["generatedCodeSource"]
+): StrategyStreamingMeta {
+  if (scopeStatus === "out_of_scope") {
+    return {
+      responseMode: "out_of_scope",
+      codeLevel: "none",
+      needsFullCode: false,
+      generatedCodeSource: "none"
+    };
+  }
+
+  const text = stripMarkdownNoise(removeCodeFences(markdown)).toLowerCase();
+  const promptText = (input.task.prompt ?? "").toLowerCase();
+  const taskText = [
+    input.task.prompt,
+    input.task.inputCode
+  ].filter(Boolean).join("\n").toLowerCase();
+  const combinedText = `${taskText}\n${text}`;
+
+  if (codeLevel === "full" || isFullStrategyRequest(taskText)) {
+    return {
+      responseMode: "strategy_generate_full",
+      codeLevel,
+      needsFullCode: true,
+      generatedCodeSource
+    };
+  }
+
+  if (isDebugStrategyRequest(combinedText)) {
+    return {
+      responseMode: "strategy_debug",
+      codeLevel,
+      needsFullCode: false,
+      generatedCodeSource
+    };
+  }
+
+  if (isModifyStrategyRequest(promptText)) {
+    return {
+      responseMode: "strategy_modify",
+      codeLevel,
+      needsFullCode: false,
+      generatedCodeSource
+    };
+  }
+
+  if (isAnswerStrategyRequest(promptText)) {
+    return {
+      responseMode: "strategy_answer",
+      codeLevel,
+      needsFullCode: false,
+      generatedCodeSource
+    };
+  }
+
+  if (/需要补充|请补充|无法可靠|信息不足|不能可靠|clarify/.test(text)) {
+    return {
+      responseMode: "clarify",
+      codeLevel,
+      needsFullCode: false,
+      generatedCodeSource
+    };
+  }
+
+  if (/报错|错误|异常|traceback|exception|syntaxerror|typeerror|nameerror|attributeerror|回测日志|运行失败|修复/.test(text)) {
+    return {
+      responseMode: "strategy_debug",
+      codeLevel,
+      needsFullCode: false,
+      generatedCodeSource
+    };
+  }
+
+  if (/审查|检查|review|风险点|优化建议|改进建议|代码质量/.test(text)) {
+    return {
+      responseMode: "strategy_review",
+      codeLevel,
+      needsFullCode: false,
+      generatedCodeSource
+    };
+  }
+
+  if (codeLevel === "snippet" || /修改|改成|替换|增加|新增|调整|局部|片段|diff|patch/.test(text)) {
+    return {
+      responseMode: "strategy_modify",
+      codeLevel,
+      needsFullCode: false,
+      generatedCodeSource
+    };
+  }
+
+  return {
+    responseMode: "strategy_answer",
+    codeLevel,
+    needsFullCode: false,
+    generatedCodeSource
+  };
+}
+
+function isFullStrategyRequest(value: string) {
+  if (/不要.*完整.*(?:策略|代码)|不(?:要|需要|用).*完整.*(?:策略|代码)|无需.*完整.*(?:策略|代码)|只(?:给|输出).*?(?:片段|局部|说明)/i.test(value)) {
+    return false;
+  }
+
+  return /完整.*(?:策略|代码)|(?:策略|平台)代码|完整\s*(?:ptrade|joinquant|qmt).*策略|可运行.*(?:策略|代码)|给我.*完整|写一个.*(?:策略|代码)|生成.*完整|full.*(?:strategy|code)/i.test(value);
+}
+
+function isDebugStrategyRequest(value: string) {
+  return /报错|错误|异常|traceback|exception|syntaxerror|typeerror|nameerror|attributeerror|回测日志|运行失败|怎么修|修复|not defined|api.*不兼容|undefined/i.test(value);
+}
+
+function isModifyStrategyRequest(value: string) {
+  return /修改|改成|改为|替换|增加|新增|调整|改参数|加止损|改调仓|增加过滤|从\s*\d+%?\s*改(?:成|为)\s*\d+%?|change|modify|update/i.test(value);
+}
+
+function isAnswerStrategyRequest(value: string) {
+  return /是什么|什么意思|怎么理解|如何计算|规则|参数|含义|指标|逻辑|止盈|止损|调仓|买卖条件|代码在哪里|对应.*代码|解释|说明|where.*code|what.*rule/i.test(value);
+}
+
+function extractCompleteStrategyCodeFromAnyFence(markdown: string) {
+  for (const match of markdown.matchAll(/```(?:[\w+-]+)?\s*\r?\n([\s\S]*?)```/g)) {
+    const code = match[1]?.trim() ?? "";
+
+    if (looksLikeCompleteStrategyCode(code)) {
+      return code;
+    }
+  }
+
+  const trimmed = markdown.trim();
+
+  return looksLikeCompleteStrategyCode(trimmed) ? trimmed : null;
+}
+
+function isDominantCompleteStrategyCodeBlock(markdown: string) {
+  const trimmed = markdown.trim();
+  const blocks = [...trimmed.matchAll(/```(?:[\w+-]+)?\s*\r?\n([\s\S]*?)```/g)]
+    .map((match) => match[1]?.trim() ?? "")
+    .filter(Boolean);
+
+  if (blocks.length !== 1) {
+    return false;
+  }
+
+  const code = blocks[0];
+  const codeShare = code.length / Math.max(trimmed.length, 1);
+
+  return codeShare >= 0.72 && looksLikeCompleteStrategyCode(code);
+}
+
 function buildReportJson(
   input: AiProviderInput,
   scopeStatus: AiTaskScopeStatus,
@@ -392,6 +571,7 @@ function buildReportJson(
     migrationNotes: string | null;
     riskWarnings: string[];
     analysisReport?: CodeAnalysisReport;
+    strategyMeta?: StrategyStreamingMeta;
   }
 ) {
   const base = {
@@ -407,8 +587,20 @@ function buildReportJson(
   };
 
   if (input.task.type === "strategy_generation") {
+    const strategyMeta = parsed.strategyMeta ?? buildStrategyStreamingMeta(
+      input,
+      scopeStatus,
+      finalAnswerMarkdown,
+      parsed.generatedCode ? "full" : "none",
+      parsed.generatedCode ? "markdown_code_section" : "none"
+    );
+
     return {
       ...base,
+      responseMode: strategyMeta.responseMode,
+      codeLevel: strategyMeta.codeLevel,
+      needsFullCode: strategyMeta.needsFullCode,
+      generatedCodeSource: strategyMeta.generatedCodeSource,
       overview: parsed.explanation,
       generatedCode: parsed.generatedCode
     };
@@ -447,13 +639,7 @@ function buildReportJson(
 
 function buildEmptyMarkdown(task: Pick<AiTask, "type">) {
   if (task.type === "strategy_generation") {
-    return [
-      `## ${STRATEGY_CONTRACT.titles.summary}`,
-      "模型未返回有效内容。",
-      "",
-      `## ${STRATEGY_CONTRACT.titles.code}`,
-      ""
-    ].join("\n");
+    return "模型未返回有效内容。";
   }
 
   if (task.type === "code_analysis") {
@@ -882,7 +1068,7 @@ function buildFallbackCodeSection(value: string, task: Pick<AiTask, "type">) {
   }
 
   return task.type === "strategy_generation"
-    ? "暂无可直接运行的策略代码。"
+    ? ""
     : "暂无可直接运行的目标平台代码。";
 }
 
