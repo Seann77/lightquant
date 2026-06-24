@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { getAdminOverview } from "@/server/admin/admin-service";
-import { AdminLoginRequired, AdminShell, AdminTable, formatDate, StatusPill, Td, Th } from "@/app/admin/AdminShell";
+import { AdminLoginRequired, AdminShell, formatMoney } from "@/app/admin/AdminShell";
 import { getAdminPageContext } from "@/app/admin/admin-page";
 
 export const dynamic = "force-dynamic";
@@ -16,72 +15,45 @@ export default async function AdminOverviewPage() {
 
   return (
     <AdminShell active="overview" adminPhone={context.user.phone}>
-      <section className="grid gap-md sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="总用户数" value={overview.totals.users.toLocaleString("zh-CN")} />
-        <Metric label="总积分余额" value={overview.totals.creditBalance.toLocaleString("zh-CN")} />
-        <Metric label="今日 AI 任务" value={overview.totals.todayAiTasks.toLocaleString("zh-CN")} />
-        <Metric label="今日 token" value={overview.totals.todayAiTokens.toLocaleString("zh-CN")} />
-        <Metric label="累计发放" value={overview.totals.creditEarned.toLocaleString("zh-CN")} />
-        <Metric label="累计消耗" value={overview.totals.creditSpent.toLocaleString("zh-CN")} />
-        <Metric label="今日订单" value={overview.totals.todayOrders.toLocaleString("zh-CN")} />
-        <Metric label="今日风险文件" value={overview.totals.todayRiskFiles.toLocaleString("zh-CN")} />
+      <section>
+        <div className="mb-sm">
+          <h2 className="text-body-emphasis text-ink">付费转化</h2>
+        </div>
+        <div className="grid gap-md md:grid-cols-3">
+          <Metric label="用户数" value={formatInteger(overview.totals.users)} />
+          <Metric label="付费用户数" value={formatInteger(overview.totals.paidUsers)} />
+          <Metric label="付费转化率" value={formatPercent(overview.totals.paidConversionRate)} />
+        </div>
+        <div className="mt-sm h-2 overflow-hidden rounded-full bg-surface-container">
+          <div
+            className="h-full rounded-full bg-primary"
+            style={{ width: `${toPercentWidth(overview.totals.paidConversionRate)}%` }}
+          />
+        </div>
       </section>
 
-      <section className="mt-lg grid gap-lg xl:grid-cols-2">
-        <div>
-          <div className="mb-sm flex items-center justify-between">
-            <h2 className="text-body-emphasis text-ink">最近失败 AI 任务</h2>
-            <Link className="text-caption-bold text-primary" href="/admin/ai-tasks?status=FAILED">查看全部</Link>
-          </div>
-          <AdminTable>
-            <thead>
-              <tr>
-                <Th>任务</Th>
-                <Th>用户</Th>
-                <Th>错误</Th>
-                <Th>时间</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {overview.recentFailedAiTasks.map((task) => (
-                <tr key={task.id}>
-                  <Td>{task.type}</Td>
-                  <Td>{task.userPhone}</Td>
-                  <Td>{task.errorCode ?? "-"}</Td>
-                  <Td>{formatDate(task.createdAt)}</Td>
-                </tr>
-              ))}
-              {overview.recentFailedAiTasks.length === 0 ? <EmptyRow colSpan={4} /> : null}
-            </tbody>
-          </AdminTable>
+      <section className="mt-lg">
+        <div className="mb-sm">
+          <h2 className="text-body-emphasis text-ink">订单概览</h2>
         </div>
+        <div className="grid gap-md sm:grid-cols-2 xl:grid-cols-4">
+          <Metric label="今日订单数" value={formatInteger(overview.totals.todayPaidOrders)} />
+          <Metric label="今日订单金额" value={formatMoney(overview.totals.todayPaidOrderAmountCents)} />
+          <Metric label="总订单数" value={formatInteger(overview.totals.paidOrders)} />
+          <Metric label="总订单金额" value={formatMoney(overview.totals.paidOrderAmountCents)} />
+        </div>
+      </section>
 
-        <div>
-          <div className="mb-sm flex items-center justify-between">
-            <h2 className="text-body-emphasis text-ink">最近风险文件</h2>
-            <Link className="text-caption-bold text-primary" href="/admin/files?scanStatus=WARNING">查看文件</Link>
-          </div>
-          <AdminTable>
-            <thead>
-              <tr>
-                <Th>文件</Th>
-                <Th>用户</Th>
-                <Th>状态</Th>
-                <Th>时间</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {overview.recentRiskFiles.map((file) => (
-                <tr key={file.id}>
-                  <Td>{file.originalName}</Td>
-                  <Td>{file.userPhone}</Td>
-                  <Td><StatusPill tone={file.scanStatus === "BLOCKED" ? "bad" : "warn"}>{file.scanStatus}</StatusPill></Td>
-                  <Td>{formatDate(file.createdAt)}</Td>
-                </tr>
-              ))}
-              {overview.recentRiskFiles.length === 0 ? <EmptyRow colSpan={4} /> : null}
-            </tbody>
-          </AdminTable>
+      <section className="mt-lg">
+        <div className="mb-sm">
+          <h2 className="text-body-emphasis text-ink">积分与 AI</h2>
+        </div>
+        <div className="grid gap-md sm:grid-cols-2 xl:grid-cols-5">
+          <Metric label="总积分余额" value={formatInteger(overview.totals.creditBalance)} />
+          <Metric label="累计发放" value={formatInteger(overview.totals.creditEarned)} />
+          <Metric label="累计消耗" value={formatInteger(overview.totals.creditSpent)} />
+          <Metric label="今日 AI 任务" value={formatInteger(overview.totals.todayAiTasks)} />
+          <Metric label="今日 token" value={formatInteger(overview.totals.todayAiTokens)} />
         </div>
       </section>
     </AdminShell>
@@ -97,10 +69,14 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function EmptyRow({ colSpan }: { colSpan: number }) {
-  return (
-    <tr>
-      <td className="px-sm py-md text-center text-caption-md text-secondary" colSpan={colSpan}>暂无数据</td>
-    </tr>
-  );
+function formatInteger(value: number) {
+  return value.toLocaleString("zh-CN");
+}
+
+function formatPercent(value: number) {
+  return `${(value * 100).toLocaleString("zh-CN", { maximumFractionDigits: 1 })}%`;
+}
+
+function toPercentWidth(value: number) {
+  return Math.min(100, Math.max(0, value * 100));
 }

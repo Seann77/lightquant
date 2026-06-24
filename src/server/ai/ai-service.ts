@@ -5,9 +5,10 @@ import { ApiError } from "@/server/http/api-response";
 import { getRepository, withRepositoryTransaction } from "@/server/repositories";
 import { getAiTaskConfig, getTotalInputChars, parseAiTaskType } from "@/server/ai/ai-task-config";
 import { runAiProvider, runAiProviderStream } from "@/server/ai/ai-provider";
+import { resolveAiRuntimeConfig } from "@/server/ai/ai-runtime-config";
 import { getAiTaskProgress, setAiTaskProgress, type AiTaskProgressSnapshot, type AiTaskProgressUpdate } from "@/server/ai/ai-task-progress";
 import { getAiPerfNow, logAiPerf, measureAiPerf } from "@/server/ai/ai-perf";
-import { getAiModelName, getAiProviderMode, getAiSupportsVision, getAiTaskTimeoutMs, getBetaVipConfig } from "@/server/env";
+import { getAiModelName, getAiProviderMode, getAiTaskTimeoutMs, getBetaVipConfig } from "@/server/env";
 import { getUploadedImageDataUrl, inferUploadedFileKind } from "@/server/files/file-service";
 import { getAiTaskBillingForUserAt, type AiTaskBilling } from "@/server/memberships/beta-membership-service";
 import type { AiProviderAttachment, AiProviderStreamDelta } from "@/server/ai/providers/types";
@@ -2141,7 +2142,7 @@ async function appendInputFileRunEvents(task: AiTask, inputFileName: string | nu
   });
 
   if (kind === "image") {
-    const supportsVision = safeGetAiSupportsVision();
+    const supportsVision = await safeGetAiSupportsVision();
 
     await appendRunEvent(task, {
       type: "parse_image",
@@ -2384,9 +2385,9 @@ function isLargeOrPrivateDetailKey(key: string) {
     normalized.includes("raw");
 }
 
-function safeGetAiSupportsVision() {
+async function safeGetAiSupportsVision() {
   try {
-    return getAiSupportsVision();
+    return (await resolveAiRuntimeConfig()).supportsVision;
   } catch {
     return false;
   }
