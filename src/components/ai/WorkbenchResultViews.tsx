@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Check, Copy } from "lucide-react";
 import { formatStrategyResultAsMarkdown } from "@/lib/ai/strategy-result-format";
 import type { AiTaskData } from "@/lib/ai/workbench-types";
@@ -722,9 +722,12 @@ export function RichTextWithCodeBlocks({ content, textClassName }: { content: st
 
 type StrategyMarkdownBlock =
   | { type: "heading"; text: string; level: 2 | 3 }
+  | { type: "shortHeading"; text: string }
   | { type: "paragraph"; text: string }
   | { type: "list"; items: string[] }
   | { type: "code"; code: string; language?: string };
+
+const STRATEGY_SHORT_HEADING_PATTERN = /^(?:结论|止损规则|止盈规则|规则说明|触发条件|执行动作|相关函数|关键参数|总结)[:：]\s*$/;
 
 function StrategyMarkdownResult({ markdown, textClassName }: { markdown: string; textClassName: string }) {
   const blocks = parseStrategyMarkdownBlocks(markdown);
@@ -734,7 +737,11 @@ function StrategyMarkdownResult({ markdown, textClassName }: { markdown: string;
       {blocks.map((block, index) => {
         if (block.type === "heading") {
           const Heading = block.level === 2 ? "h2" : "h3";
-          return <Heading key={`heading-${index}`}>{block.text}</Heading>;
+          return <Heading key={`heading-${index}`}><InlineMarkdownText text={block.text} /></Heading>;
+        }
+
+        if (block.type === "shortHeading") {
+          return <p className="lq-answer-short-heading" key={`short-heading-${index}`}><InlineMarkdownText text={block.text} /></p>;
         }
 
         if (block.type === "code") {
@@ -744,15 +751,19 @@ function StrategyMarkdownResult({ markdown, textClassName }: { markdown: string;
         if (block.type === "list") {
           return (
             <ul key={`list-${index}`}>
-              {block.items.map((item, itemIndex) => <li key={`${index}-${itemIndex}`}>{item}</li>)}
+              {block.items.map((item, itemIndex) => <li key={`${index}-${itemIndex}`}><InlineMarkdownText text={item} /></li>)}
             </ul>
           );
         }
 
-        return <p className={textClassName} key={`paragraph-${index}`}>{block.text}</p>;
+        return <p className={textClassName} key={`paragraph-${index}`}><InlineMarkdownText text={block.text} /></p>;
       })}
     </div>
   );
+}
+
+export function InlineMarkdownText({ text }: { text: string }) {
+  return <>{parseInlineMarkdown(text)}</>;
 }
 
 export function CopyableCodeBlock({ code, language }: { code: string; language?: string }) {
@@ -913,6 +924,16 @@ function parseStrategyMarkdownBlocks(markdown: string): StrategyMarkdownBlock[] 
       continue;
     }
 
+    if (isStrategyAnswerShortHeading(line)) {
+      flushParagraph();
+      flushList();
+      blocks.push({
+        type: "shortHeading",
+        text: line.trim()
+      });
+      continue;
+    }
+
     const bullet = line.match(/^\s*(?:[-*+]|\d+[.)])\s+(.+?)\s*$/);
 
     if (bullet) {
@@ -946,6 +967,76 @@ function parseStrategyMarkdownBlocks(markdown: string): StrategyMarkdownBlock[] 
     type: "paragraph",
     text: markdown
   }];
+}
+
+export function isStrategyAnswerShortHeading(value: string) {
+  return STRATEGY_SHORT_HEADING_PATTERN.test(value.trim());
+}
+
+function parseInlineMarkdown(text: string, keyPrefix = "inline"): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  let index = 0;
+  let partIndex = 0;
+
+  function pushText(value: string) {
+    if (value) {
+      nodes.push(value);
+    }
+  }
+
+  while (index < text.length) {
+    const codeIndex = text.indexOf("`", index);
+    const strongIndex = text.indexOf("**", index);
+    const hasCode = codeIndex >= 0;
+    const hasStrong = strongIndex >= 0;
+
+    if (!hasCode && !hasStrong) {
+      pushText(text.slice(index));
+      break;
+    }
+
+    const useCode = hasCode && (!hasStrong || codeIndex < strongIndex);
+    const markerIndex = useCode ? codeIndex : strongIndex;
+    pushText(text.slice(index, markerIndex));
+
+    if (useCode) {
+      const endIndex = text.indexOf("`", markerIndex + 1);
+
+      if (endIndex < 0) {
+        pushText(text.slice(markerIndex));
+        break;
+      }
+
+      nodes.push(<code key={`${keyPrefix}-code-${partIndex}`}>{text.slice(markerIndex + 1, endIndex)}</code>);
+      index = endIndex + 1;
+      partIndex += 1;
+      continue;
+    }
+
+    const endIndex = text.indexOf("**", markerIndex + 2);
+
+    if (endIndex < 0) {
+      pushText(text.slice(markerIndex));
+      break;
+    }
+
+    const strongText = text.slice(markerIndex + 2, endIndex);
+
+    if (strongText) {
+      nodes.push(
+        <strong key={`${keyPrefix}-strong-${partIndex}`}>
+          {parseInlineMarkdown(strongText, `${keyPrefix}-strong-${partIndex}`)}
+        </strong>
+      );
+    } else {
+      pushText("****");
+    }
+
+    index = endIndex + 2;
+    partIndex += 1;
+  }
+
+  return nodes.length > 0 ? nodes : [text];
 }
 
 async function copyTextToClipboard(value: string) {

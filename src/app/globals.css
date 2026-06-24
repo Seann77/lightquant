@@ -937,6 +937,8 @@ textarea {
 }
 
 .lq-strategy-page {
+  --lq-strategy-column-max: 1160px;
+  --lq-strategy-column-gutter: 48px;
   position: relative;
   display: flex;
   height: 100%;
@@ -963,8 +965,9 @@ textarea {
 }
 
 .lq-platform-strip.is-subtle .lq-platform-inner {
-  width: min(1160px, calc(100% - 96px));
+  width: min(var(--lq-strategy-column-max), calc(100% - (var(--lq-strategy-column-gutter) * 2)));
   min-width: 0;
+  margin-inline: auto;
   justify-content: flex-start;
 }
 
@@ -1060,7 +1063,7 @@ textarea {
   flex: 1 1 auto;
   flex-direction: column;
   overflow: hidden;
-  padding: 24px 34px 18px;
+  padding: 24px 0 18px;
 }
 
 .lq-signal-ribbon {
@@ -1089,10 +1092,12 @@ textarea {
 
 .lq-message-stack {
   display: flex;
-  width: min(1160px, 100%);
+  width: min(var(--lq-strategy-column-max), calc(100% - (var(--lq-strategy-column-gutter) * 2)));
+  min-width: 0;
   max-width: 100%;
   flex-direction: column;
   gap: 14px;
+  margin-inline: auto;
   padding-bottom: 28px;
 }
 
@@ -1101,6 +1106,7 @@ textarea {
   z-index: 1;
   display: flex;
   width: 100%;
+  min-width: 0;
   justify-content: flex-start;
 }
 
@@ -1159,8 +1165,9 @@ textarea {
 
 .lq-assistant-message {
   display: flex;
-  width: min(1160px, 100%);
+  width: 100%;
   min-width: 0;
+  max-width: 100%;
   flex-direction: column;
   gap: 10px;
 }
@@ -1168,6 +1175,8 @@ textarea {
 .lq-thinking-message {
   display: grid;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   grid-template-columns: 34px minmax(0, 1fr);
   gap: 12px;
   border: 1px solid rgba(201, 220, 248, 0.92);
@@ -1312,6 +1321,8 @@ textarea {
 
 .lq-streaming-markdown {
   display: grid;
+  width: 100%;
+  max-width: 100%;
   gap: 10px;
   min-width: 0;
   color: #40506a;
@@ -1338,6 +1349,31 @@ textarea {
   font-weight: 800;
 }
 
+.lq-streaming-markdown strong {
+  color: #1a2536;
+  font-weight: 750;
+}
+
+.lq-streaming-markdown p code,
+.lq-streaming-markdown li code {
+  border: 1px solid rgba(37, 99, 235, 0.15);
+  border-radius: 5px;
+  background: rgba(37, 99, 235, 0.08);
+  color: #1d4ed8;
+  font-family: var(--font-mono), "SFMono-Regular", Consolas, monospace;
+  font-size: 0.92em;
+  padding: 1px 5px;
+  white-space: break-spaces;
+}
+
+.lq-streaming-markdown .lq-answer-short-heading {
+  margin-top: 3px;
+  color: #142033;
+  font-size: 15px;
+  font-weight: 780;
+  line-height: 1.55;
+}
+
 .lq-streaming-markdown ul {
   padding-left: 20px;
 }
@@ -1353,6 +1389,18 @@ textarea {
 .lq-thinking-message.is-dark .lq-streaming-markdown h2,
 .lq-thinking-message.is-dark .lq-streaming-markdown h3 {
   color: #f4f7ff;
+}
+
+.lq-thinking-message.is-dark .lq-streaming-markdown strong,
+.lq-thinking-message.is-dark .lq-streaming-markdown .lq-answer-short-heading {
+  color: #f4f7ff;
+}
+
+.lq-thinking-message.is-dark .lq-streaming-markdown p code,
+.lq-thinking-message.is-dark .lq-streaming-markdown li code {
+  border-color: rgba(147, 197, 253, 0.25);
+  background: rgba(96, 165, 250, 0.16);
+  color: #bfdbfe;
 }
 
 .lq-code-preview .lq-thinking-message {
@@ -1884,6 +1932,7 @@ textarea {
 .lq-error-panel,
 .lq-notes-card {
   width: 100%;
+  min-width: 0;
   max-width: 1160px;
   border-radius: 8px;
 }
@@ -1920,6 +1969,10 @@ textarea {
 
 .lq-code-block-shell {
   position: relative;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   margin: 14px 0 0;
   border-radius: 8px;
   background: #101828;
@@ -1929,9 +1982,9 @@ textarea {
 .lq-code-block-toolbar {
   position: absolute;
   z-index: 2;
-  top: 8px;
-  right: 8px;
-  left: 8px;
+  top: 10px;
+  right: 12px;
+  left: 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1988,18 +2041,28 @@ textarea {
 }
 
 .lq-code-block {
+  width: 100%;
+  max-width: 100%;
   max-height: min(520px, 52vh);
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: auto;
   margin: 0;
-  padding: 48px 16px 16px;
+  padding: 52px 18px 18px;
   border-radius: 8px;
   color: #c8d5ea;
   font-family: "JetBrains Mono", Consolas, monospace;
   font-size: 13px;
   line-height: 1.7;
-  white-space: pre-wrap;
+  white-space: pre;
   word-break: normal;
   overflow-wrap: normal;
+  scrollbar-gutter: stable;
+  tab-size: 2;
+}
+
+.lq-code-block code {
+  display: block;
+  min-width: max-content;
 }
 
 .lq-notes-card {
@@ -2026,7 +2089,8 @@ textarea {
   position: sticky;
   z-index: 3;
   bottom: 0;
-  width: min(1160px, calc(100% - 72px));
+  width: min(var(--lq-strategy-column-max), calc(100% - (var(--lq-strategy-column-gutter) * 2)));
+  max-width: 100%;
   flex: 0 0 auto;
   margin: 0 auto;
   padding-top: 10px;
@@ -6302,5 +6366,111 @@ textarea {
 
   .lq-table-head {
     display: none;
+  }
+}
+
+.lq-strategy-page .lq-platform-strip.is-subtle .lq-platform-inner,
+.lq-strategy-page .lq-message-stack,
+.lq-strategy-page .lq-composer-wrap {
+  width: min(var(--lq-strategy-column-max), calc(100% - (var(--lq-strategy-column-gutter) * 2)));
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.lq-strategy-page .lq-workspace {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.lq-strategy-page .lq-message-stack,
+.lq-strategy-page .lq-assistant-row,
+.lq-strategy-page .lq-user-row,
+.lq-strategy-page .lq-assistant-message,
+.lq-strategy-page .lq-thinking-message,
+.lq-strategy-page .lq-thinking-message-body,
+.lq-strategy-page .lq-final-section,
+.lq-strategy-page .lq-assistant-answer,
+.lq-strategy-page .lq-result-card,
+.lq-strategy-page .lq-error-panel,
+.lq-strategy-page .lq-notes-card,
+.lq-strategy-page .lq-streaming-markdown {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.lq-strategy-page .lq-assistant-message,
+.lq-strategy-page .lq-thinking-message,
+.lq-strategy-page .lq-assistant-answer,
+.lq-strategy-page .lq-result-card,
+.lq-strategy-page .lq-error-panel,
+.lq-strategy-page .lq-notes-card {
+  width: 100%;
+}
+
+.lq-strategy-page .lq-thinking-message-mark {
+  grid-column: 1;
+}
+
+.lq-strategy-page .lq-thinking-message-body,
+.lq-strategy-page .lq-thinking-section {
+  grid-column: 2;
+}
+
+.lq-strategy-page .lq-final-section {
+  grid-column: 1 / -1;
+  width: 100%;
+  margin-top: 0;
+}
+
+.lq-strategy-page .lq-thinking-error {
+  grid-column: 1 / -1;
+}
+
+.lq-strategy-page .lq-thinking-message.has-no-thinking .lq-final-section {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.lq-strategy-page .lq-final-section .lq-streaming-markdown,
+.lq-strategy-page .lq-final-section .lq-code-block-shell {
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (max-width: 1679px) and (min-width: 1280px) {
+  .lq-strategy-page {
+    --lq-strategy-column-max: 1080px;
+    --lq-strategy-column-gutter: 36px;
+  }
+}
+
+@media (max-width: 1279px) and (min-width: 861px) {
+  .lq-strategy-page {
+    --lq-strategy-column-max: 980px;
+    --lq-strategy-column-gutter: 24px;
+  }
+}
+
+@media (max-width: 860px) {
+  .lq-strategy-page {
+    --lq-strategy-column-max: 100%;
+    --lq-strategy-column-gutter: 16px;
+  }
+
+  .lq-strategy-page .lq-platform-strip.is-subtle .lq-platform-inner {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .lq-strategy-page .lq-thinking-message {
+    grid-template-columns: 30px minmax(0, 1fr);
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .lq-strategy-page .lq-code-block {
+    padding: 50px 14px 16px;
+    font-size: 12.5px;
   }
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Bot, ChevronDown, ChevronRight, LoaderCircle } from "lucide-react";
-import { CopyableCodeBlock } from "@/components/ai/WorkbenchResultViews";
+import { CopyableCodeBlock, InlineMarkdownText, isStrategyAnswerShortHeading } from "@/components/ai/WorkbenchResultViews";
 
 export type AssistantThinkingStatus = "idle" | "thinking" | "answering" | "completed" | "failed";
 
@@ -35,6 +35,7 @@ type StreamProps = {
 
 type MarkdownBlock =
   | { type: "heading"; text: string; level: 2 | 3 }
+  | { type: "shortHeading"; text: string }
   | { type: "paragraph"; text: string }
   | { type: "list"; items: string[] }
   | { type: "code"; code: string; language?: string };
@@ -59,18 +60,31 @@ export function AssistantThinkingMessage({
     return null;
   }
 
+  const messageClassName = [
+    "lq-thinking-message",
+    `is-${tone}`,
+    `is-${status}`,
+    displayThinking ? "has-thinking" : "has-no-thinking",
+    hasFinal ? "has-final" : "",
+    className
+  ].filter(Boolean).join(" ");
+
   return (
-    <div className={`lq-thinking-message is-${tone} is-${status} ${className}`.trim()} aria-live="polite">
-      <div className="lq-thinking-message-mark">
-        {status === "thinking" || status === "answering" ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Bot aria-hidden="true" />}
-      </div>
-      <div className="lq-thinking-message-body">
-        {displayThinking ? <ThinkingCollapse defaultExpanded={defaultThinkingExpanded} status={status} thinking={displayThinking} /> : null}
-        {hasFinal ? (
-          <FinalAnswerStream billingLabel={billingLabel} billingWaived={billingWaived} streaming={status === "answering"} text={finalAnswerMarkdown} title={finalTitle} />
-        ) : null}
-        {error ? <div className="lq-thinking-error">{error}</div> : null}
-      </div>
+    <div className={messageClassName} aria-live="polite">
+      {displayThinking ? (
+        <>
+          <div className="lq-thinking-message-mark">
+            {status === "thinking" || status === "answering" ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Bot aria-hidden="true" />}
+          </div>
+          <div className="lq-thinking-message-body">
+            <ThinkingCollapse defaultExpanded={defaultThinkingExpanded} status={status} thinking={displayThinking} />
+          </div>
+        </>
+      ) : null}
+      {hasFinal ? (
+        <FinalAnswerStream billingLabel={billingLabel} billingWaived={billingWaived} streaming={status === "answering"} text={finalAnswerMarkdown} title={finalTitle} />
+      ) : null}
+      {error ? <div className="lq-thinking-error">{error}</div> : null}
     </div>
   );
 }
@@ -145,7 +159,11 @@ export function StreamingMarkdownResult({ markdown }: { markdown: string }) {
       {blocks.map((block, index) => {
         if (block.type === "heading") {
           const Heading = block.level === 2 ? "h2" : "h3";
-          return <Heading key={`heading-${index}`}>{block.text}</Heading>;
+          return <Heading key={`heading-${index}`}><InlineMarkdownText text={block.text} /></Heading>;
+        }
+
+        if (block.type === "shortHeading") {
+          return <p className="lq-answer-short-heading" key={`short-heading-${index}`}><InlineMarkdownText text={block.text} /></p>;
         }
 
         if (block.type === "code") {
@@ -155,12 +173,12 @@ export function StreamingMarkdownResult({ markdown }: { markdown: string }) {
         if (block.type === "list") {
           return (
             <ul key={`list-${index}`}>
-              {block.items.map((item, itemIndex) => <li key={`${index}-${itemIndex}`}>{item}</li>)}
+              {block.items.map((item, itemIndex) => <li key={`${index}-${itemIndex}`}><InlineMarkdownText text={item} /></li>)}
             </ul>
           );
         }
 
-        return <p key={`paragraph-${index}`}>{block.text}</p>;
+        return <p key={`paragraph-${index}`}><InlineMarkdownText text={block.text} /></p>;
       })}
     </div>
   );
@@ -241,6 +259,16 @@ function parseMarkdownBlocks(markdown: string): MarkdownBlock[] {
         type: "heading",
         level: heading[1] === "##" ? 2 : 3,
         text: heading[2]
+      });
+      continue;
+    }
+
+    if (isStrategyAnswerShortHeading(line)) {
+      flushParagraph();
+      flushList();
+      blocks.push({
+        type: "shortHeading",
+        text: line.trim()
       });
       continue;
     }
