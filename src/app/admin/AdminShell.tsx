@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { MaterialIcon } from "@/components/ui/MaterialIcon";
 
 type AdminShellProps = {
-  active: "overview" | "users" | "credit-ledger" | "credit-adjustments" | "orders" | "contact-requests" | "model-config" | "ai-tasks" | "files";
+  active: "overview" | "users" | "orders" | "ai-tasks" | "files";
   adminPhone: string;
   children: ReactNode;
 };
@@ -11,11 +11,7 @@ type AdminShellProps = {
 const navItems = [
   { key: "overview", href: "/admin", icon: "dashboard", label: "总览" },
   { key: "users", href: "/admin/users", icon: "group", label: "用户" },
-  { key: "credit-ledger", href: "/admin/credit-ledger", icon: "account_balance_wallet", label: "积分流水" },
-  { key: "credit-adjustments", href: "/admin/credit-adjustments", icon: "add_card", label: "补积分" },
   { key: "orders", href: "/admin/orders", icon: "receipt_long", label: "订单" },
-  { key: "contact-requests", href: "/admin/contact-requests", icon: "forum", label: "留言" },
-  { key: "model-config", href: "/admin/model-config", icon: "tune", label: "模型配置" },
   { key: "ai-tasks", href: "/admin/ai-tasks", icon: "psychology", label: "AI 任务" },
   { key: "files", href: "/admin/files", icon: "upload_file", label: "文件" }
 ] as const;
@@ -53,7 +49,7 @@ export function AdminShell({ active, adminPhone, children }: AdminShellProps) {
           <header className="sticky top-0 z-10 border-b border-steel/40 bg-paper px-md py-sm md:px-xl">
             <div className="flex flex-wrap items-center justify-between gap-sm">
               <div>
-                <div className="text-caption-sm text-secondary">运营后台</div>
+                <div className="text-caption-sm text-secondary">只读后台</div>
                 <h1 className="text-display-xs font-semibold text-ink">{navItems.find((item) => item.key === active)?.label}</h1>
               </div>
               <Link className="text-button-sm text-secondary transition-colors hover:text-primary" href="/">

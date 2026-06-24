@@ -9,9 +9,6 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   return withApiHandler(async (requestId) => ok(await listAdminOrders({
     ...getAdminListParams(request),
-    phone: getOptionalParam(request, "phone"),
-    status: getOptionalParam(request, "status"),
-    createdFrom: getOptionalParam(request, "createdFrom"),
-    createdTo: getOptionalParam(request, "createdTo")
+    status: getOptionalParam(request, "status")
   }), requestId));
 }

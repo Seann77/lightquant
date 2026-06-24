@@ -163,9 +163,7 @@ model User {
   uploadedFiles      UploadedFile[]
   legalConsents      UserLegalConsent[]
   memberships        UserMembership[]
-  contactRequests    ContactRequest[]
 
-  @@index([createdAt])
   @@map("users")
 }
 
@@ -256,7 +254,6 @@ model CreditLedger {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
-  @@index([createdAt])
   @@map("credit_ledger")
 }
 
@@ -276,77 +273,6 @@ model CreditReservation {
 
   @@index([userId, status])
   @@map("credit_reservations")
-}
-
-model AdminAuditLog {
-  id          String   @id @default(uuid()) @db.Uuid
-  adminUserId String   @map("admin_user_id") @db.Uuid
-  adminPhone  String   @map("admin_phone") @db.VarChar(20)
-  action      String   @db.VarChar(80)
-  targetType  String   @map("target_type") @db.VarChar(80)
-  targetId    String   @map("target_id") @db.VarChar(120)
-  summary     String   @db.Text
-  metadata    Json
-  requestId   String   @map("request_id") @db.VarChar(80)
-  requestIp   String?  @map("request_ip") @db.VarChar(80)
-  createdAt   DateTime @map("created_at") @db.Timestamptz(3)
-
-  @@index([adminUserId, createdAt])
-  @@index([action, createdAt])
-  @@index([targetType, targetId, createdAt])
-  @@map("admin_audit_logs")
-}
-
-model ContactRequest {
-  id            String   @id @default(uuid()) @db.Uuid
-  userId        String?  @map("user_id") @db.Uuid
-  userPhone     String?  @map("user_phone") @db.VarChar(20)
-  name          String   @db.VarChar(80)
-  contactMethod String   @map("contact_method") @db.VarChar(20)
-  contactValue  String   @map("contact_value") @db.VarChar(160)
-  category      String   @db.VarChar(40)
-  message       String   @db.Text
-  source        String   @db.VarChar(240)
-  requestIp     String?  @map("request_ip") @db.VarChar(80)
-  userAgent     String?  @map("user_agent") @db.VarChar(300)
-  createdAt     DateTime @map("created_at") @db.Timestamptz(3)
-  updatedAt     DateTime @map("updated_at") @db.Timestamptz(3)
-
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@index([createdAt])
-  @@index([category, createdAt])
-  @@index([contactMethod, createdAt])
-  @@index([source, createdAt])
-  @@map("contact_requests")
-}
-
-model AiModelProfile {
-  id             String   @id @default(uuid()) @db.Uuid
-  name           String   @db.VarChar(80)
-  provider       String   @db.VarChar(40)
-  baseUrl        String   @map("base_url") @db.VarChar(240)
-  model          String   @db.VarChar(120)
-  supportsVision Boolean  @map("supports_vision")
-  apiKeyEnvName  String?  @map("api_key_env_name") @db.VarChar(80)
-  enabled        Boolean
-  createdAt      DateTime @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime @map("updated_at") @db.Timestamptz(3)
-
-  activeSettings AiModelActiveProfile[]
-
-  @@index([enabled, provider])
-  @@map("ai_model_profiles")
-}
-
-model AiModelActiveProfile {
-  id        String   @id @db.VarChar(40)
-  profileId String   @map("profile_id") @db.Uuid
-  updatedAt DateTime @map("updated_at") @db.Timestamptz(3)
-
-  profile AiModelProfile @relation(fields: [profileId], references: [id], onDelete: Restrict)
-
-  @@map("ai_model_active_profile")
 }
 
 model RechargePlan {

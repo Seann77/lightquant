@@ -164,10 +164,6 @@ function getBoolean(raw: string | undefined, fallback: boolean) {
   return fallback;
 }
 
-function isExplicitlyEnabled(raw: string | undefined) {
-  return raw?.trim().toLowerCase() === "true";
-}
-
 function getIsoDateString(raw: string | undefined, name: string, fallback: string) {
   const value = raw?.trim() || fallback;
   const parsed = new Date(value);
@@ -199,14 +195,6 @@ export function isMockPaymentEnabled() {
 
 export function isPaymentFeatureEnabled() {
   return getBoolean(process.env.PAYMENT_FEATURE_ENABLED, process.env.NODE_ENV !== "production");
-}
-
-export function isAdminWriteEnabled() {
-  return isExplicitlyEnabled(process.env.ADMIN_WRITE_ENABLED);
-}
-
-export function isAdminModelConfigWriteEnabled() {
-  return isAdminWriteEnabled() && isExplicitlyEnabled(process.env.ADMIN_MODEL_CONFIG_WRITE_ENABLED);
 }
 
 export function getAiProviderMode(): AiProviderMode {

@@ -4,11 +4,7 @@ import { ApiError } from "@/server/http/api-response";
 import { formatProviderResultAsMarkdown } from "@/server/ai/streaming-markdown-result";
 import type { AiProviderInput, AiProviderResult, AiProviderStreamCallbacks, AiProviderStreamResult } from "@/server/ai/providers/types";
 
-type MockProviderOptions = {
-  model?: string;
-};
-
-export async function runMockAiProvider(input: AiProviderInput, options: MockProviderOptions = {}): Promise<AiProviderResult> {
+export async function runMockAiProvider(input: AiProviderInput): Promise<AiProviderResult> {
   const { task } = input;
 
   if (containsFailureTrigger(task.prompt) || containsFailureTrigger(task.inputCode)) {
@@ -16,26 +12,22 @@ export async function runMockAiProvider(input: AiProviderInput, options: MockPro
   }
 
   if (isClearlyOutOfScope(task, input.conversationContext)) {
-    return applyMockImageContext(mockOutOfScopeResult(input, options), input);
+    return applyMockImageContext(mockOutOfScopeResult(input), input);
   }
 
   if (task.type === "strategy_generation") {
-    return applyMockImageContext(mockStrategyGeneration(input, options), input);
+    return applyMockImageContext(mockStrategyGeneration(input), input);
   }
 
   if (task.type === "code_conversion") {
-    return applyMockImageContext(mockCodeConversion(input, options), input);
+    return applyMockImageContext(mockCodeConversion(input), input);
   }
 
-  return applyMockImageContext(mockCodeAnalysis(input, options), input);
+  return applyMockImageContext(mockCodeAnalysis(input), input);
 }
 
-export async function runMockAiProviderStream(
-  input: AiProviderInput,
-  callbacks: AiProviderStreamCallbacks = {},
-  options: MockProviderOptions = {}
-): Promise<AiProviderStreamResult> {
-  const result = await runMockAiProvider(input, options);
+export async function runMockAiProviderStream(input: AiProviderInput, callbacks: AiProviderStreamCallbacks = {}): Promise<AiProviderStreamResult> {
+  const result = await runMockAiProvider(input);
   const visibleThinking = "";
   const finalAnswerMarkdown = formatProviderResultAsMarkdown(result, input.task);
 
@@ -82,7 +74,7 @@ function applyMockImageContext(result: AiProviderResult, input: AiProviderInput)
   };
 }
 
-function mockOutOfScopeResult({ task, skill, config }: AiProviderInput, options: MockProviderOptions): AiProviderResult {
+function mockOutOfScopeResult({ task, skill, config }: AiProviderInput): AiProviderResult {
   return {
     scopeStatus: "out_of_scope",
     generatedCode: null,
@@ -93,12 +85,12 @@ function mockOutOfScopeResult({ task, skill, config }: AiProviderInput, options:
       overview: skill.outOfScopeResponse,
       scopeRules: [...skill.scopeRules]
     }),
-    model: getMockModelName(options),
+    model: getAiModelName("mock"),
     tokenUsage: mockTokenUsage(task)
   };
 }
 
-function mockStrategyGeneration({ task, config, conversationContext }: AiProviderInput, options: MockProviderOptions): AiProviderResult {
+function mockStrategyGeneration({ task, config, conversationContext }: AiProviderInput): AiProviderResult {
   const targetPlatform = task.targetPlatform ?? "PTrade";
   const prompt = task.prompt ?? "双均线策略";
   const contextText = conversationContext ?? "";
@@ -137,12 +129,12 @@ ${needsStopLoss ? "        g.entry_price = None" : ""}
       parameters: ["short_window=20", "long_window=60"],
       platform: targetPlatform
     }),
-    model: getMockModelName(options),
+    model: getAiModelName("mock"),
     tokenUsage: mockTokenUsage(task)
   };
 }
 
-function mockCodeConversion({ task, config }: AiProviderInput, options: MockProviderOptions): AiProviderResult {
+function mockCodeConversion({ task, config }: AiProviderInput): AiProviderResult {
   const sourcePlatform = task.sourcePlatform ?? "JoinQuant";
   const targetPlatform = task.targetPlatform ?? "PTrade";
   const input = task.inputCode?.trim() || "# 原始策略代码";
@@ -163,12 +155,12 @@ ${input}
       targetCode: true,
       changedAreas: ["行情数据接口", "下单函数", "账户字段"]
     }),
-    model: getMockModelName(options),
+    model: getAiModelName("mock"),
     tokenUsage: mockTokenUsage(task)
   };
 }
 
-function mockCodeAnalysis({ task, config }: AiProviderInput, options: MockProviderOptions): AiProviderResult {
+function mockCodeAnalysis({ task, config }: AiProviderInput): AiProviderResult {
   return {
     scopeStatus: "in_scope",
     generatedCode: null,
@@ -227,7 +219,7 @@ function mockCodeAnalysis({ task, config }: AiProviderInput, options: MockProvid
         { title: "回测验证", value: "加入交易成本和滑点假设", lines: ["补充交易费用。", "补充滑点。", "补充异常行情场景。"] }
       ]
     }),
-    model: getMockModelName(options),
+    model: getAiModelName("mock"),
     tokenUsage: mockTokenUsage(task)
   };
 }
@@ -241,10 +233,6 @@ function baseReport(task: AiTask, scopeStatus: AiTaskScopeStatus, config: AiProv
     ...extra,
     taskType: task.type
   };
-}
-
-function getMockModelName(options: MockProviderOptions) {
-  return options.model || getAiModelName("mock");
 }
 
 function mockTokenUsage(task: AiTask) {

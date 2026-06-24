@@ -57,17 +57,6 @@ function isRepositoryShapeCurrent(repository: LightQuantRepository) {
     typeof repository.countActiveAiTasksForUser === "function" &&
     typeof repository.countSmsCodesByPhoneSceneSince === "function" &&
     typeof repository.countSmsCodesByRequestIpSince === "function" &&
-    typeof repository.markSmsCodeVerificationFailed === "function" &&
-    typeof repository.listAdminCreditLedger === "function" &&
-    typeof repository.applyAdminCreditAdjustment === "function" &&
-    typeof repository.createAdminAuditLog === "function" &&
-    typeof repository.createContactRequest === "function" &&
-    typeof repository.listAdminContactRequests === "function" &&
-    typeof repository.countContactRequestsByUserSince === "function" &&
-    typeof repository.countContactRequestsByRequestIpSince === "function" &&
-    typeof repository.listAiModelProfiles === "function" &&
-    typeof repository.findAiModelProfileById === "function" &&
-    typeof repository.getActiveAiModelProfile === "function" &&
-    typeof repository.setActiveAiModelProfile === "function"
+    typeof repository.markSmsCodeVerificationFailed === "function"
   );
 }

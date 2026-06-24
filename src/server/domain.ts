@@ -22,40 +22,6 @@ export type UserLegalConsent = {
   source: string;
 };
 
-export type ContactMethod = "邮箱" | "微信号" | "手机号";
-export type ContactCategory = "使用问题" | "策略生成" | "代码转换" | "积分/充值" | "其他";
-
-export type ContactRequest = {
-  id: string;
-  userId: string | null;
-  userPhone: string | null;
-  name: string;
-  contactMethod: ContactMethod;
-  contactValue: string;
-  category: ContactCategory;
-  message: string;
-  source: string;
-  requestIp: string | null;
-  userAgent: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type AiModelProvider = "mock" | "deepseek" | "openai_compatible";
-
-export type AiModelProfile = {
-  id: string;
-  name: string;
-  provider: AiModelProvider;
-  baseUrl: string;
-  model: string;
-  supportsVision: boolean;
-  apiKeyEnvName: string | null;
-  enabled: boolean;
-  createdAt: string;
-  updatedAt: string;
-};
-
 export type MembershipType = "beta_vip";
 export type MembershipStatus = "active";
 

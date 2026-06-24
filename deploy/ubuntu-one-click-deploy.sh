@@ -22,8 +22,6 @@ REPO_URL="${REPO_URL:-}"
 REPO_BRANCH="${REPO_BRANCH:-master}"
 LOCAL_SOURCE_DIR="${LOCAL_SOURCE_DIR:-}"
 ADMIN_PHONE="${ADMIN_PHONE:-}"
-ADMIN_WRITE_ENABLED="${ADMIN_WRITE_ENABLED:-false}"
-ADMIN_MODEL_CONFIG_WRITE_ENABLED="${ADMIN_MODEL_CONFIG_WRITE_ENABLED:-false}"
 LIGHTQUANT_SMS_PROVIDER="${LIGHTQUANT_SMS_PROVIDER:-tencent}"
 ALIBABA_CLOUD_ACCESS_KEY_ID="${ALIBABA_CLOUD_ACCESS_KEY_ID:-}"
 ALIBABA_CLOUD_ACCESS_KEY_SECRET="${ALIBABA_CLOUD_ACCESS_KEY_SECRET:-}"
@@ -69,7 +67,6 @@ DB_NAME="${DB_NAME:-lightquant}"
 DB_USER="${DB_USER:-lightquant}"
 DB_PASSWORD="${DB_PASSWORD:-}"
 AUTH_SECRET="${AUTH_SECRET:-}"
-BASIC_AUTH_ENABLED="${BASIC_AUTH_ENABLED:-true}"
 BASIC_AUTH_USER="${BASIC_AUTH_USER:-admin}"
 BASIC_AUTH_PASSWORD="${BASIC_AUTH_PASSWORD:-}"
 ENABLE_SSL="${ENABLE_SSL:-true}"
@@ -217,10 +214,8 @@ validate_no_newline() {
 validate_inputs() {
   validate_domain
   validate_required ADMIN_PHONE
+  validate_required BASIC_AUTH_USER
   validate_choice ENABLE_SSL "true,false"
-  validate_choice BASIC_AUTH_ENABLED "true,false"
-  validate_choice ADMIN_WRITE_ENABLED "true,false"
-  validate_choice ADMIN_MODEL_CONFIG_WRITE_ENABLED "true,false"
   validate_choice LIGHTQUANT_PAYMENT_MODE "alipay,wechat"
   validate_choice PAYMENT_FEATURE_ENABLED "true,false"
   validate_choice LIGHTQUANT_SMS_PROVIDER "aliyun,tencent"
@@ -235,9 +230,6 @@ validate_inputs() {
   validate_identifier DB_NAME
   validate_identifier DB_USER
   validate_required LIGHTQUANT_AI_MODEL
-  if [[ "$BASIC_AUTH_ENABLED" == "true" ]]; then
-    validate_required BASIC_AUTH_USER
-  fi
   validate_sms_provider_config
   validate_no_newline DB_PASSWORD
   validate_no_newline AUTH_SECRET
@@ -377,8 +369,6 @@ LIGHTQUANT_DATA_MODE=database
 AUTH_SECRET=${AUTH_SECRET}
 DATABASE_URL=${database_url}
 ADMIN_PHONE_WHITELIST=${ADMIN_PHONE}
-ADMIN_WRITE_ENABLED=${ADMIN_WRITE_ENABLED}
-ADMIN_MODEL_CONFIG_WRITE_ENABLED=${ADMIN_MODEL_CONFIG_WRITE_ENABLED}
 
 LIGHTQUANT_SMS_PROVIDER=${LIGHTQUANT_SMS_PROVIDER}
 LIGHTQUANT_ALLOW_MOCK_SMS_IN_PRODUCTION=false
@@ -448,7 +438,6 @@ write_deploy_secrets_file() {
   write_file_sudo "$DEPLOY_SECRETS_FILE" <<EOF
 # LightQuant deployment bootstrap secrets.
 # Keep this file private. Do not commit or paste it into tickets, logs, or chat.
-BASIC_AUTH_ENABLED=${BASIC_AUTH_ENABLED}
 BASIC_AUTH_USER=${BASIC_AUTH_USER}
 BASIC_AUTH_PASSWORD=${BASIC_AUTH_PASSWORD}
 DB_NAME=${DB_NAME}
@@ -475,28 +464,8 @@ build_app() {
   run_sudo env PATH="$PATH" pm2 startup systemd -u "${USER:-root}" --hp "${HOME:-/root}" >/dev/null || true
 }
 
-nginx_admin_auth_block() {
-  if [[ "$BASIC_AUTH_ENABLED" == "true" ]]; then
-    cat <<EOF
-        auth_basic "LightQuant";
-        auth_basic_user_file /etc/nginx/.htpasswd-${APP_NAME};
-
-EOF
-  fi
-}
-
-deployment_basic_auth_summary() {
-  if [[ "$BASIC_AUTH_ENABLED" == "true" ]]; then
-    echo "Basic Auth user: ${BASIC_AUTH_USER}"
-  else
-    echo "Basic Auth: disabled"
-  fi
-}
-
 write_nginx_http_config() {
-  if [[ "$BASIC_AUTH_ENABLED" == "true" ]]; then
-    run_sudo htpasswd -bc "/etc/nginx/.htpasswd-${APP_NAME}" "$BASIC_AUTH_USER" "$BASIC_AUTH_PASSWORD" >/dev/null
-  fi
+  run_sudo htpasswd -bc "/etc/nginx/.htpasswd-${APP_NAME}" "$BASIC_AUTH_USER" "$BASIC_AUTH_PASSWORD" >/dev/null
   run_sudo mkdir -p /var/www/html/.well-known/acme-challenge
 
   write_file_sudo "/etc/nginx/sites-available/${APP_NAME}" <<EOF
@@ -510,7 +479,9 @@ server {
     }
 
     location ^~ /admin {
-$(nginx_admin_auth_block)
+        auth_basic "LightQuant";
+        auth_basic_user_file /etc/nginx/.htpasswd-${APP_NAME};
+
         proxy_pass http://127.0.0.1:${APP_PORT};
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
@@ -524,7 +495,9 @@ $(nginx_admin_auth_block)
     }
 
     location ^~ /api/v1/admin {
-$(nginx_admin_auth_block)
+        auth_basic "LightQuant";
+        auth_basic_user_file /etc/nginx/.htpasswd-${APP_NAME};
+
         proxy_pass http://127.0.0.1:${APP_PORT};
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
@@ -599,7 +572,9 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/${APP_DOMAIN}/privkey.pem;
 
     location ^~ /admin {
-$(nginx_admin_auth_block)
+        auth_basic "LightQuant";
+        auth_basic_user_file /etc/nginx/.htpasswd-${APP_NAME};
+
         proxy_pass http://127.0.0.1:${APP_PORT};
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
@@ -613,7 +588,9 @@ $(nginx_admin_auth_block)
     }
 
     location ^~ /api/v1/admin {
-$(nginx_admin_auth_block)
+        auth_basic "LightQuant";
+        auth_basic_user_file /etc/nginx/.htpasswd-${APP_NAME};
+
         proxy_pass http://127.0.0.1:${APP_PORT};
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
@@ -665,7 +642,7 @@ main() {
 Deploy finished.
 
 App URL: http://${APP_DOMAIN}
-$(deployment_basic_auth_summary)
+Basic Auth user: ${BASIC_AUTH_USER}
 Bootstrap secrets file: ${DEPLOY_SECRETS_FILE}
 Database: ${DB_NAME}
 Database user: ${DB_USER}

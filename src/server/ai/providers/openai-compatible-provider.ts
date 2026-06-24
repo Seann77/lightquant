@@ -8,7 +8,6 @@ import {
   type AiProviderMode,
   ServerConfigError
 } from "@/server/env";
-import type { AiRuntimeConfig } from "@/server/ai/ai-runtime-config";
 import type { AiTaskScopeStatus } from "@/server/domain";
 import { ApiError } from "@/server/http/api-response";
 import { loadTextContent } from "@/server/ai/skills/skill-content";
@@ -17,8 +16,6 @@ import type { AiProviderInput, AiProviderResult, AiProviderStreamCallbacks, AiPr
 
 type ProviderOptions = {
   provider: Exclude<AiProviderMode, "mock">;
-} | {
-  runtimeConfig: AiRuntimeConfig;
 };
 
 type ProviderConfig = {
@@ -95,7 +92,7 @@ const CODE_ANALYSIS_REPORT_TITLES = {
 } as const;
 
 export async function runOpenAiCompatibleProvider(input: AiProviderInput, options: ProviderOptions): Promise<AiProviderResult> {
-  const providerConfig = readProviderConfig(options);
+  const providerConfig = readProviderConfig(options.provider);
   const payload = buildChatCompletionPayload(input, providerConfig);
   let completion = await requestChatCompletion(providerConfig, payload);
   let parsed = parseCompletionContent(completion, input);
@@ -120,7 +117,7 @@ export async function runOpenAiCompatibleProviderStream(
   options: ProviderOptions,
   callbacks: AiProviderStreamCallbacks = {}
 ): Promise<AiProviderStreamResult> {
-  const providerConfig = readProviderConfig(options);
+  const providerConfig = readProviderConfig(options.provider);
   const payload = buildStreamingChatCompletionPayload(input, providerConfig);
   const stream = await requestChatCompletionStream(providerConfig, payload, input, callbacks);
   const finalAnswerMarkdown = normalizeMarkdown(stream.finalAnswerMarkdown, input.task);
@@ -137,25 +134,8 @@ export async function runOpenAiCompatibleProviderStream(
   };
 }
 
-function readProviderConfig(options: ProviderOptions): ProviderConfig {
+function readProviderConfig(provider: Exclude<AiProviderMode, "mock">): ProviderConfig {
   try {
-    if ("runtimeConfig" in options) {
-      if (options.runtimeConfig.provider === "mock") {
-        throw new ServerConfigError("Mock AI provider cannot use OpenAI compatible runtime");
-      }
-
-      return {
-        baseUrl: options.runtimeConfig.baseUrl,
-        apiKey: options.runtimeConfig.apiKey,
-        model: options.runtimeConfig.model,
-        timeoutMs: getAiTaskTimeoutMs(),
-        maxRetries: getAiMaxRetries(),
-        supportsVision: options.runtimeConfig.supportsVision
-      };
-    }
-
-    const provider = options.provider;
-
     return {
       baseUrl: getAiBaseUrl(provider),
       apiKey: getAiApiKey(provider),

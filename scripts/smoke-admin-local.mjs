@@ -1,6 +1,4 @@
-import { createHmac, randomUUID } from "crypto";
 import { config as loadEnv } from "dotenv";
-import { Pool } from "pg";
 
 loadEnv({ path: ".env", quiet: true });
 loadEnv({ path: ".env.local", quiet: true, override: true });
@@ -10,11 +8,6 @@ const adminPhones = String(process.env.ADMIN_PHONE_WHITELIST || "")
   .split(",")
   .map((phone) => phone.trim())
   .filter(Boolean);
-const adminWriteEnabled = process.env.ADMIN_WRITE_ENABLED === "true";
-const adminModelConfigWriteEnabled = process.env.ADMIN_MODEL_CONFIG_WRITE_ENABLED === "true";
-const isLocalBaseUrl = /^https?:\/\/(?:127\.0\.0\.1|localhost)(?::|\/|$)/.test(baseUrl);
-const authMode = process.env.SMOKE_ADMIN_AUTH_MODE || (isLocalBaseUrl ? "direct-session" : "none");
-let dbPool = null;
 
 console.log("LightQuant local admin permission smoke test");
 console.log(
@@ -22,9 +15,8 @@ console.log(
     {
       baseUrl,
       adminWhitelistConfigured: adminPhones.length > 0,
-      authMode,
       note:
-        "This test verifies admin API access control and read/admin-write guards. It masks phone numbers, avoids real SMS unless explicitly enabled, and does not run writes when admin write switches are on."
+        "This test verifies admin API read-only access control with mock SMS login. It masks phone numbers and does not mutate business data."
     },
     null,
     2
@@ -35,57 +27,35 @@ try {
   const unauthenticated = await createClient().requestJson("GET", "/api/v1/admin/overview");
   assertFailure("unauthenticated-admin-overview", unauthenticated, "UNAUTHORIZED");
 
+  const nonAdminPhone = createNonAdminPhone(adminPhones);
+  const nonAdminClient = createClient();
+  await login(nonAdminClient, nonAdminPhone);
+  const nonAdminOverview = await nonAdminClient.requestJson("GET", "/api/v1/admin/overview");
+  assertFailure("non-admin-overview", nonAdminOverview, "NOT_FOUND");
+
   const result = {
     ok: true,
     unauthenticated: {
       status: unauthenticated.status,
       code: unauthenticated.json.error.code
     },
-    nonAdmin: null,
-    admin: null
-  };
-
-  if (isLocalBaseUrl || process.env.SMOKE_INCLUDE_NON_ADMIN === "true") {
-    const nonAdminPhone = createNonAdminPhone(adminPhones);
-    const nonAdminClient = createClient();
-    await authenticate(nonAdminClient, nonAdminPhone, {
-      allowCreate: isLocalBaseUrl,
-      requestIp: createSmokeIp("198.51.100")
-    });
-    const nonAdminOverview = await nonAdminClient.requestJson("GET", "/api/v1/admin/overview");
-    assertFailure("non-admin-overview", nonAdminOverview, "NOT_FOUND");
-
-    result.nonAdmin = {
+    nonAdmin: {
       phoneMasked: maskPhone(nonAdminPhone),
       status: nonAdminOverview.status,
       code: nonAdminOverview.json.error.code
-    };
-  } else {
-    result.nonAdmin = {
-      skipped: true,
-      reason: "Skipped outside local base URL to avoid real SMS or test-user creation."
-    };
-  }
+    },
+    admin: null
+  };
 
   if (adminPhones.length > 0) {
     const adminPhone = adminPhones[0];
-    const orderPhoneFilter = adminPhone.slice(0, 3);
     const adminClient = createClient();
-    await authenticate(adminClient, adminPhone, {
-      allowCreate: false,
-      requestIp: createSmokeIp("203.0.113")
-    });
+    await login(adminClient, adminPhone);
 
     const endpoints = [
       "/api/v1/admin/overview",
       "/api/v1/admin/users?page=1&pageSize=5",
-      "/api/v1/admin/users?page=1&pageSize=5&createdFrom=2020-01-01&createdTo=2035-01-01",
-      "/api/v1/admin/credit-ledger?page=1&pageSize=5",
-      "/api/v1/admin/credit-ledger?page=1&pageSize=5&type=bonus&direction=in",
       "/api/v1/admin/orders?page=1&pageSize=5",
-      `/api/v1/admin/orders?page=1&pageSize=5&phone=${encodeURIComponent(orderPhoneFilter)}&status=PAID&createdFrom=2020-01-01&createdTo=2035-01-01`,
-      "/api/v1/admin/contact-requests?page=1&pageSize=5",
-      "/api/v1/admin/model-config",
       "/api/v1/admin/ai-tasks?page=1&pageSize=5",
       "/api/v1/admin/files?page=1&pageSize=5"
     ];
@@ -94,27 +64,6 @@ try {
     for (const endpoint of endpoints) {
       const response = await adminClient.requestJson("GET", endpoint);
       assertSuccess(`admin-${endpoint}`, response, 200);
-
-      if (endpoint === "/api/v1/admin/overview") {
-        assertAdminOverviewShape(response.json.data);
-      }
-
-      if (endpoint.includes("/api/v1/admin/credit-ledger")) {
-        assertAdminCreditLedgerShape(response.json.data);
-      }
-
-      if (endpoint.includes("/api/v1/admin/orders")) {
-        assertAdminOrdersShape(response.json.data);
-      }
-
-      if (endpoint.includes("/api/v1/admin/contact-requests")) {
-        assertAdminContactRequestsShape(response.json.data);
-      }
-
-      if (endpoint === "/api/v1/admin/model-config") {
-        assertAdminModelConfigShape(response.json.data);
-      }
-
       checks.push({
         endpoint,
         status: response.status,
@@ -122,47 +71,6 @@ try {
         shape: summarizeAdminResponse(endpoint, response.json.data)
       });
     }
-
-    if (adminWriteEnabled) {
-      throw new Error("smoke-admin-local requires ADMIN_WRITE_ENABLED=false to avoid mutating shared data");
-    }
-
-    if (adminModelConfigWriteEnabled) {
-      throw new Error("smoke-admin-local requires ADMIN_MODEL_CONFIG_WRITE_ENABLED=false to avoid mutating model config");
-    }
-
-    const blockedAdjustment = await adminClient.requestJson("POST", "/api/v1/admin/credit-adjustments", {
-      phone: adminPhone,
-      amount: 1,
-      reason: "smoke blocked adjustment",
-      note: "ADMIN_WRITE_ENABLED=false guard"
-    });
-
-    assertFailure("admin-credit-adjustment-write-disabled", blockedAdjustment, "FORBIDDEN");
-
-    checks.push({
-      endpoint: "/api/v1/admin/credit-adjustments",
-      status: blockedAdjustment.status,
-      success: blockedAdjustment.json.success,
-      shape: {
-        writeGuard: blockedAdjustment.json.error.code
-      }
-    });
-
-    const blockedModelSwitch = await adminClient.requestJson("POST", "/api/v1/admin/model-config/active-profile", {
-      profileId: "00000000-0000-0000-0000-000000000000"
-    });
-
-    assertFailure("admin-model-config-write-disabled", blockedModelSwitch, "FORBIDDEN");
-
-    checks.push({
-      endpoint: "/api/v1/admin/model-config/active-profile",
-      status: blockedModelSwitch.status,
-      success: blockedModelSwitch.json.success,
-      shape: {
-        writeGuard: blockedModelSwitch.json.error.code
-      }
-    });
 
     result.admin = {
       phoneMasked: maskPhone(adminPhone),
@@ -183,26 +91,16 @@ try {
     )
   );
   process.exitCode = 1;
-} finally {
-  await closeDbPool();
 }
 
-function createClient(sessionToken) {
+function createClient() {
   let cookie = "";
 
-  if (sessionToken) {
-    cookie = `lightquant_session=${sessionToken}`;
-  }
-
   return {
-    setSessionToken(sessionToken) {
-      cookie = `lightquant_session=${sessionToken}`;
-    },
-    async requestJson(method, path, body, extraHeaders = {}) {
+    async requestJson(method, path, body) {
       const headers = {
         ...(body ? { "content-type": "application/json" } : {}),
-        ...(cookie ? { cookie } : {}),
-        ...extraHeaders
+        ...(cookie ? { cookie } : {})
       };
       const response = await fetch(new URL(path, baseUrl), {
         method,
@@ -237,40 +135,13 @@ function createClient(sessionToken) {
   };
 }
 
-async function authenticate(client, phone, { allowCreate, requestIp }) {
-  if (process.env.SMOKE_ADMIN_SESSION_TOKEN && phone === adminPhones[0]) {
-    client.setSessionToken(process.env.SMOKE_ADMIN_SESSION_TOKEN.trim());
-    return;
-  }
-
-  if (authMode === "direct-session") {
-    const user = await ensureSmokeUser(phone, allowCreate);
-
-    client.setSessionToken(createSessionToken(user.id));
-    return;
-  }
-
-  if (authMode === "sms") {
-    if (!isLocalBaseUrl && process.env.SMOKE_ALLOW_REAL_SMS !== "true") {
-      throw new Error("Refusing to send real SMS for admin smoke. Set SMOKE_ALLOW_REAL_SMS=true only when this is intended.");
-    }
-
-    await loginBySms(client, phone, requestIp);
-    return;
-  }
-
-  throw new Error("Authenticated admin smoke skipped because SMOKE_ADMIN_AUTH_MODE is not configured for this base URL.");
-}
-
-async function loginBySms(client, phone, requestIp) {
-  const headers = requestIp ? { "x-forwarded-for": requestIp } : {};
-
+async function login(client, phone) {
   assertSuccess(
     "sms-code",
     await client.requestJson("POST", "/api/v1/auth/sms-code", {
       phone,
       scene: "login"
-    }, headers),
+    }),
     200
   );
 
@@ -280,123 +151,9 @@ async function loginBySms(client, phone, requestIp) {
       phone,
       code: "123456",
       acceptedLegal: true
-    }, headers),
+    }),
     200
   );
-}
-
-async function ensureSmokeUser(phone, allowCreate) {
-  const existing = await findUserByPhone(phone);
-
-  if (existing) {
-    if (existing.status !== "active") {
-      throw new Error("Smoke user exists but is not active");
-    }
-
-    return existing;
-  }
-
-  if (!allowCreate) {
-    throw new Error(`Admin smoke user ${maskPhone(phone)} does not exist locally`);
-  }
-
-  return createSmokeUser(phone);
-}
-
-async function findUserByPhone(phone) {
-  const result = await getDbPool().query(
-    'select id, phone, status from "users" where "phone" = $1 limit 1',
-    [phone]
-  );
-
-  return result.rows[0] ?? null;
-}
-
-async function createSmokeUser(phone) {
-  const now = new Date();
-  const result = await getDbPool().query(
-    `insert into "users" ("id", "phone", "display_name", "invite_code", "referred_by", "status", "created_at", "last_login_at")
-     values ($1, $2, $3, $4, null, 'active', $5, $5)
-     returning id, phone, status`,
-    [randomUUID(), phone, `Smoke ${phone.slice(-4)}`, createInviteCode(), now]
-  );
-
-  return result.rows[0];
-}
-
-function getDbPool() {
-  if (!dbPool) {
-    const databaseUrl = process.env.DATABASE_URL;
-
-    if (!databaseUrl) {
-      throw new Error("DATABASE_URL is required for direct-session admin smoke");
-    }
-
-    dbPool = new Pool(getPgPoolConfig(databaseUrl));
-  }
-
-  return dbPool;
-}
-
-function getPgPoolConfig(databaseUrl) {
-  try {
-    const parsed = new URL(databaseUrl);
-    const sslmode = parsed.searchParams.get("sslmode");
-    const isSupabaseHost = parsed.hostname.includes("supabase.com");
-    const shouldUseSsl = sslmode !== "disable" && (Boolean(sslmode) || isSupabaseHost);
-
-    if (!shouldUseSsl) {
-      return {
-        connectionString: databaseUrl
-      };
-    }
-
-    parsed.searchParams.delete("sslmode");
-
-    return {
-      connectionString: parsed.toString(),
-      ssl: {
-        rejectUnauthorized: false
-      }
-    };
-  } catch {
-    return {
-      connectionString: databaseUrl
-    };
-  }
-}
-
-async function closeDbPool() {
-  if (dbPool) {
-    await dbPool.end();
-    dbPool = null;
-  }
-}
-
-function createSessionToken(userId) {
-  const secret = process.env.AUTH_SECRET;
-
-  if (!secret || secret.length < 32) {
-    throw new Error("AUTH_SECRET must be configured for direct-session admin smoke");
-  }
-
-  const now = Math.floor(Date.now() / 1000);
-  const payload = {
-    userId,
-    issuedAt: now,
-    expiresAt: now + 60 * 60 * 24 * 30
-  };
-  const encodedPayload = Buffer.from(JSON.stringify(payload)).toString("base64url");
-
-  return `${encodedPayload}.${createHmac("sha256", secret).update(encodedPayload).digest("base64url")}`;
-}
-
-function createInviteCode() {
-  return `SM${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`.slice(0, 32);
-}
-
-function createSmokeIp(prefix) {
-  return `${prefix}.${Math.floor(Math.random() * 200) + 1}`;
 }
 
 function assertSuccess(step, response, expectedStatus) {
@@ -416,151 +173,17 @@ function assertFailure(step, response, code) {
 function summarizeAdminResponse(endpoint, data) {
   if (endpoint.includes("/overview")) {
     return {
-      keys: Object.keys(data).sort(),
-      totals: {
-        users: typeof data.totals?.users,
-        paidUsers: typeof data.totals?.paidUsers,
-        paidConversionRate: typeof data.totals?.paidConversionRate,
-        todayPaidOrders: typeof data.totals?.todayPaidOrders,
-        todayPaidOrderAmountCents: typeof data.totals?.todayPaidOrderAmountCents,
-        paidOrders: typeof data.totals?.paidOrders,
-        paidOrderAmountCents: typeof data.totals?.paidOrderAmountCents
-      }
-    };
-  }
-
-  if (endpoint.includes("/model-config")) {
-    return {
-      currentKeys: Object.keys(data.current ?? {}).sort(),
-      profilesIsArray: Array.isArray(data.profiles),
-      keyStatusesIsArray: Array.isArray(data.keyStatuses),
-      writeGuards: {
-        adminWriteEnabled: typeof data.writeGuards?.adminWriteEnabled,
-        modelConfigWriteEnabled: typeof data.writeGuards?.modelConfigWriteEnabled
-      }
+      keys: Object.keys(data).sort()
     };
   }
 
   return {
     itemsIsArray: Array.isArray(data.items),
-    firstItemKeys: Array.isArray(data.items) && data.items[0] ? Object.keys(data.items[0]).sort() : [],
     page: data.page,
     pageSize: data.pageSize,
     totalType: typeof data.total,
-    totalPages: data.totalPages,
-    ...(endpoint.includes("/api/v1/admin/orders")
-      ? {
-          summary: {
-            filteredOrders: typeof data.summary?.filteredOrders,
-            filteredOrderAmountCents: typeof data.summary?.filteredOrderAmountCents,
-            filteredPaidOrders: typeof data.summary?.filteredPaidOrders,
-            filteredPaidOrderAmountCents: typeof data.summary?.filteredPaidOrderAmountCents
-          }
-        }
-      : {})
+    totalPages: data.totalPages
   };
-}
-
-function assertAdminOverviewShape(data) {
-  const totals = data?.totals;
-
-  if (!totals || typeof totals !== "object") {
-    throw new Error("admin-overview expected totals object");
-  }
-
-  for (const field of [
-    "users",
-    "paidUsers",
-    "paidConversionRate",
-    "todayPaidOrders",
-    "todayPaidOrderAmountCents",
-    "paidOrders",
-    "paidOrderAmountCents"
-  ]) {
-    if (typeof totals[field] !== "number") {
-      throw new Error(`admin-overview expected totals.${field} to be number`);
-    }
-  }
-}
-
-function assertAdminCreditLedgerShape(data) {
-  if (!data || !Array.isArray(data.items) || typeof data.total !== "number") {
-    throw new Error("admin-credit-ledger expected paginated items");
-  }
-
-  const [item] = data.items;
-
-  if (!item) {
-    return;
-  }
-
-  for (const field of ["userPhone", "direction", "type", "amount", "balanceAfter", "sourceType", "sourceId", "remark", "createdAt"]) {
-    if (!(field in item)) {
-      throw new Error(`admin-credit-ledger expected item.${field}`);
-    }
-  }
-}
-
-function assertAdminOrdersShape(data) {
-  if (!data || !Array.isArray(data.items) || typeof data.total !== "number") {
-    throw new Error("admin-orders expected paginated items");
-  }
-
-  if (!data.summary || typeof data.summary !== "object") {
-    throw new Error("admin-orders expected summary object");
-  }
-
-  for (const field of ["filteredOrders", "filteredOrderAmountCents", "filteredPaidOrders", "filteredPaidOrderAmountCents"]) {
-    if (typeof data.summary[field] !== "number") {
-      throw new Error(`admin-orders expected summary.${field} to be number`);
-    }
-  }
-}
-
-function assertAdminContactRequestsShape(data) {
-  if (!data || !Array.isArray(data.items) || typeof data.total !== "number") {
-    throw new Error("admin-contact-requests expected paginated items");
-  }
-
-  const [item] = data.items;
-
-  if (!item) {
-    return;
-  }
-
-  for (const field of ["userPhone", "name", "contactMethod", "contactValue", "category", "message", "source", "createdAt"]) {
-    if (!(field in item)) {
-      throw new Error(`admin-contact-requests expected item.${field}`);
-    }
-  }
-}
-
-function assertAdminModelConfigShape(data) {
-  if (!data || typeof data !== "object") {
-    throw new Error("admin-model-config expected object");
-  }
-
-  for (const field of ["current", "profiles", "keyStatuses", "writeGuards"]) {
-    if (!(field in data)) {
-      throw new Error(`admin-model-config expected ${field}`);
-    }
-  }
-
-  if (!data.current || typeof data.current.provider !== "string" || typeof data.current.model !== "string") {
-    throw new Error("admin-model-config expected current provider/model");
-  }
-
-  if (typeof data.current.apiKeyConfigured !== "boolean" || typeof data.current.configValid !== "boolean") {
-    throw new Error("admin-model-config expected current safe booleans");
-  }
-
-  if (!Array.isArray(data.profiles) || !Array.isArray(data.keyStatuses)) {
-    throw new Error("admin-model-config expected profiles/keyStatuses arrays");
-  }
-
-  if (typeof data.writeGuards.adminWriteEnabled !== "boolean" || typeof data.writeGuards.modelConfigWriteEnabled !== "boolean") {
-    throw new Error("admin-model-config expected write guard booleans");
-  }
 }
 
 function createNonAdminPhone(adminWhitelist) {
