@@ -15,6 +15,10 @@ import type {
   AiTaskStatus,
   AiTaskType,
   AiTaskScopeStatus,
+  AiModelProfile,
+  ContactCategory,
+  ContactMethod,
+  ContactRequest,
   CreditAccount,
   CreditLedger,
   CreditLedgerDirection,
@@ -107,6 +111,26 @@ export type CreateUserLegalConsentInput = {
   source: string;
 };
 
+export type CreateContactRequestInput = {
+  userId: string;
+  userPhone: string;
+  name: string;
+  contactMethod: ContactMethod;
+  contactValue: string;
+  category: ContactCategory;
+  message: string;
+  source: string;
+  requestIp: string | null;
+  userAgent: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SetActiveAiModelProfileInput = {
+  profileId: string;
+  updatedAt: string;
+};
+
 export type UpsertUserMembershipInput = {
   userId: string;
   type: UserMembership["type"];
@@ -131,6 +155,24 @@ export type ApplyCreditLedgerInput = {
   idempotencyKey: string;
   remark: string;
   createdAt: string;
+};
+
+export type CreateAdminAuditLogInput = {
+  adminUserId: string;
+  adminPhone: string;
+  action: string;
+  targetType: string;
+  targetId: string;
+  summary: string;
+  metadata: Record<string, unknown>;
+  requestId: string;
+  requestIp: string | null;
+  createdAt: string;
+};
+
+export type ApplyAdminCreditAdjustmentInput = {
+  ledger: ApplyCreditLedgerInput;
+  audit: CreateAdminAuditLogInput;
 };
 
 export type CreateRechargeOrderInput = {
@@ -316,16 +358,18 @@ export type AiConversationLatestTask = Pick<AiTask, "conversationId" | "type" | 
 export type AdminOverview = {
   totals: {
     users: number;
+    paidUsers: number;
+    paidConversionRate: number;
     creditBalance: number;
     creditEarned: number;
     creditSpent: number;
     todayAiTasks: number;
     todayAiTokens: number;
-    todayOrders: number;
-    todayRiskFiles: number;
+    todayPaidOrders: number;
+    todayPaidOrderAmountCents: number;
+    paidOrders: number;
+    paidOrderAmountCents: number;
   };
-  recentFailedAiTasks: AdminAiTaskItem[];
-  recentRiskFiles: AdminUploadedFileItem[];
 };
 
 export type AdminUserItem = {
@@ -344,6 +388,19 @@ export type AdminUserItem = {
     remark: string;
     createdAt: string;
   } | null;
+};
+
+export type AdminCreditLedgerItem = {
+  id: string;
+  userPhone: string;
+  direction: CreditLedgerDirection;
+  type: CreditLedgerType;
+  amount: number;
+  balanceAfter: number;
+  sourceType: string;
+  sourceId: string;
+  remark: string;
+  createdAt: string;
 };
 
 export type AdminOrderItem = {
@@ -400,6 +457,18 @@ export type AdminUploadedFileItem = {
   createdAt: string;
 };
 
+export type AdminContactRequestItem = {
+  id: string;
+  userPhone: string | null;
+  name: string;
+  contactMethod: ContactMethod;
+  contactValue: string;
+  category: ContactCategory;
+  message: string;
+  source: string;
+  createdAt: string;
+};
+
 export type AdminUserPage = {
   items: AdminUserItem[];
   total: number;
@@ -408,6 +477,14 @@ export type AdminUserPage = {
 export type AdminOrderPage = {
   items: AdminOrderItem[];
   total: number;
+  summary: AdminOrderSummary;
+};
+
+export type AdminOrderSummary = {
+  filteredOrders: number;
+  filteredOrderAmountCents: number;
+  filteredPaidOrders: number;
+  filteredPaidOrderAmountCents: number;
 };
 
 export type AdminAiTaskPage = {
@@ -418,6 +495,46 @@ export type AdminAiTaskPage = {
 export type AdminUploadedFilePage = {
   items: AdminUploadedFileItem[];
   total: number;
+};
+
+export type AdminCreditLedgerPage = {
+  items: AdminCreditLedgerItem[];
+  total: number;
+};
+
+export type AdminContactRequestPage = {
+  items: AdminContactRequestItem[];
+  total: number;
+};
+
+export type AdminUserFilters = {
+  phone?: string;
+  createdFrom?: string;
+  createdTo?: string;
+};
+
+export type AdminOrderFilters = {
+  phone?: string;
+  status?: OrderStatus;
+  createdFrom?: string;
+  createdTo?: string;
+};
+
+export type AdminCreditLedgerFilters = {
+  phone?: string;
+  type?: CreditLedgerType;
+  direction?: CreditLedgerDirection;
+  createdFrom?: string;
+  createdTo?: string;
+};
+
+export type AdminContactRequestFilters = {
+  keyword?: string;
+  contactMethod?: ContactMethod;
+  category?: ContactCategory;
+  source?: string;
+  createdFrom?: string;
+  createdTo?: string;
 };
 
 export interface LightQuantRepository {
@@ -433,12 +550,21 @@ export interface LightQuantRepository {
   findUserByInviteCode(inviteCode: string): Promise<User | null>;
   createUser(input: CreateUserInput): Promise<User>;
   createUserLegalConsent(input: CreateUserLegalConsentInput): Promise<UserLegalConsent>;
+  createContactRequest(input: CreateContactRequestInput): Promise<ContactRequest>;
+  countContactRequestsByUserSince(userId: string, since: string): Promise<number>;
+  countContactRequestsByRequestIpSince(requestIp: string, since: string): Promise<number>;
   updateUserLastLogin(userId: string, lastLoginAt: string): Promise<User>;
+  listAiModelProfiles(): Promise<AiModelProfile[]>;
+  findAiModelProfileById(profileId: string): Promise<AiModelProfile | null>;
+  getActiveAiModelProfile(): Promise<AiModelProfile | null>;
+  setActiveAiModelProfile(input: SetActiveAiModelProfileInput): Promise<AiModelProfile>;
   findActiveMembershipForUser(userId: string, type: MembershipType, at: string): Promise<UserMembership | null>;
   upsertUserMembership(input: UpsertUserMembershipInput): Promise<UserMembership>;
   getCreditAccount(userId: string): Promise<CreditAccount | null>;
   ensureCreditAccount(userId: string, now: string): Promise<CreditAccount>;
   applyCreditLedger(input: ApplyCreditLedgerInput): Promise<AppliedCreditLedger>;
+  applyAdminCreditAdjustment(input: ApplyAdminCreditAdjustmentInput): Promise<AppliedCreditLedger>;
+  createAdminAuditLog(input: CreateAdminAuditLogInput): Promise<void>;
   listCreditLedger(userId: string, pagination: Pagination): Promise<LedgerPage>;
   listEnabledRechargePlans(): Promise<RechargePlan[]>;
   findRechargePlanById(id: string): Promise<RechargePlan | null>;
@@ -480,10 +606,12 @@ export interface LightQuantRepository {
   findUploadedFileById(id: string): Promise<UploadedFile | null>;
   listUploadedFilesByIds(fileIds: string[]): Promise<UploadedFile[]>;
   getAdminOverview(todayStart: string): Promise<AdminOverview>;
-  listAdminUsers(pagination: Pagination, filters: { phone?: string }): Promise<AdminUserPage>;
-  listAdminOrders(pagination: Pagination, filters: { status?: OrderStatus }): Promise<AdminOrderPage>;
+  listAdminUsers(pagination: Pagination, filters: AdminUserFilters): Promise<AdminUserPage>;
+  listAdminOrders(pagination: Pagination, filters: AdminOrderFilters): Promise<AdminOrderPage>;
   listAdminAiTasks(pagination: Pagination, filters: { type?: AiTaskType; status?: AiTaskStatus }): Promise<AdminAiTaskPage>;
   listAdminUploadedFiles(pagination: Pagination, filters: { scanStatus?: UploadedFileScanStatus }): Promise<AdminUploadedFilePage>;
+  listAdminCreditLedger(pagination: Pagination, filters: AdminCreditLedgerFilters): Promise<AdminCreditLedgerPage>;
+  listAdminContactRequests(pagination: Pagination, filters: AdminContactRequestFilters): Promise<AdminContactRequestPage>;
   findCreditReservationByIdempotencyKey(idempotencyKey: string): Promise<CreditReservation | null>;
   findCreditReservationByTaskId(taskId: string): Promise<CreditReservation | null>;
   createCreditReservation(input: CreateCreditReservationInput): Promise<CreditReservation>;
