@@ -18,8 +18,28 @@ const requiredSnippets = [
     snippet: 'LIGHTQUANT_SMS_PROVIDER="${LIGHTQUANT_SMS_PROVIDER:-tencent}"'
   },
   {
+    name: "basic auth enabled default",
+    snippet: 'BASIC_AUTH_ENABLED="${BASIC_AUTH_ENABLED:-true}"'
+  },
+  {
     name: "sms provider passthrough",
     snippet: "LIGHTQUANT_SMS_PROVIDER=${LIGHTQUANT_SMS_PROVIDER}"
+  },
+  {
+    name: "admin write disabled default",
+    snippet: 'ADMIN_WRITE_ENABLED="${ADMIN_WRITE_ENABLED:-false}"'
+  },
+  {
+    name: "admin model config write disabled default",
+    snippet: 'ADMIN_MODEL_CONFIG_WRITE_ENABLED="${ADMIN_MODEL_CONFIG_WRITE_ENABLED:-false}"'
+  },
+  {
+    name: "admin write env passthrough",
+    snippet: "ADMIN_WRITE_ENABLED=${ADMIN_WRITE_ENABLED}"
+  },
+  {
+    name: "admin model config write env passthrough",
+    snippet: "ADMIN_MODEL_CONFIG_WRITE_ENABLED=${ADMIN_MODEL_CONFIG_WRITE_ENABLED}"
   },
   {
     name: "mock sms disabled in production",
@@ -138,6 +158,22 @@ const requiredSnippets = [
     snippet: "validate_inputs()"
   },
   {
+    name: "basic auth flag validation",
+    snippet: 'validate_choice BASIC_AUTH_ENABLED "true,false"'
+  },
+  {
+    name: "conditional basic auth password file",
+    snippet: 'if [[ "$BASIC_AUTH_ENABLED" == "true" ]]; then'
+  },
+  {
+    name: "conditional nginx admin auth block",
+    snippet: "nginx_admin_auth_block"
+  },
+  {
+    name: "basic auth enabled stored in deploy secrets",
+    snippet: "BASIC_AUTH_ENABLED=${BASIC_AUTH_ENABLED}"
+  },
+  {
     name: "domain validation",
     snippet: "validate_domain"
   },
@@ -160,6 +196,14 @@ const requiredSnippets = [
   {
     name: "payment feature flag validation",
     snippet: 'validate_choice PAYMENT_FEATURE_ENABLED "true,false"'
+  },
+  {
+    name: "admin write flag validation",
+    snippet: 'validate_choice ADMIN_WRITE_ENABLED "true,false"'
+  },
+  {
+    name: "admin model config write flag validation",
+    snippet: 'validate_choice ADMIN_MODEL_CONFIG_WRITE_ENABLED "true,false"'
   },
   {
     name: "production sms provider validation",
@@ -199,11 +243,21 @@ const forbiddenSnippets = [
   {
     name: "production mock sms allowed",
     snippet: "LIGHTQUANT_ALLOW_MOCK_SMS_IN_PRODUCTION=true"
+  },
+  {
+    name: "admin write enabled default",
+    snippet: 'ADMIN_WRITE_ENABLED="${ADMIN_WRITE_ENABLED:-true}"'
+  },
+  {
+    name: "admin model config write enabled default",
+    snippet: 'ADMIN_MODEL_CONFIG_WRITE_ENABLED="${ADMIN_MODEL_CONFIG_WRITE_ENABLED:-true}"'
   }
 ];
 const requiredEnvAssignments = [
   "NODE_ENV=production",
   "LIGHTQUANT_DATA_MODE=database",
+  "ADMIN_WRITE_ENABLED=${ADMIN_WRITE_ENABLED}",
+  "ADMIN_MODEL_CONFIG_WRITE_ENABLED=${ADMIN_MODEL_CONFIG_WRITE_ENABLED}",
   "LIGHTQUANT_SMS_PROVIDER=${LIGHTQUANT_SMS_PROVIDER}",
   "LIGHTQUANT_ALLOW_MOCK_SMS_IN_PRODUCTION=false",
   "ALIBABA_CLOUD_ACCESS_KEY_ID=${ALIBABA_CLOUD_ACCESS_KEY_ID}",
@@ -244,6 +298,14 @@ const forbiddenEnvPatterns = [
   {
     name: "mock ai provider",
     pattern: /^LIGHTQUANT_AI_PROVIDER=mock$/m
+  },
+  {
+    name: "admin write enabled by default",
+    pattern: /^ADMIN_WRITE_ENABLED=true$/m
+  },
+  {
+    name: "admin model config write enabled by default",
+    pattern: /^ADMIN_MODEL_CONFIG_WRITE_ENABLED=true$/m
   },
   {
     name: "legacy zhipu key",
@@ -289,17 +351,31 @@ if (envTemplate) {
 }
 
 const deploySummary = content.split("Deploy finished.")[1] ?? "";
-if (deploySummary.includes("LIGHTQUANT_AI_API_KEY")) {
-  failures.push("Deploy summary must not print LIGHTQUANT_AI_API_KEY");
-}
-if (deploySummary.includes("${BASIC_AUTH_PASSWORD}")) {
-  failures.push("Deploy summary must not print BASIC_AUTH_PASSWORD");
-}
-if (deploySummary.includes("${DB_PASSWORD}")) {
-  failures.push("Deploy summary must not print DB_PASSWORD");
-}
-if (deploySummary.includes("${AUTH_SECRET}")) {
-  failures.push("Deploy summary must not print AUTH_SECRET");
+const forbiddenDeploySummarySnippets = [
+  "DATABASE_URL",
+  "DB_PASSWORD",
+  "AUTH_SECRET",
+  "LIGHTQUANT_AI_API_KEY",
+  "OPENAI_API_KEY",
+  "DEEPSEEK_API_KEY",
+  "DASHSCOPE_API_KEY",
+  "BASIC_AUTH_PASSWORD",
+  "TENCENTCLOUD_SECRET_KEY",
+  "ALIBABA_CLOUD_ACCESS_KEY_SECRET",
+  "ALIPAY_PRIVATE_KEY",
+  "WECHAT_PAY_API_KEY",
+  "WECHAT_PAY_PRIVATE_KEY",
+  "${database_url}",
+  "${DB_PASSWORD}",
+  "${AUTH_SECRET}",
+  "${LIGHTQUANT_AI_API_KEY}",
+  "${BASIC_AUTH_PASSWORD}"
+];
+
+for (const snippet of forbiddenDeploySummarySnippets) {
+  if (deploySummary.includes(snippet)) {
+    failures.push(`Deploy summary must not print ${snippet}`);
+  }
 }
 
 const mainIndex = content.indexOf("main() {");

@@ -1,8 +1,8 @@
-import * as tencentcloud from "tencentcloud-sdk-nodejs";
+import { sms } from "tencentcloud-sdk-nodejs";
 import { getTencentSmsConfig } from "@/server/env";
 import { ApiError } from "@/server/http/api-response";
 
-const smsClient = tencentcloud.sms.v20210111.Client;
+const smsClient = sms.v20210111.Client;
 
 type TencentSmsClient = InstanceType<typeof smsClient>;
 
