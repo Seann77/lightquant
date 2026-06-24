@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
+import { formatStrategyResultAsMarkdown } from "@/lib/ai/strategy-result-format";
 import type { AiTaskData } from "@/lib/ai/workbench-types";
 
 export type ReportItem = {
@@ -39,16 +40,15 @@ export function StrategyResultView({
   task: AiTaskData["task"] | null;
 }) {
   const outOfScope = result.scopeStatus === "out_of_scope";
+  const markdown = formatStrategyResultAsMarkdown(result);
 
   return (
     <div className="lq-assistant-answer">
       <div className="lq-answer-head">
-        <h2>{outOfScope ? "模块范围提示" : "策略生成结果"}</h2>
+        <h2>{getStrategyResponseTitle(result)}</h2>
         {task ? <BillingCostTag billing={billing} task={task} /> : null}
       </div>
-      {result.explanation ? <RichTextWithCodeBlocks content={result.explanation} textClassName="lq-answer-text" /> : null}
-      {result.generatedCode ? <CopyableCodeBlock code={result.generatedCode} /> : null}
-      {result.migrationNotes ? <RichTextWithCodeBlocks content={result.migrationNotes} textClassName="lq-answer-note" /> : null}
+      {markdown ? <StrategyMarkdownResult markdown={markdown} textClassName="lq-answer-text" /> : null}
       {!outOfScope ? <p className="lq-answer-footnote">结果仅供研究和回测参考，实盘前请自行验证。</p> : null}
     </div>
   );
@@ -62,18 +62,46 @@ export function StrategyResultCard({ data }: { data: AiTaskData }) {
   }
 
   const outOfScope = result.scopeStatus === "out_of_scope";
+  const markdown = formatStrategyResultAsMarkdown(result);
 
   return (
     <div className="lq-result-card">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2>{outOfScope ? "模块范围提示" : "策略生成结果"}</h2>
+        <h2>{getStrategyResponseTitle(result)}</h2>
         <BillingCostTag billing={data.billing} task={data.task} />
       </div>
-      {result.explanation ? <RichTextWithCodeBlocks content={result.explanation} textClassName="m-0 text-sm leading-7 text-[#5b6472]" /> : null}
-      {result.generatedCode ? <CopyableCodeBlock code={result.generatedCode} /> : null}
-      <p className="lq-answer-footnote">结果仅供研究和回测参考，实盘前请自行验证。</p>
+      {markdown ? <StrategyMarkdownResult markdown={markdown} textClassName="m-0 text-sm leading-7 text-[#5b6472]" /> : null}
+      {!outOfScope ? <p className="lq-answer-footnote">结果仅供研究和回测参考，实盘前请自行验证。</p> : null}
     </div>
   );
+}
+
+export function getStrategyResponseTitle(result: AiTaskData["result"] | null | undefined) {
+  if (result?.scopeStatus === "out_of_scope") {
+    return "范围提示";
+  }
+
+  const report = readRecord(result?.reportJson);
+  const responseMode = typeof report?.responseMode === "string" ? report.responseMode : "";
+
+  switch (responseMode) {
+    case "strategy_answer":
+      return "策略答疑";
+    case "strategy_modify":
+      return "策略修改建议";
+    case "strategy_generate_full":
+      return "完整策略代码";
+    case "strategy_debug":
+      return "问题诊断";
+    case "strategy_review":
+      return "策略审查";
+    case "clarify":
+      return "需要补充信息";
+    case "out_of_scope":
+      return "范围提示";
+    default:
+      return result?.generatedCode ? "完整策略代码" : "策略答疑";
+  }
 }
 
 function BillingCostTag({ billing, task }: { billing?: AiTaskData["billing"] | null; task: AiTaskData["task"] }) {
@@ -301,6 +329,10 @@ function readJsonResultField(value: string, fieldNames: string[]) {
   }
 
   return "";
+}
+
+function readRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
 }
 
 export function CodeAnalysisResultView({
@@ -688,6 +720,41 @@ export function RichTextWithCodeBlocks({ content, textClassName }: { content: st
   );
 }
 
+type StrategyMarkdownBlock =
+  | { type: "heading"; text: string; level: 2 | 3 }
+  | { type: "paragraph"; text: string }
+  | { type: "list"; items: string[] }
+  | { type: "code"; code: string; language?: string };
+
+function StrategyMarkdownResult({ markdown, textClassName }: { markdown: string; textClassName: string }) {
+  const blocks = parseStrategyMarkdownBlocks(markdown);
+
+  return (
+    <div className="lq-streaming-markdown">
+      {blocks.map((block, index) => {
+        if (block.type === "heading") {
+          const Heading = block.level === 2 ? "h2" : "h3";
+          return <Heading key={`heading-${index}`}>{block.text}</Heading>;
+        }
+
+        if (block.type === "code") {
+          return <CopyableCodeBlock code={block.code} key={`code-${index}`} language={block.language} />;
+        }
+
+        if (block.type === "list") {
+          return (
+            <ul key={`list-${index}`}>
+              {block.items.map((item, itemIndex) => <li key={`${index}-${itemIndex}`}>{item}</li>)}
+            </ul>
+          );
+        }
+
+        return <p className={textClassName} key={`paragraph-${index}`}>{block.text}</p>;
+      })}
+    </div>
+  );
+}
+
 export function CopyableCodeBlock({ code, language }: { code: string; language?: string }) {
   return (
     <div className="lq-code-block-shell">
@@ -772,6 +839,112 @@ export function parseMarkdownCodeBlocks(content: string) {
   return parts.length > 0 ? parts : [{
     type: "text" as const,
     text: content
+  }];
+}
+
+function parseStrategyMarkdownBlocks(markdown: string): StrategyMarkdownBlock[] {
+  const lines = markdown.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+  const blocks: StrategyMarkdownBlock[] = [];
+  let paragraph: string[] = [];
+  let list: string[] = [];
+  let code: { language?: string; lines: string[] } | null = null;
+
+  function flushParagraph() {
+    if (paragraph.length === 0) {
+      return;
+    }
+
+    blocks.push({
+      type: "paragraph",
+      text: paragraph.join("\n").trim()
+    });
+    paragraph = [];
+  }
+
+  function flushList() {
+    if (list.length === 0) {
+      return;
+    }
+
+    blocks.push({
+      type: "list",
+      items: list
+    });
+    list = [];
+  }
+
+  for (const line of lines) {
+    const fence = line.match(/^```([\w+-]*)\s*$/);
+
+    if (fence) {
+      if (code) {
+        blocks.push({
+          type: "code",
+          code: code.lines.join("\n").trim(),
+          language: code.language
+        });
+        code = null;
+      } else {
+        flushParagraph();
+        flushList();
+        code = {
+          language: fence[1] || undefined,
+          lines: []
+        };
+      }
+      continue;
+    }
+
+    if (code) {
+      code.lines.push(line);
+      continue;
+    }
+
+    const heading = line.match(/^(##|###)\s+(.+?)\s*$/);
+
+    if (heading) {
+      flushParagraph();
+      flushList();
+      blocks.push({
+        type: "heading",
+        level: heading[1] === "##" ? 2 : 3,
+        text: heading[2]
+      });
+      continue;
+    }
+
+    const bullet = line.match(/^\s*(?:[-*+]|\d+[.)])\s+(.+?)\s*$/);
+
+    if (bullet) {
+      flushParagraph();
+      list.push(bullet[1]);
+      continue;
+    }
+
+    if (!line.trim()) {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+
+    flushList();
+    paragraph.push(line);
+  }
+
+  if (code) {
+    blocks.push({
+      type: "code",
+      code: code.lines.join("\n").trim(),
+      language: code.language
+    });
+  }
+
+  flushParagraph();
+  flushList();
+
+  return blocks.length > 0 ? blocks : [{
+    type: "paragraph",
+    text: markdown
   }];
 }
 
