@@ -51,6 +51,8 @@
     "smoke:auth:sms-rate-limit": "tsx scripts/smoke-auth-sms-rate-limit.ts",
     "smoke:ui:pages": "node scripts/smoke-ui-pages-local.mjs",
     "smoke:ai:config-check": "node scripts/smoke-ai-config-check.mjs",
+    "smoke:ai:continuation": "tsx scripts/smoke-ai-continuation-prompt.ts",
+    "smoke:ai:stream-partial": "tsx scripts/smoke-ai-stream-partial.ts",
     "smoke:ai:local": "node scripts/smoke-ai-async-local.mjs",
     "smoke:ai:events": "node scripts/smoke-ai-run-events-local.mjs",
     "smoke:ai:workbench": "node scripts/smoke-ai-workbench-local.mjs",

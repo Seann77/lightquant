@@ -272,9 +272,9 @@ export function getAiModelName(provider: AiProviderMode = getAiProviderMode()) {
 }
 
 export function getAiTaskTimeoutMs() {
-  const value = Number(process.env.AI_TASK_TIMEOUT_MS ?? "60000");
+  const value = Number(process.env.AI_TASK_TIMEOUT_MS ?? "300000");
 
-  return Number.isFinite(value) && value > 0 ? value : 60000;
+  return Number.isFinite(value) && value > 0 ? value : 300000;
 }
 
 export function getAiMaxRetries() {

@@ -12,6 +12,7 @@ import { getAiModelName, getAiProviderMode, getAiTaskTimeoutMs, getBetaVipConfig
 import { getUploadedImageDataUrl, inferUploadedFileKind } from "@/server/files/file-service";
 import { getAiTaskBillingForUserAt, type AiTaskBilling } from "@/server/memberships/beta-membership-service";
 import type { AiProviderAttachment, AiProviderStreamDelta } from "@/server/ai/providers/types";
+import { buildContinuationDraft } from "@/server/ai/continuation";
 import { normalizeStrategyFinalAnswerMarkdown } from "@/lib/ai/strategy-result-format";
 
 type CreateAiTaskRequest = {
@@ -93,21 +94,12 @@ export async function createAiTask(userId: string, input: CreateAiTaskRequest, r
   const totalStartedAt = getAiPerfNow();
   const type = normalizeTaskType(input.type);
   const clientRequestId = normalizeNonEmpty(input.clientRequestId, "clientRequestId");
-  const normalized = normalizeTaskInput(type, input);
   const config = getAiTaskConfig(type);
   const repository = getRepository();
   const existing = await measureAiPerf("create_task.find_existing", {
     requestId,
     taskType: type
   }, () => repository.findAiTaskByClientRequestId(userId, clientRequestId));
-
-  logAiPerf("create_task.start", {
-    requestId,
-    taskType: type,
-    hasConversation: Boolean(input.conversationId),
-    hasInputFile: Boolean(input.inputFileId),
-    inputChars: getTotalInputChars(normalized)
-  });
 
   if (existing) {
     const response = await measureAiPerf("create_task.build_existing_response", {
@@ -127,16 +119,43 @@ export async function createAiTask(userId: string, input: CreateAiTaskRequest, r
     return response;
   }
 
-  const resolvedInput = await measureAiPerf("create_task.resolve_input_file", {
-    requestId,
-    taskType: type,
-    hasInputFile: Boolean(normalized.inputFileId)
-  }, () => resolveInputFile(userId, type, normalized));
+  const rawUserPrompt = normalizeOptionalText(input.messageContent) ?? normalizeOptionalText(input.prompt);
   const conversationDraft = await measureAiPerf("create_task.prepare_conversation", {
     requestId,
     taskType: type,
     hasConversation: Boolean(input.conversationId)
   }, () => prepareConversationForTask(userId, type, normalizeOptionalText(input.conversationId)));
+  const continuationDraft = buildContinuationDraft({
+    messages: conversationDraft.messages,
+    taskType: type,
+    userPrompt: rawUserPrompt
+  });
+  const normalized = normalizeTaskInput(type, input, {
+    allowContinuationWithoutCode: Boolean(continuationDraft)
+  });
+  const providerInput = continuationDraft
+    ? {
+        ...normalized,
+        prompt: continuationDraft.prompt,
+        sourcePlatform: normalized.sourcePlatform ?? conversationDraft.conversation?.sourcePlatform ?? null,
+        targetPlatform: normalized.targetPlatform ?? conversationDraft.conversation?.targetPlatform ?? null
+      }
+    : normalized;
+
+  logAiPerf("create_task.start", {
+    requestId,
+    taskType: type,
+    hasConversation: Boolean(input.conversationId),
+    hasInputFile: Boolean(input.inputFileId),
+    inputChars: getTotalInputChars(providerInput),
+    continuation: Boolean(continuationDraft)
+  });
+
+  const resolvedInput = await measureAiPerf("create_task.resolve_input_file", {
+    requestId,
+    taskType: type,
+    hasInputFile: Boolean(providerInput.inputFileId)
+  }, () => resolveInputFile(userId, type, providerInput));
 
   const limitInput = {
     ...resolvedInput,
@@ -232,15 +251,21 @@ export async function createAiTask(userId: string, input: CreateAiTaskRequest, r
           userId,
           role: "user",
           taskId: null,
-          content: getUserMessageContent(type, resolvedInput),
+          content: getUserMessageContent(type, continuationDraft ? { ...resolvedInput, prompt: normalized.prompt } : resolvedInput),
           contentJson: {
             taskType: type,
             targetPlatform: resolvedInput.targetPlatform,
             sourcePlatform: resolvedInput.sourcePlatform,
-            prompt: resolvedInput.prompt,
+            prompt: continuationDraft ? normalized.prompt : resolvedInput.prompt,
             inputCodePreview: normalizePreview(resolvedInput.inputCode, 500),
             inputFileId: resolvedInput.inputFileId,
             inputFileName: resolvedInput.inputFileName,
+            continuation: continuationDraft
+              ? {
+                  previousMessageId: continuationDraft.previousMessageId,
+                  previousTailChars: continuationDraft.previousTail.length
+                }
+              : null,
             clientRequestId
           },
           createdAt: now
@@ -1826,7 +1851,7 @@ function normalizeConversationStatus(value: string): AiConversationStatus {
   throw new ApiError("VALIDATION_ERROR", "status 参数不正确", 400);
 }
 
-function normalizeTaskInput(type: AiTaskType, input: CreateAiTaskRequest) {
+function normalizeTaskInput(type: AiTaskType, input: CreateAiTaskRequest, options: { allowContinuationWithoutCode?: boolean } = {}) {
   const prompt = normalizeOptionalText(input.messageContent) ?? normalizeOptionalText(input.prompt);
   const inputCode = normalizeOptionalText(input.inputCode);
   const inputFileId = normalizeOptionalText(input.inputFileId);
@@ -1837,7 +1862,7 @@ function normalizeTaskInput(type: AiTaskType, input: CreateAiTaskRequest) {
     throw new ApiError("VALIDATION_ERROR", "请输入策略需求", 400);
   }
 
-  if (type === "code_conversion" && !inputCode && !inputFileId) {
+  if (type === "code_conversion" && !inputCode && !inputFileId && !options.allowContinuationWithoutCode) {
     throw new ApiError("VALIDATION_ERROR", "请输入需要转换的代码", 400);
   }
 
@@ -1976,7 +2001,8 @@ async function prepareConversationForTask(
   if (!conversationId) {
     return {
       conversation: null,
-      contextText: ""
+      contextText: "",
+      messages: []
     };
   }
 
@@ -1995,7 +2021,8 @@ async function prepareConversationForTask(
 
   return {
     conversation,
-    contextText
+    contextText,
+    messages
   };
 }
 

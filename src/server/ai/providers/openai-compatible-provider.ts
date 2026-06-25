@@ -65,6 +65,8 @@ type ChatCompletionStreamChunk = {
   } | null;
 };
 
+type StreamTruncateReason = "timeout" | "length" | "stream_error";
+
 type StreamAccumulator = {
   model: string;
   tokenUsage: AiProviderResult["tokenUsage"];
@@ -72,6 +74,9 @@ type StreamAccumulator = {
   finalAnswerMarkdown: string;
   thinkingTruncated: boolean;
   finalTruncated: boolean;
+  truncateReason: StreamTruncateReason | null;
+  finishReason: string | null;
+  sawDoneSignal: boolean;
 };
 
 const COMMON_PROVIDER_PROMPT = loadTextContent("common-provider.md");
@@ -124,15 +129,19 @@ export async function runOpenAiCompatibleProviderStream(
   const providerConfig = readProviderConfig(options);
   const payload = buildStreamingChatCompletionPayload(input, providerConfig);
   const stream = await requestChatCompletionStream(providerConfig, payload, input, callbacks);
-  const finalAnswerMarkdown = normalizeMarkdown(stream.finalAnswerMarkdown, input.task);
+  const rawFinalAnswerMarkdown = stream.finalAnswerMarkdown.trim();
+  const finalAnswerMarkdown = stream.truncateReason
+    ? rawFinalAnswerMarkdown || normalizeMarkdown(stream.finalAnswerMarkdown, input.task)
+    : normalizeMarkdown(stream.finalAnswerMarkdown, input.task);
   const parsed = parseStreamingMarkdownResult(input, finalAnswerMarkdown);
+  const providerResult = applyStreamPartialMetadata(applyVisionFallback({
+    ...parsed,
+    model: stream.model || providerConfig.model,
+    tokenUsage: stream.tokenUsage
+  }, input, providerConfig.supportsVision), input, stream, finalAnswerMarkdown);
 
   return {
-    result: applyVisionFallback({
-      ...parsed,
-      model: stream.model || providerConfig.model,
-      tokenUsage: stream.tokenUsage
-    }, input, providerConfig.supportsVision),
+    result: providerResult,
     visibleThinking: truncateStreamingText(stream.visibleThinking, getMaxThinkingChars(input)),
     finalAnswerMarkdown
   };
@@ -177,6 +186,7 @@ function readProviderConfig(options: ProviderOptions): ProviderConfig {
 function buildChatCompletionPayload(input: AiProviderInput, providerConfig: ProviderConfig, forceInScope = false) {
   const usesMimoParams = shouldUseMimoCompatibleParams(providerConfig);
   const outputTokenField = usesMimoParams ? "max_completion_tokens" : "max_tokens";
+  const enableThinking = shouldEnableMimoThinking(input);
 
   return {
     model: providerConfig.model,
@@ -196,13 +206,14 @@ function buildChatCompletionPayload(input: AiProviderInput, providerConfig: Prov
     [outputTokenField]: input.config.maxOutputTokens,
     temperature: 0.2,
     stream: false,
-    ...(usesMimoParams ? { thinking: { type: "disabled" } } : {})
+    ...(usesMimoParams ? { thinking: { type: enableThinking ? "enabled" : "disabled" } } : {})
   };
 }
 
 function buildStreamingChatCompletionPayload(input: AiProviderInput, providerConfig: ProviderConfig) {
   const usesMimoParams = shouldUseMimoCompatibleParams(providerConfig);
   const outputTokenField = usesMimoParams ? "max_completion_tokens" : "max_tokens";
+  const enableThinking = shouldEnableMimoThinking(input);
 
   return {
     model: providerConfig.model,
@@ -219,8 +230,12 @@ function buildStreamingChatCompletionPayload(input: AiProviderInput, providerCon
     [outputTokenField]: getStreamingOutputTokenLimit(input),
     temperature: 0.2,
     stream: true,
-    ...(usesMimoParams ? { thinking: { type: "enabled" } } : {})
+    ...(usesMimoParams ? { thinking: { type: enableThinking ? "enabled" : "disabled" } } : {})
   };
+}
+
+function shouldEnableMimoThinking(input: AiProviderInput) {
+  return input.task.type === "strategy_generation" || input.task.type === "code_analysis";
 }
 
 function buildStreamingSystemMessage(input: AiProviderInput) {
@@ -238,6 +253,7 @@ function buildStreamingSystemMessage(input: AiProviderInput) {
     COMMON_SAFETY_PROMPT,
     "",
     taskSpecificGuidance(task.type),
+    buildContinuationSystemGuidance(task.prompt),
     "",
     `任务名称：${config.displayName}`,
     `任务范围：${config.scopeDescription}`,
@@ -354,6 +370,7 @@ function buildSystemMessage(input: AiProviderInput, forceInScope: boolean) {
     COMMON_SAFETY_PROMPT,
     "",
     taskSpecificGuidance(task.type),
+    buildContinuationSystemGuidance(task.prompt),
     "",
     `任务名称：${config.displayName}`,
     `任务范围：${config.scopeDescription}`,
@@ -367,6 +384,22 @@ function buildSystemMessage(input: AiProviderInput, forceInScope: boolean) {
     "",
     JSON_OUTPUT_PROMPT
   ].filter(Boolean).join("\n");
+}
+
+function buildContinuationSystemGuidance(prompt: string | null) {
+  if (!prompt?.includes("<previous_assistant_tail>")) {
+    return "";
+  }
+
+  return [
+    "续写任务约束：你正在补全上一条被截断的代码输出。",
+    "不要从头重新输出。",
+    "不要重复上一条已经输出过的内容。",
+    "只从上一条内容的截断点之后继续。",
+    "如果上一条停在半句代码、半个括号、半个字符串或半个代码块中，请先补齐该语法结构。",
+    "输出应延续原始任务的平台、策略意图和代码风格。",
+    "完成后正常收尾。"
+  ].join("\n");
 }
 
 function taskSpecificGuidance(type: AiProviderInput["task"]["type"]) {
@@ -522,7 +555,10 @@ async function requestChatCompletionStream(
     visibleThinking: "",
     finalAnswerMarkdown: "",
     thinkingTruncated: false,
-    finalTruncated: false
+    finalTruncated: false,
+    truncateReason: null,
+    finishReason: null,
+    sawDoneSignal: false
   };
 
   try {
@@ -536,8 +572,6 @@ async function requestChatCompletionStream(
       signal: controller.signal
     });
 
-    clearTimeout(timeout);
-
     if (!response.ok) {
       throw apiErrorForProviderStatus(response.status);
     }
@@ -550,8 +584,16 @@ async function requestChatCompletionStream(
 
     return accumulator;
   } catch (error) {
+    const normalized = normalizeProviderError(error);
+
+    if (accumulator.finalAnswerMarkdown.trim()) {
+      markStreamTruncated(accumulator, normalized.code === "AI_PROVIDER_TIMEOUT" ? "timeout" : "stream_error");
+      return accumulator;
+    }
+
+    throw normalized;
+  } finally {
     clearTimeout(timeout);
-    throw normalizeProviderError(error);
   }
 }
 
@@ -585,7 +627,12 @@ async function readProviderSseStream(
 
       const data = trimmed.slice(5).trim();
 
-      if (!data || data === "[DONE]") {
+      if (!data) {
+        continue;
+      }
+
+      if (data === "[DONE]") {
+        accumulator.sawDoneSignal = true;
         continue;
       }
 
@@ -607,9 +654,18 @@ async function readProviderSseStream(
 
     const data = trimmed.slice(5).trim();
 
-    if (data && data !== "[DONE]") {
+    if (data === "[DONE]") {
+      accumulator.sawDoneSignal = true;
+      continue;
+    }
+
+    if (data) {
       await handleProviderStreamData(data, input, accumulator, callbacks);
     }
+  }
+
+  if (!accumulator.sawDoneSignal && !accumulator.finishReason && accumulator.finalAnswerMarkdown.trim()) {
+    markStreamTruncated(accumulator, "stream_error");
   }
 }
 
@@ -638,9 +694,19 @@ async function handleProviderStreamData(
   }
 
   for (const choice of chunk.choices ?? []) {
+    const finishReason = choice.finish_reason ?? null;
+
+    if (choice.finish_reason) {
+      accumulator.finishReason = choice.finish_reason;
+    }
+
     const delta = choice.delta;
 
     if (!delta) {
+      if (finishReason === "length") {
+        markStreamTruncated(accumulator, "length");
+      }
+
       continue;
     }
 
@@ -653,6 +719,10 @@ async function handleProviderStreamData(
 
     if (contentDelta) {
       await appendFinalDelta(contentDelta, input, accumulator, callbacks);
+    }
+
+    if (finishReason === "length") {
+      markStreamTruncated(accumulator, "length");
     }
   }
 }
@@ -704,7 +774,7 @@ async function appendFinalDelta(
   const remaining = maxLength - accumulator.finalAnswerMarkdown.length;
 
   if (remaining <= 0) {
-    accumulator.finalTruncated = true;
+    markStreamTruncated(accumulator, "length");
     const marker = "\n\n[最终结果已截断]";
     accumulator.finalAnswerMarkdown += marker;
     await callbacks.onDelta?.({ type: "final_delta", delta: marker });
@@ -716,11 +786,16 @@ async function appendFinalDelta(
   await callbacks.onDelta?.({ type: "final_delta", delta: visibleDelta });
 
   if (delta.length > remaining) {
-    accumulator.finalTruncated = true;
+    markStreamTruncated(accumulator, "length");
     const marker = "\n\n[最终结果已截断]";
     accumulator.finalAnswerMarkdown += marker;
     await callbacks.onDelta?.({ type: "final_delta", delta: marker });
   }
+}
+
+function markStreamTruncated(accumulator: StreamAccumulator, reason: StreamTruncateReason) {
+  accumulator.finalTruncated = true;
+  accumulator.truncateReason = accumulator.truncateReason ?? reason;
 }
 
 function createChatCompletionUrl(baseUrl: string) {
@@ -831,18 +906,10 @@ function getMaxThinkingChars(input: AiProviderInput) {
 }
 
 function getMaxFinalAnswerChars(input: AiProviderInput) {
-  return Math.min(90000, Math.max(12000, input.config.maxResultChars));
+  return Math.max(12000, input.config.maxResultChars);
 }
 
 function getStreamingOutputTokenLimit(input: AiProviderInput) {
-  if (input.task.type === "strategy_generation") {
-    return Math.min(input.config.maxOutputTokens, 4000);
-  }
-
-  if (input.task.type === "code_analysis") {
-    return Math.min(input.config.maxOutputTokens, 5000);
-  }
-
   return input.config.maxOutputTokens;
 }
 
@@ -1061,6 +1128,34 @@ function applyVisionFallback(result: AiProviderResult, input: AiProviderInput, s
           sizeBytes: attachment.sizeBytes
         }))
       }
+    }
+  };
+}
+
+function applyStreamPartialMetadata(
+  result: AiProviderResult,
+  input: AiProviderInput,
+  stream: StreamAccumulator,
+  finalAnswerMarkdown: string
+): AiProviderResult {
+  if (!stream.truncateReason) {
+    return result;
+  }
+
+  const reportJson = isObject(result.reportJson) ? result.reportJson : {};
+
+  return {
+    ...result,
+    reportJson: {
+      ...reportJson,
+      finalAnswerMarkdown,
+      partial: true,
+      truncated: true,
+      truncateReason: stream.truncateReason,
+      canContinue: true,
+      outputTokenLimit: getStreamingOutputTokenLimit(input),
+      finishReason: stream.finishReason,
+      streamCompleted: stream.sawDoneSignal
     }
   };
 }
