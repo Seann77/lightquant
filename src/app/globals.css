@@ -3570,6 +3570,14 @@ textarea {
   display: flex;
   min-width: 0;
   flex-direction: column;
+  grid-template-columns: none;
+  gap: 0;
+}
+
+.lq-analysis-results .lq-analysis-report-grid {
+  display: flex !important;
+  grid-template-columns: none !important;
+  gap: 0 !important;
 }
 
 .lq-analysis-report-item {
@@ -3577,6 +3585,7 @@ textarea {
   border: 0;
   border-bottom: 1px solid rgba(194, 215, 245, 0.78);
   background: transparent;
+  box-shadow: none;
   padding: 20px 0 21px;
 }
 
