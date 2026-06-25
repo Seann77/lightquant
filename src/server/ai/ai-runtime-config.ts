@@ -9,6 +9,7 @@ import {
   type AiProviderMode
 } from "@/server/env";
 import { getRepository } from "@/server/repositories";
+import { decryptConfigSecret } from "@/server/security/config-encryption";
 
 export const ALLOWED_AI_API_KEY_ENV_NAMES = ["LIGHTQUANT_AI_API_KEY", "DEEPSEEK_API_KEY"] as const;
 
@@ -20,10 +21,12 @@ export type AiRuntimeConfig = {
   apiKey: string;
   model: string;
   supportsVision: boolean;
-  source: "env" | "database override";
+  source: "env" | "database profile";
   activeProfileId: string | null;
   activeProfileName: string | null;
   apiKeyEnvName: AllowedAiApiKeyEnvName | null;
+  apiKeySecretId: string | null;
+  apiKeySource: "none" | "env" | "database secret";
 };
 
 export type AiRuntimeConfigSummary = {
@@ -33,7 +36,9 @@ export type AiRuntimeConfigSummary = {
   supportsVision: boolean;
   apiKeyConfigured: boolean;
   apiKeyEnvName: AllowedAiApiKeyEnvName | null;
-  source: "env" | "database override";
+  apiKeySecretId: string | null;
+  apiKeySource: "none" | "env" | "database secret";
+  source: "env" | "database profile";
   activeProfileId: string | null;
   activeProfileName: string | null;
   configValid: boolean;
@@ -50,7 +55,7 @@ export async function resolveAiRuntimeConfig(): Promise<AiRuntimeConfig> {
   return resolveEnvRuntimeConfig();
 }
 
-export function summarizeAiRuntimeConfig(activeProfile: AiModelProfile | null): AiRuntimeConfigSummary {
+export async function summarizeAiRuntimeConfig(activeProfile: AiModelProfile | null): Promise<AiRuntimeConfigSummary> {
   if (activeProfile) {
     return summarizeProfileRuntimeConfig(activeProfile);
   }
@@ -72,8 +77,8 @@ export function sanitizeBaseUrlForAdmin(baseUrl: string) {
   }
 }
 
-export function validateAiModelProfileForRuntime(profile: AiModelProfile) {
-  resolveProfileRuntimeConfig(profile);
+export async function validateAiModelProfileForRuntime(profile: AiModelProfile) {
+  await resolveProfileRuntimeConfig(profile);
 }
 
 export function isAllowedAiApiKeyEnvName(value: string | null | undefined): value is AllowedAiApiKeyEnvName {
@@ -84,7 +89,23 @@ export function isAiProviderMode(value: string): value is AiProviderMode {
   return value === "mock" || value === "deepseek" || value === "openai_compatible";
 }
 
-function resolveProfileRuntimeConfig(profile: AiModelProfile): AiRuntimeConfig {
+export function isValidAiBaseUrl(provider: AiProviderMode, baseUrl: string) {
+  const trimmed = baseUrl.trim();
+
+  if (provider === "mock") {
+    return trimmed === "mock:";
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+
+    return parsed.protocol === "https:" && Boolean(parsed.host);
+  } catch {
+    return false;
+  }
+}
+
+async function resolveProfileRuntimeConfig(profile: AiModelProfile): Promise<AiRuntimeConfig> {
   if (!profile.enabled) {
     throw new ServerConfigError("Active AI model profile is disabled");
   }
@@ -104,7 +125,7 @@ function resolveProfileRuntimeConfig(profile: AiModelProfile): AiRuntimeConfig {
     throw new ServerConfigError("Active AI model profile model is required");
   }
 
-  if (sanitizeBaseUrlForAdmin(baseUrl) === "invalid") {
+  if (!isValidAiBaseUrl(profile.provider, baseUrl)) {
     throw new ServerConfigError("Active AI model profile baseUrl is invalid");
   }
 
@@ -115,15 +136,53 @@ function resolveProfileRuntimeConfig(profile: AiModelProfile): AiRuntimeConfig {
       apiKey: "",
       model,
       supportsVision: profile.supportsVision,
-      source: "database override",
+      source: "database profile",
       activeProfileId: profile.id,
       activeProfileName: profile.name,
-      apiKeyEnvName: null
+      apiKeyEnvName: null,
+      apiKeySecretId: null,
+      apiKeySource: "none"
     };
   }
 
+  if (profile.apiKeySecretId) {
+    const secret = await getRepository().findAiModelSecretById(profile.apiKeySecretId);
+
+    if (!secret) {
+      throw new ServerConfigError("Active AI model profile API key secret is missing");
+    }
+
+    try {
+      const apiKey = decryptConfigSecret(secret.encryptedValue).trim();
+
+      if (!apiKey) {
+        throw new ServerConfigError("Active AI model profile API key secret is empty");
+      }
+
+      return {
+        provider: profile.provider,
+        baseUrl,
+        apiKey,
+        model,
+        supportsVision: profile.supportsVision,
+        source: "database profile",
+        activeProfileId: profile.id,
+        activeProfileName: profile.name,
+        apiKeyEnvName: null,
+        apiKeySecretId: secret.id,
+        apiKeySource: "database secret"
+      };
+    } catch (error) {
+      if (error instanceof ServerConfigError) {
+        throw error;
+      }
+
+      throw new ServerConfigError("Active AI model profile API key secret cannot be decrypted");
+    }
+  }
+
   if (!isAllowedAiApiKeyEnvName(profile.apiKeyEnvName)) {
-    throw new ServerConfigError("Active AI model profile apiKeyEnvName is not allowed");
+    throw new ServerConfigError("Active AI model profile API key is not configured");
   }
 
   const apiKey = process.env[profile.apiKeyEnvName]?.trim();
@@ -138,10 +197,12 @@ function resolveProfileRuntimeConfig(profile: AiModelProfile): AiRuntimeConfig {
     apiKey,
     model,
     supportsVision: profile.supportsVision,
-    source: "database override",
+    source: "database profile",
     activeProfileId: profile.id,
     activeProfileName: profile.name,
-    apiKeyEnvName: profile.apiKeyEnvName
+    apiKeyEnvName: profile.apiKeyEnvName,
+    apiKeySecretId: null,
+    apiKeySource: "env"
   };
 }
 
@@ -158,13 +219,15 @@ function resolveEnvRuntimeConfig(): AiRuntimeConfig {
     source: "env",
     activeProfileId: null,
     activeProfileName: null,
-    apiKeyEnvName
+    apiKeyEnvName,
+    apiKeySecretId: null,
+    apiKeySource: apiKeyEnvName ? "env" : "none"
   };
 }
 
-function summarizeProfileRuntimeConfig(profile: AiModelProfile): AiRuntimeConfigSummary {
+async function summarizeProfileRuntimeConfig(profile: AiModelProfile): Promise<AiRuntimeConfigSummary> {
   try {
-    const config = resolveProfileRuntimeConfig(profile);
+    const config = await resolveProfileRuntimeConfig(profile);
 
     return {
       provider: config.provider,
@@ -173,6 +236,8 @@ function summarizeProfileRuntimeConfig(profile: AiModelProfile): AiRuntimeConfig
       supportsVision: config.supportsVision,
       apiKeyConfigured: Boolean(config.apiKey),
       apiKeyEnvName: config.apiKeyEnvName,
+      apiKeySecretId: config.apiKeySecretId,
+      apiKeySource: config.apiKeySource,
       source: config.source,
       activeProfileId: config.activeProfileId,
       activeProfileName: config.activeProfileName,
@@ -185,9 +250,14 @@ function summarizeProfileRuntimeConfig(profile: AiModelProfile): AiRuntimeConfig
       baseUrlHost: sanitizeBaseUrlForAdmin(profile.baseUrl),
       model: profile.model || "-",
       supportsVision: profile.supportsVision,
-      apiKeyConfigured: Boolean(profile.apiKeyEnvName && process.env[profile.apiKeyEnvName]?.trim()),
+      apiKeyConfigured: Boolean(
+        profile.apiKeySecretId ||
+        (isAllowedAiApiKeyEnvName(profile.apiKeyEnvName) && process.env[profile.apiKeyEnvName]?.trim())
+      ),
       apiKeyEnvName: isAllowedAiApiKeyEnvName(profile.apiKeyEnvName) ? profile.apiKeyEnvName : null,
-      source: "database override",
+      apiKeySecretId: profile.apiKeySecretId,
+      apiKeySource: profile.apiKeySecretId ? "database secret" : profile.apiKeyEnvName ? "env" : "none",
+      source: "database profile",
       activeProfileId: profile.id,
       activeProfileName: profile.name,
       configValid: false,
@@ -207,6 +277,8 @@ function summarizeEnvRuntimeConfig(): AiRuntimeConfigSummary {
       supportsVision: config.supportsVision,
       apiKeyConfigured: Boolean(config.apiKey),
       apiKeyEnvName: config.apiKeyEnvName,
+      apiKeySecretId: null,
+      apiKeySource: config.apiKeySource,
       source: config.source,
       activeProfileId: null,
       activeProfileName: null,
@@ -223,6 +295,8 @@ function summarizeEnvRuntimeConfig(): AiRuntimeConfigSummary {
       supportsVision: safeReadEnvSupportsVision(provider),
       apiKeyConfigured: hasEnvApiKey(provider),
       apiKeyEnvName: provider === "mock" || provider === "invalid" ? null : getEnvApiKeyName(provider),
+      apiKeySecretId: null,
+      apiKeySource: provider === "mock" || provider === "invalid" ? "none" : "env",
       source: "env",
       activeProfileId: null,
       activeProfileName: null,

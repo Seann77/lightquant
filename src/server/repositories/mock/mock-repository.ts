@@ -8,6 +8,7 @@ import type {
   AiRunEvent,
   AiTaskResult,
   AiModelProfile,
+  AiModelSecret,
   ContactRequest,
   CreditAccount,
   CreditLedger,
@@ -42,6 +43,7 @@ import type {
   ApplyAdminCreditAdjustmentInput,
   ApplyCreditLedgerInput,
   CreateAdminAuditLogInput,
+  CreateAiModelProfileInput,
   CreateContactRequestInput,
   CreateAiTaskInput,
   CreateAiConversationInput,
@@ -59,7 +61,10 @@ import type {
   LedgerPage,
   LightQuantRepository,
   SetActiveAiModelProfileInput,
+  UpdateAiModelProfileEnabledInput,
+  UpdateAiModelProfileInput,
   UpsertUserMembershipInput,
+  UpsertAiModelSecretInput,
   UpdateAiConversationInput,
   UpdateAiTaskInput
 } from "@/server/repositories/types";
@@ -137,6 +142,7 @@ export class MockLightQuantRepository implements LightQuantRepository {
   private readonly uploadedFiles = new Map<string, UploadedFile>();
   private readonly contactRequests = new Map<string, ContactRequest>();
   private readonly aiModelProfiles = new Map<string, AiModelProfile>();
+  private readonly aiModelSecrets = new Map<string, AiModelSecret>();
   private activeAiModelProfileId: string | null = null;
   private readonly creditReservations = new Map<string, CreditReservation>();
   private readonly creditReservationsByIdempotencyKey = new Map<string, string>();
@@ -307,6 +313,57 @@ export class MockLightQuantRepository implements LightQuantRepository {
     return this.aiModelProfiles.get(profileId) ?? null;
   }
 
+  async createAiModelProfile(input: CreateAiModelProfileInput) {
+    const profile: AiModelProfile = {
+      id: randomUUID(),
+      ...input
+    };
+
+    this.aiModelProfiles.set(profile.id, profile);
+    return profile;
+  }
+
+  async updateAiModelProfile(input: UpdateAiModelProfileInput) {
+    const profile = this.aiModelProfiles.get(input.profileId);
+
+    if (!profile) {
+      throw new ApiError("NOT_FOUND", "模型配置不存在", 404);
+    }
+
+    const updated: AiModelProfile = {
+      ...profile,
+      name: input.name,
+      provider: input.provider,
+      baseUrl: input.baseUrl,
+      model: input.model,
+      supportsVision: input.supportsVision,
+      apiKeyEnvName: input.apiKeyEnvName,
+      apiKeySecretId: input.apiKeySecretId,
+      enabled: input.enabled,
+      updatedAt: input.updatedAt
+    };
+
+    this.aiModelProfiles.set(updated.id, updated);
+    return updated;
+  }
+
+  async updateAiModelProfileEnabled(input: UpdateAiModelProfileEnabledInput) {
+    const profile = this.aiModelProfiles.get(input.profileId);
+
+    if (!profile) {
+      throw new ApiError("NOT_FOUND", "模型配置不存在", 404);
+    }
+
+    const updated: AiModelProfile = {
+      ...profile,
+      enabled: input.enabled,
+      updatedAt: input.updatedAt
+    };
+
+    this.aiModelProfiles.set(updated.id, updated);
+    return updated;
+  }
+
   async getActiveAiModelProfile() {
     return this.activeAiModelProfileId ? this.aiModelProfiles.get(this.activeAiModelProfileId) ?? null : null;
   }
@@ -320,6 +377,39 @@ export class MockLightQuantRepository implements LightQuantRepository {
 
     this.activeAiModelProfileId = profile.id;
     return profile;
+  }
+
+  async listAiModelSecrets() {
+    return [...this.aiModelSecrets.values()].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  }
+
+  async findAiModelSecretById(secretId: string) {
+    return this.aiModelSecrets.get(secretId) ?? null;
+  }
+
+  async upsertAiModelSecret(input: UpsertAiModelSecretInput) {
+    const existing = input.secretId ? this.aiModelSecrets.get(input.secretId) : null;
+    const secret: AiModelSecret = existing
+      ? {
+          ...existing,
+          name: input.name,
+          provider: input.provider,
+          encryptedValue: input.encryptedValue,
+          keyHint: input.keyHint,
+          updatedAt: input.updatedAt
+        }
+      : {
+          id: randomUUID(),
+          name: input.name,
+          provider: input.provider,
+          encryptedValue: input.encryptedValue,
+          keyHint: input.keyHint,
+          createdAt: input.createdAt,
+          updatedAt: input.updatedAt
+        };
+
+    this.aiModelSecrets.set(secret.id, secret);
+    return secret;
   }
 
   async findActiveMembershipForUser(userId: string, type: UserMembership["type"], at: string) {

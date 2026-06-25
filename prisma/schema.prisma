@@ -329,14 +329,32 @@ model AiModelProfile {
   model          String   @db.VarChar(120)
   supportsVision Boolean  @map("supports_vision")
   apiKeyEnvName  String?  @map("api_key_env_name") @db.VarChar(80)
+  apiKeySecretId String?  @map("api_key_secret_id") @db.Uuid
   enabled        Boolean
   createdAt      DateTime @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime @map("updated_at") @db.Timestamptz(3)
 
   activeSettings AiModelActiveProfile[]
+  apiKeySecret   AiModelSecret? @relation(fields: [apiKeySecretId], references: [id], onDelete: SetNull)
 
   @@index([enabled, provider])
+  @@index([apiKeySecretId])
   @@map("ai_model_profiles")
+}
+
+model AiModelSecret {
+  id             String   @id @default(uuid()) @db.Uuid
+  name           String   @db.VarChar(80)
+  provider       String?  @db.VarChar(40)
+  encryptedValue String   @map("encrypted_value") @db.Text
+  keyHint        String?  @map("key_hint") @db.VarChar(16)
+  createdAt      DateTime @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @map("updated_at") @db.Timestamptz(3)
+
+  profiles AiModelProfile[]
+
+  @@index([provider, updatedAt])
+  @@map("ai_model_secrets")
 }
 
 model AiModelActiveProfile {

@@ -11,6 +11,7 @@ import type {
   AiRunEvent,
   AiRunEventStatus,
   AiRunEventVisibility,
+  AiModelSecret,
   AiTaskResult,
   AiTaskStatus,
   AiTaskType,
@@ -128,6 +129,48 @@ export type CreateContactRequestInput = {
 
 export type SetActiveAiModelProfileInput = {
   profileId: string;
+  updatedAt: string;
+};
+
+export type CreateAiModelProfileInput = {
+  name: string;
+  provider: AiModelProfile["provider"];
+  baseUrl: string;
+  model: string;
+  supportsVision: boolean;
+  apiKeyEnvName: string | null;
+  apiKeySecretId: string | null;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type UpdateAiModelProfileInput = {
+  profileId: string;
+  name: string;
+  provider: AiModelProfile["provider"];
+  baseUrl: string;
+  model: string;
+  supportsVision: boolean;
+  apiKeyEnvName: string | null;
+  apiKeySecretId: string | null;
+  enabled: boolean;
+  updatedAt: string;
+};
+
+export type UpdateAiModelProfileEnabledInput = {
+  profileId: string;
+  enabled: boolean;
+  updatedAt: string;
+};
+
+export type UpsertAiModelSecretInput = {
+  secretId?: string;
+  name: string;
+  provider: AiModelProfile["provider"] | null;
+  encryptedValue: string;
+  keyHint: string | null;
+  createdAt: string;
   updatedAt: string;
 };
 
@@ -556,8 +599,14 @@ export interface LightQuantRepository {
   updateUserLastLogin(userId: string, lastLoginAt: string): Promise<User>;
   listAiModelProfiles(): Promise<AiModelProfile[]>;
   findAiModelProfileById(profileId: string): Promise<AiModelProfile | null>;
+  createAiModelProfile(input: CreateAiModelProfileInput): Promise<AiModelProfile>;
+  updateAiModelProfile(input: UpdateAiModelProfileInput): Promise<AiModelProfile>;
+  updateAiModelProfileEnabled(input: UpdateAiModelProfileEnabledInput): Promise<AiModelProfile>;
   getActiveAiModelProfile(): Promise<AiModelProfile | null>;
   setActiveAiModelProfile(input: SetActiveAiModelProfileInput): Promise<AiModelProfile>;
+  listAiModelSecrets(): Promise<AiModelSecret[]>;
+  findAiModelSecretById(secretId: string): Promise<AiModelSecret | null>;
+  upsertAiModelSecret(input: UpsertAiModelSecretInput): Promise<AiModelSecret>;
   findActiveMembershipForUser(userId: string, type: MembershipType, at: string): Promise<UserMembership | null>;
   upsertUserMembership(input: UpsertUserMembershipInput): Promise<UserMembership>;
   getCreditAccount(userId: string): Promise<CreditAccount | null>;

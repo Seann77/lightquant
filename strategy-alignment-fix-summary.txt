@@ -1,0 +1,118 @@
+策略生成页面对齐修复总结
+
+目标：
+修复策略生成页面中最终回答区域仍然偏移的问题。重点不是继续微调 margin、padding 或 width，而是处理 AssistantThinkingMessage 的 DOM/grid 结构，让最终回答不再被左侧 AI 图标列长期缩进。
+
+当前现象：
+1. 回答卡片和输入框外框看起来接近，但最终回答正文左侧仍然空出一条明显区域。
+2. 上方历史/普通 assistant bubble、最终回答卡片、输入框之间仍然没有形成统一视觉边界。
+3. 右侧也存在轻微压迫和漂移。
+
+核心原因：
+当前 AssistantThinkingMessage 大概率是两列 grid：
+- 第 1 列：AI 图标
+- 第 2 列：思考过程/正文区域
+
+当前结构类似：
+
+<div className="lq-thinking-message">
+  <div className="lq-thinking-message-mark" />
+  <div className="lq-thinking-message-body">
+    <ThinkingCollapse />
+    <FinalAnswerStream />
+  </div>
+</div>
+
+上一轮给 .lq-final-section 设置 grid-column: 1 / -1 没有真正生效，因为 .lq-final-section 被包在 .lq-thinking-message-body 里面，而 .lq-thinking-message-body 本身已经只占第 2 列。子元素不能跨出父元素所在的 grid 区域。
+
+正确修复方向：
+1. 调整 AssistantThinkingMessage 结构。
+2. 将 FinalAnswerStream 从 .lq-thinking-message-body 中移出，让它成为 .lq-thinking-message 的直接子元素。
+3. 让顶部思考过程继续使用 AI 图标列，但最终回答横跨整张卡片。
+4. 没有 thinking、只有 final answer 时，不要渲染空图标列占位。
+5. 同时检查普通 assistant bubble、历史 fallback、失败卡片是否也和输入框外框统一。
+
+建议目标结构：
+
+<div className="lq-thinking-message">
+  {displayThinking ? (
+    <>
+      <div className="lq-thinking-message-mark">...</div>
+      <div className="lq-thinking-message-body">
+        <ThinkingCollapse />
+      </div>
+    </>
+  ) : null}
+
+  {hasFinal ? (
+    <FinalAnswerStream ... />
+  ) : null}
+
+  {error ? <div className="lq-thinking-error">...</div> : null}
+</div>
+
+CSS 要点：
+1. .lq-thinking-message 仍可使用两列 grid。
+2. .lq-thinking-message-mark 放第 1 列。
+3. .lq-thinking-message-body 放第 2 列。
+4. .lq-final-section 必须作为 .lq-thinking-message 的直接子元素，并设置 grid-column: 1 / -1。
+5. .lq-thinking-error 可按场景横跨整行或放在合理位置。
+6. 不要使用负 margin 或魔法数字硬挪位置。
+
+需要检查的文件：
+1. src/components/ai/AssistantThinkingMessage.tsx
+2. src/app/globals.css
+3. 必要时检查 src/app/chat/ChatClient.tsx
+4. 必要时检查 src/components/ai/WorkbenchResultViews.tsx
+
+不要修改：
+1. AI prompt/guidance
+2. provider
+3. streaming parser
+4. generatedCode 识别逻辑
+5. 数据库
+6. 计费
+7. 任务类型
+8. 部署脚本
+
+验证场景：
+A. 只有最终回答，没有思考过程
+- 最终回答铺满卡片内容宽度
+- 没有左侧图标列空白
+- 与输入框外框视觉对齐
+
+B. 有思考过程 + 最终回答
+- 思考过程仍有 AI 图标
+- 最终回答从下一行开始横跨整张卡片
+- 最终回答不被图标列缩进
+
+C. 历史消息恢复
+- 恢复后的最终回答布局和刚生成时一致
+- 不出现左侧空白列
+
+D. 普通 assistant fallback
+- 没有结构化 result 时，普通 assistant bubble 不明显偏移
+- 不影响用户右侧气泡
+
+E. 代码块回答
+- 代码块不撑破容器
+- 右侧安全边距正常
+- 复制按钮正常
+- 长代码只在代码块内部横向滚动
+
+F. 其他模块回归
+- 代码转换页面正常
+- 代码解析页面正常
+
+验证命令：
+1. git diff --check
+2. npm run typecheck
+3. npm run check:quick
+
+完成后需要输出：
+1. 为什么上一轮 .lq-final-section { grid-column: 1 / -1 } 没生效
+2. 本次如何调整组件结构
+3. 修改了哪些文件
+4. A-F 验证结果
+5. 是否仍有残余对齐问题
+6. 不提交 git

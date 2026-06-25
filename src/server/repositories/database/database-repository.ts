@@ -9,6 +9,7 @@ import type {
   AiRunEvent,
   AiTaskResult,
   AiModelProfile,
+  AiModelSecret,
   ContactRequest,
   CreditAccount,
   CreditLedger,
@@ -45,6 +46,7 @@ import type {
   ApplyAdminCreditAdjustmentInput,
   ApplyCreditLedgerInput,
   CreateAdminAuditLogInput,
+  CreateAiModelProfileInput,
   CreateContactRequestInput,
   CreateAiTaskInput,
   CreateAiConversationInput,
@@ -62,7 +64,10 @@ import type {
   LedgerPage,
   LightQuantRepository,
   SetActiveAiModelProfileInput,
+  UpdateAiModelProfileEnabledInput,
+  UpdateAiModelProfileInput,
   UpsertUserMembershipInput,
+  UpsertAiModelSecretInput,
   UpdateAiConversationInput,
   UpdateAiTaskInput
 } from "@/server/repositories/types";
@@ -368,6 +373,60 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
     return profile ? toAiModelProfile(profile) : null;
   }
 
+  async createAiModelProfile(input: CreateAiModelProfileInput) {
+    const profile = await this.db.aiModelProfile.create({
+      data: {
+        name: input.name,
+        provider: input.provider,
+        baseUrl: input.baseUrl,
+        model: input.model,
+        supportsVision: input.supportsVision,
+        apiKeyEnvName: input.apiKeyEnvName,
+        apiKeySecretId: input.apiKeySecretId,
+        enabled: input.enabled,
+        createdAt: toDate(input.createdAt),
+        updatedAt: toDate(input.updatedAt)
+      }
+    });
+
+    return toAiModelProfile(profile);
+  }
+
+  async updateAiModelProfile(input: UpdateAiModelProfileInput) {
+    const profile = await this.db.aiModelProfile.update({
+      where: {
+        id: input.profileId
+      },
+      data: {
+        name: input.name,
+        provider: input.provider,
+        baseUrl: input.baseUrl,
+        model: input.model,
+        supportsVision: input.supportsVision,
+        apiKeyEnvName: input.apiKeyEnvName,
+        apiKeySecretId: input.apiKeySecretId,
+        enabled: input.enabled,
+        updatedAt: toDate(input.updatedAt)
+      }
+    });
+
+    return toAiModelProfile(profile);
+  }
+
+  async updateAiModelProfileEnabled(input: UpdateAiModelProfileEnabledInput) {
+    const profile = await this.db.aiModelProfile.update({
+      where: {
+        id: input.profileId
+      },
+      data: {
+        enabled: input.enabled,
+        updatedAt: toDate(input.updatedAt)
+      }
+    });
+
+    return toAiModelProfile(profile);
+  }
+
   async getActiveAiModelProfile() {
     const active = await this.db.aiModelActiveProfile.findUnique({
       where: {
@@ -408,6 +467,54 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
     });
 
     return toAiModelProfile(profile);
+  }
+
+  async listAiModelSecrets() {
+    const secrets = await this.db.aiModelSecret.findMany({
+      orderBy: {
+        updatedAt: "desc"
+      }
+    });
+
+    return secrets.map(toAiModelSecret);
+  }
+
+  async findAiModelSecretById(secretId: string) {
+    const secret = await this.db.aiModelSecret.findUnique({
+      where: {
+        id: secretId
+      }
+    });
+
+    return secret ? toAiModelSecret(secret) : null;
+  }
+
+  async upsertAiModelSecret(input: UpsertAiModelSecretInput) {
+    const secret = input.secretId
+      ? await this.db.aiModelSecret.update({
+          where: {
+            id: input.secretId
+          },
+          data: {
+            name: input.name,
+            provider: input.provider,
+            encryptedValue: input.encryptedValue,
+            keyHint: input.keyHint,
+            updatedAt: toDate(input.updatedAt)
+          }
+        })
+      : await this.db.aiModelSecret.create({
+          data: {
+            name: input.name,
+            provider: input.provider,
+            encryptedValue: input.encryptedValue,
+            keyHint: input.keyHint,
+            createdAt: toDate(input.createdAt),
+            updatedAt: toDate(input.updatedAt)
+          }
+        });
+
+    return toAiModelSecret(secret);
   }
 
   async findActiveMembershipForUser(userId: string, type: UserMembership["type"], at: string) {
@@ -2193,6 +2300,7 @@ function toAiModelProfile(profile: {
   model: string;
   supportsVision: boolean;
   apiKeyEnvName: string | null;
+  apiKeySecretId: string | null;
   enabled: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -2205,9 +2313,30 @@ function toAiModelProfile(profile: {
     model: profile.model,
     supportsVision: profile.supportsVision,
     apiKeyEnvName: profile.apiKeyEnvName,
+    apiKeySecretId: profile.apiKeySecretId,
     enabled: profile.enabled,
     createdAt: toIso(profile.createdAt),
     updatedAt: toIso(profile.updatedAt)
+  };
+}
+
+function toAiModelSecret(secret: {
+  id: string;
+  name: string;
+  provider: string | null;
+  encryptedValue: string;
+  keyHint: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}): AiModelSecret {
+  return {
+    id: secret.id,
+    name: secret.name,
+    provider: secret.provider as AiModelSecret["provider"],
+    encryptedValue: secret.encryptedValue,
+    keyHint: secret.keyHint,
+    createdAt: toIso(secret.createdAt),
+    updatedAt: toIso(secret.updatedAt)
   };
 }
 

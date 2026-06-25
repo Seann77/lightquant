@@ -937,8 +937,10 @@ textarea {
 }
 
 .lq-strategy-page {
-  --lq-strategy-column-max: 1160px;
-  --lq-strategy-column-gutter: 48px;
+  --lq-strategy-content-max: 1160px;
+  --lq-strategy-content-gutter: 48px;
+  --lq-strategy-column-max: var(--lq-strategy-content-max);
+  --lq-strategy-column-gutter: var(--lq-strategy-content-gutter);
   position: relative;
   display: flex;
   height: 100%;
@@ -6381,15 +6383,35 @@ textarea {
 .lq-strategy-page .lq-platform-strip.is-subtle .lq-platform-inner,
 .lq-strategy-page .lq-message-stack,
 .lq-strategy-page .lq-composer-wrap {
-  width: min(var(--lq-strategy-column-max), calc(100% - (var(--lq-strategy-column-gutter) * 2)));
+  width: min(var(--lq-strategy-content-max), calc(100% - (var(--lq-strategy-content-gutter) * 2)));
   max-width: 100%;
   margin-left: auto;
   margin-right: auto;
 }
 
+.lq-strategy-page .lq-platform-strip {
+  position: relative;
+  z-index: 4;
+  flex: 0 0 auto;
+}
+
 .lq-strategy-page .lq-workspace {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
   padding-left: 0;
   padding-right: 0;
+}
+
+.lq-strategy-page .lq-strategy-thread {
+  width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  scrollbar-width: none;
+}
+
+.lq-strategy-page .lq-strategy-thread::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .lq-strategy-page .lq-message-stack,
@@ -6413,7 +6435,10 @@ textarea {
 .lq-strategy-page .lq-assistant-answer,
 .lq-strategy-page .lq-result-card,
 .lq-strategy-page .lq-error-panel,
-.lq-strategy-page .lq-notes-card {
+.lq-strategy-page .lq-notes-card,
+.lq-strategy-page .lq-chat-bubble.is-plain,
+.lq-strategy-page .lq-strategy-failure-card,
+.lq-strategy-page .lq-composer {
   width: 100%;
 }
 
@@ -6449,22 +6474,22 @@ textarea {
 
 @media (max-width: 1679px) and (min-width: 1280px) {
   .lq-strategy-page {
-    --lq-strategy-column-max: 1080px;
-    --lq-strategy-column-gutter: 36px;
+    --lq-strategy-content-max: 1080px;
+    --lq-strategy-content-gutter: 36px;
   }
 }
 
 @media (max-width: 1279px) and (min-width: 861px) {
   .lq-strategy-page {
-    --lq-strategy-column-max: 980px;
-    --lq-strategy-column-gutter: 24px;
+    --lq-strategy-content-max: 980px;
+    --lq-strategy-content-gutter: 24px;
   }
 }
 
 @media (max-width: 860px) {
   .lq-strategy-page {
-    --lq-strategy-column-max: 100%;
-    --lq-strategy-column-gutter: 16px;
+    --lq-strategy-content-max: 100%;
+    --lq-strategy-content-gutter: 16px;
   }
 
   .lq-strategy-page .lq-platform-strip.is-subtle .lq-platform-inner {
