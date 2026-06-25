@@ -567,14 +567,19 @@ enable_https_if_requested() {
     return
   fi
 
-  run_sudo certbot certonly \
-    --webroot \
-    -w /var/www/html \
-    -d "$APP_DOMAIN" \
-    --non-interactive \
-    --agree-tos \
-    -m "$LETSENCRYPT_EMAIL" \
-    --keep-until-expiring
+  local cert_dir="/etc/letsencrypt/live/${APP_DOMAIN}"
+  if run_sudo test -f "${cert_dir}/fullchain.pem" && run_sudo test -f "${cert_dir}/privkey.pem"; then
+    echo "Existing Let's Encrypt certificate found for ${APP_DOMAIN}; skipping certbot certonly."
+  else
+    run_sudo certbot certonly \
+      --webroot \
+      -w /var/www/html \
+      -d "$APP_DOMAIN" \
+      --non-interactive \
+      --agree-tos \
+      -m "$LETSENCRYPT_EMAIL" \
+      --keep-until-expiring
+  fi
 
   write_file_sudo "/etc/nginx/sites-available/${APP_NAME}" <<EOF
 server {
