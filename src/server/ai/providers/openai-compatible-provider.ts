@@ -12,7 +12,7 @@ import type { AiRuntimeConfig } from "@/server/ai/ai-runtime-config";
 import type { AiTaskScopeStatus } from "@/server/domain";
 import { ApiError } from "@/server/http/api-response";
 import { loadTextContent } from "@/server/ai/skills/skill-content";
-import { normalizeMarkdown, parseStreamingMarkdownResult, truncateStreamingText } from "@/server/ai/streaming-markdown-result";
+import { normalizeMarkdown, parseStreamingMarkdownResult } from "@/server/ai/streaming-markdown-result";
 import type { AiProviderInput, AiProviderResult, AiProviderStreamCallbacks, AiProviderStreamResult } from "@/server/ai/providers/types";
 import { normalizeCompleteStrategyCode } from "@/lib/ai/strategy-result-format";
 
@@ -142,7 +142,7 @@ export async function runOpenAiCompatibleProviderStream(
 
   return {
     result: providerResult,
-    visibleThinking: truncateStreamingText(stream.visibleThinking, getMaxThinkingChars(input)),
+    visibleThinking: stream.visibleThinking,
     finalAnswerMarkdown
   };
 }
@@ -186,7 +186,7 @@ function readProviderConfig(options: ProviderOptions): ProviderConfig {
 function buildChatCompletionPayload(input: AiProviderInput, providerConfig: ProviderConfig, forceInScope = false) {
   const usesMimoParams = shouldUseMimoCompatibleParams(providerConfig);
   const outputTokenField = usesMimoParams ? "max_completion_tokens" : "max_tokens";
-  const enableThinking = shouldEnableMimoThinking(input);
+  const thinkingOptions = getProviderThinkingOptions(providerConfig, input);
 
   return {
     model: providerConfig.model,
@@ -206,14 +206,14 @@ function buildChatCompletionPayload(input: AiProviderInput, providerConfig: Prov
     [outputTokenField]: input.config.maxOutputTokens,
     temperature: 0.2,
     stream: false,
-    ...(usesMimoParams ? { thinking: { type: enableThinking ? "enabled" : "disabled" } } : {})
+    ...thinkingOptions
   };
 }
 
 function buildStreamingChatCompletionPayload(input: AiProviderInput, providerConfig: ProviderConfig) {
   const usesMimoParams = shouldUseMimoCompatibleParams(providerConfig);
   const outputTokenField = usesMimoParams ? "max_completion_tokens" : "max_tokens";
-  const enableThinking = shouldEnableMimoThinking(input);
+  const thinkingOptions = getProviderThinkingOptions(providerConfig, input);
 
   return {
     model: providerConfig.model,
@@ -230,8 +230,28 @@ function buildStreamingChatCompletionPayload(input: AiProviderInput, providerCon
     [outputTokenField]: getStreamingOutputTokenLimit(input),
     temperature: 0.2,
     stream: true,
-    ...(usesMimoParams ? { thinking: { type: enableThinking ? "enabled" : "disabled" } } : {})
+    ...thinkingOptions
   };
+}
+
+function getProviderThinkingOptions(config: Pick<ProviderConfig, "baseUrl" | "model">, input: AiProviderInput) {
+  if (shouldUseMimoCompatibleParams(config)) {
+    return {
+      thinking: {
+        type: shouldEnableMimoThinking(input) ? "enabled" : "disabled"
+      }
+    };
+  }
+
+  if (shouldUseDeepSeekCompatibleParams(config)) {
+    return {
+      thinking: {
+        type: "disabled"
+      }
+    };
+  }
+
+  return {};
 }
 
 function shouldEnableMimoThinking(input: AiProviderInput) {
@@ -350,6 +370,10 @@ function buildStreamingFinalAnswerGuidance(type: AiProviderInput["task"]["type"]
 
 function shouldUseMimoCompatibleParams(config: Pick<ProviderConfig, "baseUrl" | "model">) {
   return config.model.toLowerCase().startsWith("mimo-") || config.baseUrl.toLowerCase().includes("xiaomimimo.com");
+}
+
+function shouldUseDeepSeekCompatibleParams(config: Pick<ProviderConfig, "baseUrl" | "model">) {
+  return config.model.toLowerCase().startsWith("deepseek-") || config.baseUrl.toLowerCase().includes("api.deepseek.com");
 }
 
 function buildSystemMessage(input: AiProviderInput, forceInScope: boolean) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
@@ -18,6 +18,12 @@ import {
 } from "lucide-react";
 import { getFileUploadFriendlyError, getUploadAccept, getUploadButtonLabel, uploadCodeFile, type UploadedCodeFile } from "@/lib/file-upload";
 import { normalizeStrategyFinalAnswerMarkdown } from "@/lib/ai/strategy-result-format";
+import {
+  buildAiTaskFingerprint,
+  canContinueAiTaskData,
+  isAiTaskDataCompleteSuccess,
+  isAiTaskDataPartial
+} from "@/lib/ai/task-fingerprint";
 import { chatPlatformOptions, convertPlatforms } from "@/lib/mock-data";
 import { PlatformDropdown } from "@/components/ui/PlatformDropdown";
 import { AssistantThinkingMessage, type AssistantThinkingStatus } from "@/components/ai/AssistantThinkingMessage";
@@ -137,6 +143,9 @@ function StrategyModeContent() {
   const [uploadedFile, setUploadedFile] = useState<UploadedCodeFile | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [lastSuccessfulFingerprint, setLastSuccessfulFingerprint] = useState<string | null>(null);
+  const [lastPartialFingerprint, setLastPartialFingerprint] = useState<string | null>(null);
+  const [lastPartialCanContinue, setLastPartialCanContinue] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const compositionRef = useRef(false);
   const strategyThreadRef = useRef<HTMLDivElement>(null);
@@ -153,6 +162,20 @@ function StrategyModeContent() {
   const activeJob = activeJobId ? jobsById[activeJobId] ?? null : null;
   const activeJobRunning = Boolean(activeJob && isJobActive(activeJob));
   const elapsedSeconds = useElapsedSeconds(activeJobRunning, activeJob?.startedAt ?? activeJob?.createdAt);
+  const strategyCurrentFingerprint = useMemo(() => buildAiTaskFingerprint({
+    type: "strategy_generation",
+    targetPlatform,
+    prompt,
+    messageContent: prompt,
+    inputFile: uploadedFile
+  }), [targetPlatform, prompt, uploadedFile]);
+  const strategyHasInput = Boolean(prompt.trim() || uploadedFile);
+  const strategyDuplicateCompleted = strategyHasInput && lastSuccessfulFingerprint === strategyCurrentFingerprint;
+  const strategyContinuationAvailable = !strategyHasInput && lastPartialCanContinue && Boolean(lastPartialFingerprint);
+  const strategySubmitDisabled = activeJobRunning ||
+    uploading ||
+    uploadedFile?.scanStatus === "BLOCKED" ||
+    (!strategyContinuationAvailable && (!strategyHasInput || strategyDuplicateCompleted));
 
   useEffect(() => {
     activeConversationKeyRef.current = currentConversationKey;
@@ -182,13 +205,29 @@ function StrategyModeContent() {
         setTargetPlatform(summary.targetPlatform);
       }
     },
-    onRestore: (data) => {
+    onRestore: (data, restored) => {
       setConversation(data.conversation);
       setMessages(data.messages.map(toStrategyMessage));
       hydrateConversationJobs(data.conversation.id, data.tasks ?? [], data.messages);
 
       if (data.conversation.targetPlatform && chatPlatformOptions.includes(data.conversation.targetPlatform)) {
         setTargetPlatform(data.conversation.targetPlatform);
+      }
+
+      const restoredFingerprint = buildStrategyRestoredFingerprint(data.messages, restored.targetPlatform ?? data.conversation.targetPlatform);
+
+      if (restoredFingerprint && isAiTaskDataCompleteSuccess(restored.taskData)) {
+        setLastSuccessfulFingerprint(restoredFingerprint);
+        setLastPartialFingerprint(null);
+        setLastPartialCanContinue(false);
+      } else if (restoredFingerprint && isAiTaskDataPartial(restored.taskData)) {
+        setLastSuccessfulFingerprint(null);
+        setLastPartialFingerprint(restoredFingerprint);
+        setLastPartialCanContinue(canContinueAiTaskData(restored.taskData));
+      } else {
+        setLastSuccessfulFingerprint(null);
+        setLastPartialFingerprint(null);
+        setLastPartialCanContinue(false);
       }
     },
     onError: (historyError) => {
@@ -367,18 +406,33 @@ function StrategyModeContent() {
     }
   }
 
-  async function handleSubmit() {
+  async function handleSubmit(options: { continuation?: boolean } = {}) {
+    const continueOutput = options.continuation === true;
+
     if (activeJobRunning || uploading) {
       return;
     }
 
-    const messageContent = prompt.trim();
-
-    if (!messageContent && !uploadedFile) {
+    if (continueOutput && !strategyContinuationAvailable) {
       return;
     }
 
-    if (uploadedFile?.scanStatus === "BLOCKED") {
+    if (!continueOutput && strategyDuplicateCompleted) {
+      return;
+    }
+
+    const messageContent = continueOutput ? "继续输出" : prompt.trim();
+    const submittedFingerprint = continueOutput ? lastPartialFingerprint : strategyCurrentFingerprint;
+
+    if (!submittedFingerprint) {
+      return;
+    }
+
+    if (!continueOutput && !messageContent && !uploadedFile) {
+      return;
+    }
+
+    if (!continueOutput && uploadedFile?.scanStatus === "BLOCKED") {
       return;
     }
 
@@ -391,8 +445,8 @@ function StrategyModeContent() {
       prompt: optimisticUserContent,
       messageContent: optimisticUserContent,
       targetPlatform,
-      inputFileId: uploadedFile?.fileId,
-      inputFileName: uploadedFile?.originalName
+      inputFileId: continueOutput ? undefined : uploadedFile?.fileId,
+      inputFileName: continueOutput ? undefined : uploadedFile?.originalName
     };
     const localJob = createLocalStrategyJob({
       id: clientRequestId,
@@ -420,10 +474,11 @@ function StrategyModeContent() {
         content: optimisticUserContent,
         contentJson: {
           targetPlatform,
-          inputFileId: uploadedFile?.fileId ?? null,
-          inputFileName: uploadedFile?.originalName ?? null
+          inputFileId: continueOutput ? null : uploadedFile?.fileId ?? null,
+          inputFileName: continueOutput ? null : uploadedFile?.originalName ?? null,
+          continuation: continueOutput
         },
-        attachments: uploadedFile ? [uploadedFileToMessageAttachment(uploadedFile, `local-attachment-${clientRequestId}`)] : [],
+        attachments: !continueOutput && uploadedFile ? [uploadedFileToMessageAttachment(uploadedFile, `local-attachment-${clientRequestId}`)] : [],
         createdAt: new Date().toISOString()
       }
     ]);
@@ -442,7 +497,7 @@ function StrategyModeContent() {
         messageContent: optimisticUserContent,
         targetPlatform,
         prompt: optimisticUserContent,
-        inputFileId: uploadedFile?.fileId,
+        inputFileId: continueOutput ? undefined : uploadedFile?.fileId,
         clientRequestId
       }, {
         signal: streamController.signal,
@@ -483,6 +538,11 @@ function StrategyModeContent() {
         localJobId: localJob.id,
         sourceConversationKey: conversationKeyAtSubmit,
         request
+      });
+      rememberTaskFingerprintOutcome(completed, submittedFingerprint, {
+        setLastSuccessfulFingerprint,
+        setLastPartialFingerprint,
+        setLastPartialCanContinue
       });
       window.dispatchEvent(new Event("lightquant:credits-updated"));
       window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
@@ -975,12 +1035,18 @@ function StrategyModeContent() {
                 </div>
                 <button
                   className="lq-primary-btn"
-                  disabled={activeJobRunning || (!prompt.trim() && !uploadedFile) || uploadedFile?.scanStatus === "BLOCKED"}
-                  onClick={handleSubmit}
+                  disabled={strategySubmitDisabled}
+                  onClick={() => void handleSubmit({ continuation: strategyContinuationAvailable })}
                   type="button"
                 >
                   {activeJobRunning ? <LoaderCircle aria-hidden="true" className="animate-spin" size={18} /> : <Send aria-hidden="true" size={18} />}
-                  {activeJobRunning ? `${activeJob?.status === "queued" ? "排队中" : "处理中"} ${elapsedSeconds}s` : "发送"}
+                  {activeJobRunning
+                    ? `${activeJob?.status === "queued" ? "排队中" : "处理中"} ${elapsedSeconds}s`
+                    : strategyContinuationAvailable
+                      ? "继续输出"
+                      : strategyDuplicateCompleted
+                        ? "已完成生成"
+                        : "发送"}
                 </button>
               </div>
             </div>
@@ -1010,6 +1076,9 @@ function ConvertModeContent() {
   const [inputSource, setInputSource] = useState<"manual" | "attachment" | "restored">("manual");
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [lastSuccessfulFingerprint, setLastSuccessfulFingerprint] = useState<string | null>(null);
+  const [lastPartialFingerprint, setLastPartialFingerprint] = useState<string | null>(null);
+  const [lastPartialCanContinue, setLastPartialCanContinue] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const conversionPreviewRef = useRef<HTMLDivElement>(null);
   const conversionAutoFollowRef = useRef(true);
@@ -1025,6 +1094,21 @@ function ConvertModeContent() {
   const elapsedSeconds = useElapsedSeconds(conversionLoading, taskData?.task.startedAt ?? taskData?.task.createdAt ?? undefined);
 
   const activeConversionConversationId = taskData?.conversation?.id ?? taskData?.task.conversationId ?? conversationIdFromUrl;
+  const finalInputText = getFinalConversionInputText(inputCode);
+  const finalPrompt = prompt.trim();
+  const finalTotalInputChars = getConversionTotalInputChars(finalInputText, finalPrompt, sourcePlatform, targetPlatform);
+  const conversionCurrentFingerprint = useMemo(() => buildAiTaskFingerprint({
+    type: "code_conversion",
+    sourcePlatform,
+    targetPlatform,
+    prompt: finalPrompt,
+    inputCode: finalInputText,
+    inputFile: uploadedFile
+  }), [sourcePlatform, targetPlatform, finalPrompt, finalInputText, uploadedFile]);
+  const conversionDuplicateCompleted = Boolean(finalInputText) && lastSuccessfulFingerprint === conversionCurrentFingerprint;
+  const conversionContinuationAvailable = Boolean(finalInputText) &&
+    lastPartialCanContinue &&
+    lastPartialFingerprint === conversionCurrentFingerprint;
 
   useWorkbenchConversationRestore({
     conversationId: conversationIdFromUrl,
@@ -1057,10 +1141,28 @@ function ConvertModeContent() {
         setTargetPlatform(restored.targetPlatform);
       }
 
-      setPrompt(restored.prompt ?? "");
-      setInputCode(formatRestoredInputText(restored.inputCodePreview, restored.inputFileName));
+      const restoredPrompt = restored.prompt ?? "";
+      const restoredInputCode = formatRestoredInputText(restored.inputCodePreview, restored.inputFileName);
+      const restoredFile = createRestoredUploadedFile(restored);
+      const restoredSourcePlatform = restored.sourcePlatform && convertPlatforms.source.includes(restored.sourcePlatform)
+        ? restored.sourcePlatform
+        : sourcePlatform;
+      const restoredTargetPlatform = restored.targetPlatform && convertPlatforms.target.includes(restored.targetPlatform)
+        ? restored.targetPlatform
+        : targetPlatform;
+      const restoredFingerprint = buildAiTaskFingerprint({
+        type: "code_conversion",
+        sourcePlatform: restoredSourcePlatform,
+        targetPlatform: restoredTargetPlatform,
+        prompt: restoredPrompt,
+        inputCode: getFinalConversionInputText(restoredInputCode),
+        inputFile: restoredFile
+      });
+
+      setPrompt(restoredPrompt);
+      setInputCode(restoredInputCode);
       setInputSource("restored");
-      setUploadedFile(createRestoredUploadedFile(restored));
+      setUploadedFile(restoredFile);
       setTaskData(restored.taskData);
       setStreamState(createThinkingStateFromTaskData(restored.taskData, "code_conversion"));
       setActiveTab(getConversationActiveTab(conversationData.conversation, conversionTabs, conversionTabs[0]));
@@ -1069,6 +1171,20 @@ function ConvertModeContent() {
       cancelRequestedRef.current = false;
       pollingConversionTaskIdRef.current = null;
       streamingConversionTaskIdRef.current = null;
+
+      if (isAiTaskDataCompleteSuccess(restored.taskData)) {
+        setLastSuccessfulFingerprint(restoredFingerprint);
+        setLastPartialFingerprint(null);
+        setLastPartialCanContinue(false);
+      } else if (isAiTaskDataPartial(restored.taskData)) {
+        setLastSuccessfulFingerprint(null);
+        setLastPartialFingerprint(restoredFingerprint);
+        setLastPartialCanContinue(canContinueAiTaskData(restored.taskData));
+      } else {
+        setLastSuccessfulFingerprint(null);
+        setLastPartialFingerprint(null);
+        setLastPartialCanContinue(false);
+      }
     },
     onError: (historyError) => {
       setError(getFriendlyError(historyError));
@@ -1216,12 +1332,35 @@ function ConvertModeContent() {
     }
   }
 
-  async function handleSubmit() {
-    const finalInputText = getFinalConversionInputText(inputCode);
-    const finalPrompt = prompt.trim();
-    const finalTotalInputChars = getConversionTotalInputChars(finalInputText, finalPrompt, sourcePlatform, targetPlatform);
+  async function handleSubmit(options: { continuation?: boolean } = {}) {
+    const continueOutput = options.continuation === true;
+    const submittedFingerprint = continueOutput ? lastPartialFingerprint : conversionCurrentFingerprint;
 
-    if (finalTotalInputChars > CODE_CONVERSION_MAX_TOTAL_INPUT_CHARS) {
+    if (conversionLoading || uploading) {
+      return;
+    }
+
+    if (!submittedFingerprint) {
+      return;
+    }
+
+    if (continueOutput && !conversionContinuationAvailable) {
+      return;
+    }
+
+    if (!continueOutput && conversionDuplicateCompleted) {
+      return;
+    }
+
+    if (!continueOutput && !finalInputText) {
+      return;
+    }
+
+    if (!continueOutput && uploadedFile?.scanStatus === "BLOCKED") {
+      return;
+    }
+
+    if (!continueOutput && finalTotalInputChars > CODE_CONVERSION_MAX_TOTAL_INPUT_CHARS) {
       setError(getConversionInputTooLargeMessage(finalTotalInputChars, inputSource === "attachment" && Boolean(uploadedFile)));
       return;
     }
@@ -1246,9 +1385,9 @@ function ConvertModeContent() {
         conversationId: currentConversationId,
         sourcePlatform,
         targetPlatform,
-        inputCode: finalInputText,
-        prompt: finalPrompt,
-        inputFileId: uploadedFile?.fileId,
+        inputCode: continueOutput ? undefined : finalInputText,
+        prompt: continueOutput ? "继续输出" : finalPrompt,
+        inputFileId: continueOutput ? undefined : uploadedFile?.fileId,
         clientRequestId: createWorkbenchClientRequestId("convert")
       }, {
         onTask: (data) => {
@@ -1285,6 +1424,11 @@ function ConvertModeContent() {
       setStreamState((current) => createThinkingStateFromTaskData(completed, "code_conversion", current));
       setActiveTab(conversionTabs[0]);
       replaceWorkbenchConversationUrl(router, { type: "chat", mode: "convert" }, conversationIdFromUrl, completed.conversation?.id ?? completed.task.conversationId ?? null);
+      rememberTaskFingerprintOutcome(completed, submittedFingerprint, {
+        setLastSuccessfulFingerprint,
+        setLastPartialFingerprint,
+        setLastPartialCanContinue
+      });
       window.dispatchEvent(new Event("lightquant:credits-updated"));
       window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
     } catch (submitError) {
@@ -1355,16 +1499,16 @@ function ConvertModeContent() {
   const conversionCopyContent = isCodeConversionCodeTab(activeTab) ? targetCode : migrationNotes;
   const conversionLineCount = Math.max(10, conversionPanelContent ? conversionPanelContent.split(/\r\n|\r|\n/).length : 10);
   const canCopyConversionContent = Boolean(conversionCopyContent.trim());
-  const finalInputText = getFinalConversionInputText(inputCode);
-  const finalPrompt = prompt.trim();
-  const finalTotalInputChars = getConversionTotalInputChars(finalInputText, finalPrompt, sourcePlatform, targetPlatform);
   const inputTooLargeMessage = finalTotalInputChars > CODE_CONVERSION_MAX_TOTAL_INPUT_CHARS
     ? getConversionInputTooLargeMessage(finalTotalInputChars, inputSource === "attachment" && Boolean(uploadedFile))
     : "";
-  const shownError = error || inputTooLargeMessage;
+  const shownError = error || (conversionContinuationAvailable ? "" : inputTooLargeMessage);
   const hasConversionOutput = Boolean(targetCode.trim() || migrationNotes.trim());
   const taskStatus = taskData?.task.status ?? (conversionLoading ? "RUNNING" : null);
   const canCancelTask = Boolean(taskData?.task.id && (taskStatus === "PENDING" || taskStatus === "RUNNING"));
+  const conversionSubmitDisabled = conversionLoading ||
+    uploading ||
+    (!conversionContinuationAvailable && (Boolean(inputTooLargeMessage) || !finalInputText || uploadedFile?.scanStatus === "BLOCKED" || conversionDuplicateCompleted));
 
   useEffect(() => {
     conversionTabChangedRef.current = conversionMountedRef.current;
@@ -1507,12 +1651,18 @@ function ConvertModeContent() {
           <div className="lq-actions-left">
             <button
               className="lq-primary-btn"
-              disabled={conversionLoading || Boolean(inputTooLargeMessage) || !finalInputText || uploadedFile?.scanStatus === "BLOCKED"}
-              onClick={handleSubmit}
+              disabled={conversionSubmitDisabled}
+              onClick={() => void handleSubmit({ continuation: conversionContinuationAvailable })}
               type="button"
             >
               {conversionLoading ? <LoaderCircle aria-hidden="true" className="animate-spin" size={18} /> : <Sparkles aria-hidden="true" size={18} />}
-              {conversionLoading ? `转换中 ${elapsedSeconds}s` : "开始转换"}
+              {conversionLoading
+                ? `转换中 ${elapsedSeconds}s`
+                : conversionContinuationAvailable
+                  ? "继续输出"
+                  : conversionDuplicateCompleted
+                    ? "已完成转换"
+                    : "开始转换"}
             </button>
             <button
               className="lq-secondary-btn"
@@ -1763,6 +1913,69 @@ function useElapsedSeconds(active: boolean, startedAt?: string) {
   }, [active, startedAt]);
 
   return elapsedSeconds;
+}
+
+function rememberTaskFingerprintOutcome(
+  data: AiTaskData,
+  fingerprint: string,
+  setters: {
+    setLastSuccessfulFingerprint: (value: string | null) => void;
+    setLastPartialFingerprint: (value: string | null) => void;
+    setLastPartialCanContinue: (value: boolean) => void;
+  }
+) {
+  if (isAiTaskDataPartial(data)) {
+    setters.setLastSuccessfulFingerprint(null);
+    setters.setLastPartialFingerprint(fingerprint);
+    setters.setLastPartialCanContinue(canContinueAiTaskData(data));
+    return;
+  }
+
+  if (isAiTaskDataCompleteSuccess(data)) {
+    setters.setLastSuccessfulFingerprint(fingerprint);
+    setters.setLastPartialFingerprint(null);
+    setters.setLastPartialCanContinue(false);
+  }
+}
+
+function buildStrategyRestoredFingerprint(messages: AiMessageData[], targetPlatform: string | null | undefined) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    const contentJson = readRecord(message.contentJson);
+
+    if (message.role !== "user") {
+      continue;
+    }
+
+    if (contentJson?.continuation) {
+      continue;
+    }
+
+    if (typeof contentJson?.taskType === "string" && contentJson.taskType !== "strategy_generation") {
+      continue;
+    }
+
+    const inputFileId = readNullableString(contentJson?.inputFileId);
+    const inputFileName = readNullableString(contentJson?.inputFileName);
+    const inputCodePreview = readNullableString(contentJson?.inputCodePreview);
+    const prompt = readNullableString(contentJson?.prompt) ?? (inputFileId ? null : message.content);
+
+    return buildAiTaskFingerprint({
+      type: "strategy_generation",
+      targetPlatform: readNullableString(contentJson?.targetPlatform) ?? targetPlatform,
+      prompt,
+      messageContent: prompt,
+      inputFile: inputFileId || inputFileName || inputCodePreview
+        ? {
+            fileId: inputFileId ?? undefined,
+            originalName: inputFileName ?? undefined,
+            contentPreview: inputCodePreview ?? undefined
+          }
+        : null
+    });
+  }
+
+  return null;
 }
 
 function getAiWaitMessage(action: string, elapsedSeconds: number) {

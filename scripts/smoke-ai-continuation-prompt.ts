@@ -66,7 +66,8 @@ const analysisDraft = buildContinuationDraft({
   userPrompt: "继续输出"
 });
 
-expect("analysis does not enter continuation mode", analysisDraft === null);
+expect("analysis draft exists", Boolean(analysisDraft));
+expectIncludes("analysis task label", analysisDraft?.prompt, "代码翻译解析");
 
 const nonPartialDraft = buildContinuationDraft({
   messages: [
@@ -119,7 +120,7 @@ console.log(JSON.stringify({
     "continuation intent",
     "partial assistant detection",
     "bounded previous output tail",
-    "strategy/code conversion prompt constraints"
+    "strategy/code conversion/code analysis prompt constraints"
   ]
 }, null, 2));
 

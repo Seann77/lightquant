@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   BarChart3,
@@ -27,6 +27,12 @@ import {
   streamWorkbenchAiTask,
   waitForAiTaskResult
 } from "@/lib/ai/workbench-client";
+import {
+  buildAiTaskFingerprint,
+  canContinueAiTaskData,
+  isAiTaskDataCompleteSuccess,
+  isAiTaskDataPartial
+} from "@/lib/ai/task-fingerprint";
 import { useWorkbenchConversationRestore } from "@/lib/ai/use-workbench-conversation";
 import type { AiTaskData } from "@/lib/ai/workbench-types";
 
@@ -53,6 +59,9 @@ export function CodeAnalysisClient() {
   const [uploadedFile, setUploadedFile] = useState<UploadedCodeFile | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [lastSuccessfulFingerprint, setLastSuccessfulFingerprint] = useState<string | null>(null);
+  const [lastPartialFingerprint, setLastPartialFingerprint] = useState<string | null>(null);
+  const [lastPartialCanContinue, setLastPartialCanContinue] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollingAnalysisTaskIdRef = useRef<string | null>(null);
   const streamingAnalysisTaskIdRef = useRef<string | null>(null);
@@ -64,6 +73,17 @@ export function CodeAnalysisClient() {
   const elapsedSeconds = useElapsedSeconds(analysisBusy, analysisStartedAt);
 
   const activeAnalysisConversationId = data?.conversation?.id ?? data?.task.conversationId ?? conversationIdFromUrl;
+  const finalInputText = getFinalInputText(inputCode, inputSource);
+  const analysisCurrentFingerprint = useMemo(() => buildAiTaskFingerprint({
+    type: "code_analysis",
+    sourcePlatform: platform,
+    inputCode: finalInputText,
+    inputFile: uploadedFile
+  }), [platform, finalInputText, uploadedFile]);
+  const analysisDuplicateCompleted = Boolean(lastSuccessfulFingerprint && lastSuccessfulFingerprint === analysisCurrentFingerprint);
+  const analysisContinuationAvailable = lastPartialCanContinue &&
+    Boolean(lastPartialFingerprint) &&
+    (finalInputText ? lastPartialFingerprint === analysisCurrentFingerprint : inputSource === "restored");
 
   const resetAnalysisLocalState = useCallback(() => {
     setInputCode("");
@@ -103,15 +123,41 @@ export function CodeAnalysisClient() {
         setPlatform(restored.sourcePlatform);
       }
 
-      setInputCode(formatRestoredInputText(restored.inputCodePreview, restored.inputFileName));
+      const restoredInputCode = formatRestoredInputText(restored.inputCodePreview, restored.inputFileName);
+      const restoredFile = createRestoredUploadedFile(restored);
+      const restoredPlatform = restored.sourcePlatform && codeAnalysisPlatforms.includes(restored.sourcePlatform)
+        ? restored.sourcePlatform
+        : platform;
+      const restoredFingerprint = buildAiTaskFingerprint({
+        type: "code_analysis",
+        sourcePlatform: restoredPlatform,
+        inputCode: getFinalInputText(restoredInputCode, "restored"),
+        inputFile: restoredFile
+      });
+
+      setInputCode(restoredInputCode);
       setInputSource("restored");
-      setUploadedFile(createRestoredUploadedFile(restored));
+      setUploadedFile(restoredFile);
       setData(restored.taskData);
       setStreamState(createThinkingStateFromTaskData(restored.taskData));
       setActiveTab(getConversationActiveTab(conversationData.conversation, codeAnalysisTabs, codeAnalysisTabs[0]));
       setLoading(false);
       pollingAnalysisTaskIdRef.current = null;
       streamingAnalysisTaskIdRef.current = null;
+
+      if (isAiTaskDataCompleteSuccess(restored.taskData)) {
+        setLastSuccessfulFingerprint(restoredFingerprint);
+        setLastPartialFingerprint(null);
+        setLastPartialCanContinue(false);
+      } else if (isAiTaskDataPartial(restored.taskData)) {
+        setLastSuccessfulFingerprint(null);
+        setLastPartialFingerprint(restoredFingerprint);
+        setLastPartialCanContinue(canContinueAiTaskData(restored.taskData));
+      } else {
+        setLastSuccessfulFingerprint(null);
+        setLastPartialFingerprint(null);
+        setLastPartialCanContinue(false);
+      }
     },
     onError: (historyError) => {
       setError(getFriendlyError(historyError));
@@ -255,17 +301,44 @@ export function CodeAnalysisClient() {
     }
   }
 
-  async function handleSubmit() {
-    const finalInputText = getFinalInputText(inputCode, inputSource);
+  async function handleSubmit(options: { continuation?: boolean } = {}) {
+    const continueOutput = options.continuation === true;
+    const submittedFingerprint = continueOutput ? lastPartialFingerprint : analysisCurrentFingerprint;
 
-    if (!finalInputText) {
+    if (analysisBusy || uploading) {
+      return;
+    }
+
+    if (!submittedFingerprint) {
+      return;
+    }
+
+    if (continueOutput && !analysisContinuationAvailable) {
+      return;
+    }
+
+    if (!continueOutput && analysisDuplicateCompleted) {
+      return;
+    }
+
+    if (!continueOutput && !finalInputText) {
       setError(inputSource === "restored"
         ? "历史输入仅为摘要，请粘贴完整代码或重新上传附件后再解析。"
         : "请粘贴需要解析的策略代码，或上传可解析的文本文件。");
       return;
     }
 
+    if (!continueOutput && uploadedFile?.scanStatus === "BLOCKED") {
+      return;
+    }
+
     const currentConversationId = data?.conversation?.id ?? conversationIdFromUrl ?? undefined;
+
+    if (continueOutput && !currentConversationId) {
+      setError("当前输出已截断，请在当前会话中继续输出补全结果。");
+      return;
+    }
+
     setLoading(true);
     setError("");
     setData(null);
@@ -279,8 +352,10 @@ export function CodeAnalysisClient() {
         type: "code_analysis",
         conversationId: currentConversationId,
         sourcePlatform: platform,
-        inputCode: finalInputText,
-        inputFileId: uploadedFile?.contentText ? uploadedFile.fileId : undefined,
+        messageContent: continueOutput ? "继续输出" : undefined,
+        prompt: continueOutput ? "继续输出" : undefined,
+        inputCode: continueOutput ? undefined : finalInputText,
+        inputFileId: continueOutput ? undefined : uploadedFile?.contentText ? uploadedFile.fileId : undefined,
         clientRequestId: createWorkbenchClientRequestId("analysis")
       }, {
         onTask: (payload) => {
@@ -316,6 +391,11 @@ export function CodeAnalysisClient() {
       setData(completed);
       setStreamState((current) => createThinkingStateFromTaskData(completed, current));
       replaceWorkbenchConversationUrl(router, { type: "analysis" }, conversationIdFromUrl, completed.conversation?.id ?? completed.task.conversationId ?? null);
+      rememberAnalysisTaskFingerprintOutcome(completed, submittedFingerprint, {
+        setLastSuccessfulFingerprint,
+        setLastPartialFingerprint,
+        setLastPartialCanContinue
+      });
       window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
       window.dispatchEvent(new Event("lightquant:credits-updated"));
     } catch (submitError) {
@@ -337,9 +417,10 @@ export function CodeAnalysisClient() {
   const reportJson = result?.reportJson;
   const reportRecord = reportJson && typeof reportJson === "object" && !Array.isArray(reportJson) ? reportJson as Record<string, unknown> : null;
   const parseFailed = Boolean(reportRecord?.providerFallback || (data?.task.status === "SUCCEEDED" && !result));
-  const finalInputText = getFinalInputText(inputCode, inputSource);
   const analysisInputChars = finalInputText.length;
-  const canSubmit = Boolean(finalInputText) && !analysisBusy && uploadedFile?.scanStatus !== "BLOCKED";
+  const canSubmit = !analysisBusy &&
+    !uploading &&
+    (analysisContinuationAvailable || (Boolean(finalInputText) && !analysisDuplicateCompleted && uploadedFile?.scanStatus !== "BLOCKED"));
 
   return (
     <WorkbenchShell className="lq-analysis-page min-h-full">
@@ -390,11 +471,17 @@ export function CodeAnalysisClient() {
             <button
               className="lq-primary-btn"
               disabled={!canSubmit}
-              onClick={handleSubmit}
+              onClick={() => void handleSubmit({ continuation: analysisContinuationAvailable })}
               type="button"
             >
               {analysisBusy ? <LoaderCircle aria-hidden="true" className="animate-spin" size={18} /> : <Sparkles aria-hidden="true" size={18} />}
-              {analysisBusy ? `解析中 ${elapsedSeconds}s` : "开始解析"}
+              {analysisBusy
+                ? `解析中 ${elapsedSeconds}s`
+                : analysisContinuationAvailable
+                  ? "继续输出"
+                  : analysisDuplicateCompleted
+                    ? "已完成解析"
+                    : "开始解析"}
             </button>
             <div className="lq-cost-pill">
               <DollarSign aria-hidden="true" />
@@ -485,6 +572,29 @@ function createThinkingStateFromTaskData(data: AiTaskData | null | undefined, pr
     finalAnswerMarkdown,
     taskId: data.task.id
   };
+}
+
+function rememberAnalysisTaskFingerprintOutcome(
+  data: AiTaskData,
+  fingerprint: string,
+  setters: {
+    setLastSuccessfulFingerprint: (value: string | null) => void;
+    setLastPartialFingerprint: (value: string | null) => void;
+    setLastPartialCanContinue: (value: boolean) => void;
+  }
+) {
+  if (isAiTaskDataPartial(data)) {
+    setters.setLastSuccessfulFingerprint(null);
+    setters.setLastPartialFingerprint(fingerprint);
+    setters.setLastPartialCanContinue(canContinueAiTaskData(data));
+    return;
+  }
+
+  if (isAiTaskDataCompleteSuccess(data)) {
+    setters.setLastSuccessfulFingerprint(fingerprint);
+    setters.setLastPartialFingerprint(null);
+    setters.setLastPartialCanContinue(false);
+  }
 }
 
 function getFinalInputText(inputCode: string, inputSource: AnalysisInputSource) {

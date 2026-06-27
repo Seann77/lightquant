@@ -55,7 +55,7 @@ export function buildContinuationDraft(input: {
   taskType: AiTaskType;
   userPrompt: string | null | undefined;
 }): AiContinuationDraft | null {
-  if (input.taskType !== "strategy_generation" && input.taskType !== "code_conversion") {
+  if (input.taskType !== "strategy_generation" && input.taskType !== "code_conversion" && input.taskType !== "code_analysis") {
     return null;
   }
 
@@ -86,7 +86,11 @@ export function buildContinuationPrompt(input: {
   userPrompt: string | null | undefined;
   previousTail: string;
 }) {
-  const taskName = input.taskType === "code_conversion" ? "代码转换" : "完整策略生成";
+  const taskName = input.taskType === "code_conversion"
+    ? "代码转换"
+    : input.taskType === "code_analysis"
+      ? "代码翻译解析"
+      : "完整策略生成";
 
   return [
     "你正在补全上一条被截断的代码输出。",

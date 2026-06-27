@@ -15,12 +15,15 @@ main().catch((error) => {
 async function main() {
   try {
     await testLengthPartial();
+    await testThinkingTruncationDoesNotMarkPartial();
     await testTimeoutPartial();
 
     console.log(JSON.stringify({
       ok: true,
       checked: [
         "stream finish_reason length marks partial",
+        "thinking truncation keeps specific marker",
+        "thinking truncation does not mark final result partial",
         "stream timeout with content marks partial",
         "partial metadata includes continuation fields",
         "strategy generation thinking enabled",
@@ -81,6 +84,65 @@ async function testLengthPartial() {
     expect("length reason", report?.truncateReason === "length");
     expect("length can continue", report?.canContinue === true);
     expect("length output token limit", report?.outputTokenLimit === 64000);
+  } finally {
+    server.close();
+  }
+}
+
+async function testThinkingTruncationDoesNotMarkPartial() {
+  process.env.AI_TASK_TIMEOUT_MS = "1000";
+  const server = createServer((request, response) => {
+    void handleSseRequest(request, response, "enabled", () => {
+      response.write(streamChunk({
+        model: "fake-mimo",
+        choices: [
+          {
+            delta: {
+              reasoning_content: "thinking ".repeat(2200)
+            }
+          }
+        ]
+      }));
+      response.write(streamChunk({
+        choices: [
+          {
+            delta: {
+              content: "## 完整策略代码\n```python\nprint('done')\n```"
+            }
+          }
+        ]
+      }));
+      response.write(streamChunk({
+        choices: [
+          {
+            delta: {},
+            finish_reason: "stop"
+          }
+        ],
+        usage: {
+          prompt_tokens: 10,
+          completion_tokens: 20,
+          total_tokens: 30
+        }
+      }));
+      response.write("data: [DONE]\n\n");
+      response.end();
+    });
+  });
+
+  const baseUrl = await listen(server);
+
+  try {
+    const stream = await runOpenAiCompatibleProviderStream(createProviderInput("strategy_generation"), {
+      runtimeConfig: createRuntimeConfig(baseUrl)
+    });
+    const report = readRecord(stream.result.reportJson);
+
+    expect("thinking-specific marker", stream.visibleThinking.includes("[思考过程已截断]"));
+    expect("no generic content marker", !stream.visibleThinking.includes("[内容已截断]"));
+    expect("thinking truncation not partial", report?.partial !== true);
+    expect("thinking truncation not result-truncated", report?.truncated !== true);
+    expect("final answer preserved", stream.finalAnswerMarkdown.includes("print('done')"));
   } finally {
     server.close();
   }

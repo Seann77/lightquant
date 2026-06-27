@@ -1866,7 +1866,7 @@ function normalizeTaskInput(type: AiTaskType, input: CreateAiTaskRequest, option
     throw new ApiError("VALIDATION_ERROR", "请输入需要转换的代码", 400);
   }
 
-  if (type === "code_analysis" && !inputCode && !inputFileId) {
+  if (type === "code_analysis" && !inputCode && !inputFileId && !options.allowContinuationWithoutCode) {
     throw new ApiError("VALIDATION_ERROR", "请输入需要解析的代码", 400);
   }
 
