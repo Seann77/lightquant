@@ -32,6 +32,10 @@ console.log(
 );
 
 try {
+  const publicWechatGroupQr = await createClient().requestJson("GET", "/api/v1/public/wechat-group-qr");
+  assertSuccess("public-wechat-group-qr", publicWechatGroupQr, 200);
+  assertPublicWechatGroupQrShape(publicWechatGroupQr.json.data);
+
   const unauthenticated = await createClient().requestJson("GET", "/api/v1/admin/overview");
   assertFailure("unauthenticated-admin-overview", unauthenticated, "UNAUTHORIZED");
 
@@ -85,6 +89,7 @@ try {
       "/api/v1/admin/orders?page=1&pageSize=5",
       `/api/v1/admin/orders?page=1&pageSize=5&phone=${encodeURIComponent(orderPhoneFilter)}&status=PAID&createdFrom=2020-01-01&createdTo=2035-01-01`,
       "/api/v1/admin/contact-requests?page=1&pageSize=5",
+      "/api/v1/admin/wechat-group-qr",
       "/api/v1/admin/model-config",
       "/api/v1/admin/ai-tasks?page=1&pageSize=5",
       "/api/v1/admin/files?page=1&pageSize=5"
@@ -111,6 +116,10 @@ try {
         assertAdminContactRequestsShape(response.json.data);
       }
 
+      if (endpoint === "/api/v1/admin/wechat-group-qr") {
+        assertAdminWechatGroupQrShape(response.json.data);
+      }
+
       if (endpoint === "/api/v1/admin/model-config") {
         assertAdminModelConfigShape(response.json.data);
       }
@@ -123,46 +132,75 @@ try {
       });
     }
 
-    if (adminWriteEnabled) {
-      throw new Error("smoke-admin-local requires ADMIN_WRITE_ENABLED=false to avoid mutating shared data");
+    if (!adminWriteEnabled) {
+      const blockedAdjustment = await adminClient.requestJson("POST", "/api/v1/admin/credit-adjustments", {
+        phone: adminPhone,
+        amount: 1,
+        reason: "smoke blocked adjustment",
+        note: "ADMIN_WRITE_ENABLED=false guard"
+      });
+
+      assertFailure("admin-credit-adjustment-write-disabled", blockedAdjustment, "FORBIDDEN");
+
+      checks.push({
+        endpoint: "/api/v1/admin/credit-adjustments",
+        status: blockedAdjustment.status,
+        success: blockedAdjustment.json.success,
+        shape: {
+          writeGuard: blockedAdjustment.json.error.code
+        }
+      });
+
+      const qrFormData = new FormData();
+      qrFormData.append("file", new Blob([createSmokePng()], { type: "image/png" }), "smoke-wechat-qr.png");
+      qrFormData.append("expiresAt", "2035-01-01T00:00");
+      const blockedWechatQrUpload = await adminClient.requestForm("POST", "/api/v1/admin/wechat-group-qr", qrFormData);
+
+      assertFailure("admin-wechat-group-qr-write-disabled", blockedWechatQrUpload, "FORBIDDEN");
+
+      checks.push({
+        endpoint: "/api/v1/admin/wechat-group-qr",
+        status: blockedWechatQrUpload.status,
+        success: blockedWechatQrUpload.json.success,
+        shape: {
+          writeGuard: blockedWechatQrUpload.json.error.code
+        }
+      });
+    } else {
+      checks.push({
+        endpoint: "/api/v1/admin/credit-adjustments",
+        skipped: true,
+        reason: "ADMIN_WRITE_ENABLED=true; write smoke avoids mutating shared data."
+      });
+      checks.push({
+        endpoint: "/api/v1/admin/wechat-group-qr",
+        skipped: true,
+        reason: "ADMIN_WRITE_ENABLED=true; upload smoke avoids mutating shared data."
+      });
     }
 
-    if (adminModelConfigWriteEnabled) {
-      throw new Error("smoke-admin-local requires ADMIN_MODEL_CONFIG_WRITE_ENABLED=false to avoid mutating model config");
+    if (!adminWriteEnabled && !adminModelConfigWriteEnabled) {
+      const blockedModelSwitch = await adminClient.requestJson("POST", "/api/v1/admin/model-config/active-profile", {
+        profileId: "00000000-0000-0000-0000-000000000000"
+      });
+
+      assertFailure("admin-model-config-write-disabled", blockedModelSwitch, "FORBIDDEN");
+
+      checks.push({
+        endpoint: "/api/v1/admin/model-config/active-profile",
+        status: blockedModelSwitch.status,
+        success: blockedModelSwitch.json.success,
+        shape: {
+          writeGuard: blockedModelSwitch.json.error.code
+        }
+      });
+    } else {
+      checks.push({
+        endpoint: "/api/v1/admin/model-config/active-profile",
+        skipped: true,
+        reason: "Model config write smoke avoids mutating shared data when write switches are enabled."
+      });
     }
-
-    const blockedAdjustment = await adminClient.requestJson("POST", "/api/v1/admin/credit-adjustments", {
-      phone: adminPhone,
-      amount: 1,
-      reason: "smoke blocked adjustment",
-      note: "ADMIN_WRITE_ENABLED=false guard"
-    });
-
-    assertFailure("admin-credit-adjustment-write-disabled", blockedAdjustment, "FORBIDDEN");
-
-    checks.push({
-      endpoint: "/api/v1/admin/credit-adjustments",
-      status: blockedAdjustment.status,
-      success: blockedAdjustment.json.success,
-      shape: {
-        writeGuard: blockedAdjustment.json.error.code
-      }
-    });
-
-    const blockedModelSwitch = await adminClient.requestJson("POST", "/api/v1/admin/model-config/active-profile", {
-      profileId: "00000000-0000-0000-0000-000000000000"
-    });
-
-    assertFailure("admin-model-config-write-disabled", blockedModelSwitch, "FORBIDDEN");
-
-    checks.push({
-      endpoint: "/api/v1/admin/model-config/active-profile",
-      status: blockedModelSwitch.status,
-      success: blockedModelSwitch.json.success,
-      shape: {
-        writeGuard: blockedModelSwitch.json.error.code
-      }
-    });
 
     result.admin = {
       phoneMasked: maskPhone(adminPhone),
@@ -219,6 +257,31 @@ function createClient(sessionToken) {
         cookie = setCookies.map((value) => value.split(";")[0]).join("; ");
       }
 
+      const text = await response.text();
+      let json = null;
+
+      try {
+        json = JSON.parse(text);
+      } catch {
+        // Keep raw text for assertion errors.
+      }
+
+      return {
+        status: response.status,
+        json,
+        text
+      };
+    },
+    async requestForm(method, path, formData, extraHeaders = {}) {
+      const headers = {
+        ...(cookie ? { cookie } : {}),
+        ...extraHeaders
+      };
+      const response = await fetch(new URL(path, baseUrl), {
+        method,
+        headers,
+        body: formData
+      });
       const text = await response.text();
       let json = null;
 
@@ -441,6 +504,14 @@ function summarizeAdminResponse(endpoint, data) {
     };
   }
 
+  if (endpoint.includes("/wechat-group-qr")) {
+    return {
+      currentType: data.current === null ? "null" : typeof data.current,
+      historyIsArray: Array.isArray(data.history),
+      writeEnabled: typeof data.writeEnabled
+    };
+  }
+
   return {
     itemsIsArray: Array.isArray(data.items),
     firstItemKeys: Array.isArray(data.items) && data.items[0] ? Object.keys(data.items[0]).sort() : [],
@@ -461,6 +532,24 @@ function summarizeAdminResponse(endpoint, data) {
   };
 }
 
+function assertPublicWechatGroupQrShape(data) {
+  if (!data || typeof data !== "object") {
+    throw new Error("public-wechat-group-qr expected object");
+  }
+
+  if (typeof data.configured !== "boolean") {
+    throw new Error("public-wechat-group-qr expected configured boolean");
+  }
+
+  if (data.imageUrl !== null && typeof data.imageUrl !== "string") {
+    throw new Error("public-wechat-group-qr expected imageUrl string or null");
+  }
+
+  if (data.updatedAt !== null && typeof data.updatedAt !== "string") {
+    throw new Error("public-wechat-group-qr expected updatedAt string or null");
+  }
+}
+
 function assertAdminOverviewShape(data) {
   const totals = data?.totals;
 
@@ -479,6 +568,36 @@ function assertAdminOverviewShape(data) {
   ]) {
     if (typeof totals[field] !== "number") {
       throw new Error(`admin-overview expected totals.${field} to be number`);
+    }
+  }
+}
+
+function assertAdminWechatGroupQrShape(data) {
+  if (!data || typeof data !== "object") {
+    throw new Error("admin-wechat-group-qr expected object");
+  }
+
+  if (!Array.isArray(data.history)) {
+    throw new Error("admin-wechat-group-qr expected history array");
+  }
+
+  if (data.current !== null && typeof data.current !== "object") {
+    throw new Error("admin-wechat-group-qr expected current object or null");
+  }
+
+  if (typeof data.writeEnabled !== "boolean") {
+    throw new Error("admin-wechat-group-qr expected writeEnabled boolean");
+  }
+
+  const [item] = data.history;
+
+  if (!item) {
+    return;
+  }
+
+  for (const field of ["id", "imageUrl", "imageMimeType", "imageSizeBytes", "imageSha256Prefix", "expiresAt", "expired", "status", "uploadedByAdminPhone", "createdAt", "activatedAt"]) {
+    if (!(field in item)) {
+      throw new Error(`admin-wechat-group-qr expected item.${field}`);
     }
   }
 }
@@ -577,4 +696,11 @@ function createNonAdminPhone(adminWhitelist) {
 
 function maskPhone(phone) {
   return `${phone.slice(0, 3)}****${phone.slice(-4)}`;
+}
+
+function createSmokePng() {
+  return Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/l1M1hgAAAABJRU5ErkJggg==",
+    "base64"
+  );
 }

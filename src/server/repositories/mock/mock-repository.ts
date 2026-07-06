@@ -20,7 +20,8 @@ import type {
   UploadedFile,
   User,
   UserLegalConsent,
-  UserMembership
+  UserMembership,
+  WechatGroupQrCode
 } from "@/server/domain";
 import { ApiError } from "@/server/http/api-response";
 import { getOrderExpiresAt, isOrderExpired } from "@/server/payments/payment-config";
@@ -43,6 +44,7 @@ import type {
   ApplyAdminCreditAdjustmentInput,
   ApplyCreditLedgerInput,
   CreateAdminAuditLogInput,
+  CreateAndActivateWechatGroupQrCodeInput,
   CreateAiModelProfileInput,
   CreateContactRequestInput,
   CreateAiTaskInput,
@@ -141,6 +143,7 @@ export class MockLightQuantRepository implements LightQuantRepository {
   private readonly aiRunEvents = new Map<string, AiRunEvent>();
   private readonly uploadedFiles = new Map<string, UploadedFile>();
   private readonly contactRequests = new Map<string, ContactRequest>();
+  private readonly wechatGroupQrCodes = new Map<string, WechatGroupQrCode>();
   private readonly aiModelProfiles = new Map<string, AiModelProfile>();
   private readonly aiModelSecrets = new Map<string, AiModelSecret>();
   private activeAiModelProfileId: string | null = null;
@@ -286,6 +289,41 @@ export class MockLightQuantRepository implements LightQuantRepository {
     return [...this.contactRequests.values()]
       .filter((request) => request.requestIp === requestIp && request.createdAt >= since)
       .length;
+  }
+
+  async getActiveWechatGroupQrCode() {
+    return [...this.wechatGroupQrCodes.values()]
+      .filter((qrCode) => qrCode.status === "active")
+      .sort((left, right) => right.activatedAt.localeCompare(left.activatedAt))[0] ?? null;
+  }
+
+  async findWechatGroupQrCodeById(id: string) {
+    return this.wechatGroupQrCodes.get(id) ?? null;
+  }
+
+  async listAdminWechatGroupQrCodes(limit: number) {
+    return [...this.wechatGroupQrCodes.values()]
+      .sort((left, right) => right.activatedAt.localeCompare(left.activatedAt) || right.createdAt.localeCompare(left.createdAt))
+      .slice(0, Math.max(1, Math.min(100, limit)));
+  }
+
+  async createAndActivateWechatGroupQrCode(input: CreateAndActivateWechatGroupQrCodeInput) {
+    for (const qrCode of this.wechatGroupQrCodes.values()) {
+      if (qrCode.status === "active") {
+        this.wechatGroupQrCodes.set(qrCode.id, {
+          ...qrCode,
+          status: "archived"
+        });
+      }
+    }
+
+    const next: WechatGroupQrCode = {
+      ...input,
+      status: "active"
+    };
+
+    this.wechatGroupQrCodes.set(next.id, next);
+    return next;
   }
 
   async updateUserLastLogin(userId: string, lastLoginAt: string) {

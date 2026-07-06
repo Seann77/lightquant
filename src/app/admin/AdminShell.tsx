@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { MaterialIcon } from "@/components/ui/MaterialIcon";
 
 type AdminShellProps = {
-  active: "overview" | "users" | "credit-ledger" | "credit-adjustments" | "orders" | "contact-requests" | "model-config" | "ai-tasks" | "files";
+  active: "overview" | "users" | "credit-ledger" | "credit-adjustments" | "orders" | "contact-requests" | "wechat-group-qr" | "model-config" | "ai-tasks" | "files";
   adminPhone: string;
   children: ReactNode;
 };
@@ -15,6 +15,7 @@ const navItems = [
   { key: "credit-adjustments", href: "/admin/credit-adjustments", icon: "add_card", label: "补积分" },
   { key: "orders", href: "/admin/orders", icon: "receipt_long", label: "订单" },
   { key: "contact-requests", href: "/admin/contact-requests", icon: "forum", label: "留言" },
+  { key: "wechat-group-qr", href: "/admin/wechat-group-qr", icon: "qr_code", label: "微信群" },
   { key: "model-config", href: "/admin/model-config", icon: "tune", label: "模型配置" },
   { key: "ai-tasks", href: "/admin/ai-tasks", icon: "psychology", label: "AI 任务" },
   { key: "files", href: "/admin/files", icon: "upload_file", label: "文件" }

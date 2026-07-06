@@ -41,6 +41,22 @@ export type ContactRequest = {
   updatedAt: string;
 };
 
+export type WechatGroupQrCodeStatus = "active" | "archived";
+
+export type WechatGroupQrCode = {
+  id: string;
+  storageKey: string;
+  imageMimeType: string;
+  imageSizeBytes: number;
+  imageSha256: string;
+  expiresAt: string;
+  status: WechatGroupQrCodeStatus;
+  uploadedByAdminUserId: string;
+  uploadedByAdminPhone: string;
+  createdAt: string;
+  activatedAt: string;
+};
+
 export type AiModelProvider = "mock" | "deepseek" | "openai_compatible";
 
 export type AiModelProfile = {

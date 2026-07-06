@@ -321,6 +321,25 @@ model ContactRequest {
   @@map("contact_requests")
 }
 
+model WechatGroupQrCode {
+  id                    String   @id @default(uuid()) @db.Uuid
+  storageKey            String   @map("storage_key") @db.VarChar(512)
+  imageMimeType         String   @map("image_mime_type") @db.VarChar(80)
+  imageSizeBytes        Int      @map("image_size_bytes")
+  imageSha256           String   @map("image_sha256") @db.VarChar(64)
+  expiresAt             DateTime @map("expires_at") @db.Timestamptz(3)
+  status                String   @db.VarChar(20)
+  uploadedByAdminUserId String   @map("uploaded_by_admin_user_id") @db.Uuid
+  uploadedByAdminPhone  String   @map("uploaded_by_admin_phone") @db.VarChar(20)
+  createdAt             DateTime @map("created_at") @db.Timestamptz(3)
+  activatedAt           DateTime @map("activated_at") @db.Timestamptz(3)
+
+  @@index([status, activatedAt])
+  @@index([expiresAt])
+  @@index([createdAt])
+  @@map("wechat_group_qr_codes")
+}
+
 model AiModelProfile {
   id             String   @id @default(uuid()) @db.Uuid
   name           String   @db.VarChar(80)

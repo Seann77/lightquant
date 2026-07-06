@@ -21,7 +21,8 @@ import type {
   UploadedFile,
   User,
   UserLegalConsent,
-  UserMembership
+  UserMembership,
+  WechatGroupQrCode
 } from "@/server/domain";
 import { ApiError } from "@/server/http/api-response";
 import { measureAiPerf } from "@/server/ai/ai-perf";
@@ -46,6 +47,7 @@ import type {
   ApplyAdminCreditAdjustmentInput,
   ApplyCreditLedgerInput,
   CreateAdminAuditLogInput,
+  CreateAndActivateWechatGroupQrCodeInput,
   CreateAiModelProfileInput,
   CreateContactRequestInput,
   CreateAiTaskInput,
@@ -333,6 +335,74 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
         }
       }
     });
+  }
+
+  async getActiveWechatGroupQrCode() {
+    const qrCode = await this.db.wechatGroupQrCode.findFirst({
+      where: {
+        status: "active"
+      },
+      orderBy: {
+        activatedAt: "desc"
+      }
+    });
+
+    return qrCode ? toWechatGroupQrCode(qrCode) : null;
+  }
+
+  async findWechatGroupQrCodeById(id: string) {
+    const qrCode = await this.db.wechatGroupQrCode.findUnique({
+      where: {
+        id
+      }
+    });
+
+    return qrCode ? toWechatGroupQrCode(qrCode) : null;
+  }
+
+  async listAdminWechatGroupQrCodes(limit: number) {
+    const qrCodes = await this.db.wechatGroupQrCode.findMany({
+      orderBy: [
+        {
+          activatedAt: "desc"
+        },
+        {
+          createdAt: "desc"
+        }
+      ],
+      take: Math.max(1, Math.min(100, limit))
+    });
+
+    return qrCodes.map(toWechatGroupQrCode);
+  }
+
+  async createAndActivateWechatGroupQrCode(input: CreateAndActivateWechatGroupQrCodeInput) {
+    await this.db.wechatGroupQrCode.updateMany({
+      where: {
+        status: "active"
+      },
+      data: {
+        status: "archived"
+      }
+    });
+
+    const qrCode = await this.db.wechatGroupQrCode.create({
+      data: {
+        id: input.id,
+        storageKey: input.storageKey,
+        imageMimeType: input.imageMimeType,
+        imageSizeBytes: input.imageSizeBytes,
+        imageSha256: input.imageSha256,
+        expiresAt: toDate(input.expiresAt),
+        status: "active",
+        uploadedByAdminUserId: input.uploadedByAdminUserId,
+        uploadedByAdminPhone: input.uploadedByAdminPhone,
+        createdAt: toDate(input.createdAt),
+        activatedAt: toDate(input.activatedAt)
+      }
+    });
+
+    return toWechatGroupQrCode(qrCode);
   }
 
   async updateUserLastLogin(userId: string, lastLoginAt: string) {
@@ -2289,6 +2359,34 @@ function toContactRequest(request: {
     userAgent: request.userAgent,
     createdAt: toIso(request.createdAt),
     updatedAt: toIso(request.updatedAt)
+  };
+}
+
+function toWechatGroupQrCode(qrCode: {
+  id: string;
+  storageKey: string;
+  imageMimeType: string;
+  imageSizeBytes: number;
+  imageSha256: string;
+  expiresAt: Date;
+  status: string;
+  uploadedByAdminUserId: string;
+  uploadedByAdminPhone: string;
+  createdAt: Date;
+  activatedAt: Date;
+}): WechatGroupQrCode {
+  return {
+    id: qrCode.id,
+    storageKey: qrCode.storageKey,
+    imageMimeType: qrCode.imageMimeType,
+    imageSizeBytes: qrCode.imageSizeBytes,
+    imageSha256: qrCode.imageSha256,
+    expiresAt: toIso(qrCode.expiresAt),
+    status: qrCode.status as WechatGroupQrCode["status"],
+    uploadedByAdminUserId: qrCode.uploadedByAdminUserId,
+    uploadedByAdminPhone: qrCode.uploadedByAdminPhone,
+    createdAt: toIso(qrCode.createdAt),
+    activatedAt: toIso(qrCode.activatedAt)
   };
 }
 

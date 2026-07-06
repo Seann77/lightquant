@@ -325,6 +325,16 @@ export function getFileStorageRoot() {
   return process.env.FILE_STORAGE_ROOT?.trim() || ".lightquant/uploads";
 }
 
+export function getAdminAssetStorageRoot() {
+  return process.env.ADMIN_ASSET_STORAGE_ROOT?.trim() || ".lightquant/admin-assets";
+}
+
+export function getWechatGroupQrUploadMaxBytes() {
+  const value = Number(process.env.WECHAT_GROUP_QR_MAX_BYTES ?? "2097152");
+
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : 2097152;
+}
+
 export function getFileAllowedExtensions() {
   const raw = process.env.FILE_ALLOWED_EXTENSIONS ?? ".py,.txt,.log,.png,.jpg";
   const extensions = raw

@@ -65,6 +65,10 @@ function isRepositoryShapeCurrent(repository: LightQuantRepository) {
     typeof repository.listAdminContactRequests === "function" &&
     typeof repository.countContactRequestsByUserSince === "function" &&
     typeof repository.countContactRequestsByRequestIpSince === "function" &&
+    typeof repository.getActiveWechatGroupQrCode === "function" &&
+    typeof repository.findWechatGroupQrCodeById === "function" &&
+    typeof repository.listAdminWechatGroupQrCodes === "function" &&
+    typeof repository.createAndActivateWechatGroupQrCode === "function" &&
     typeof repository.listAiModelProfiles === "function" &&
     typeof repository.findAiModelProfileById === "function" &&
     typeof repository.createAiModelProfile === "function" &&

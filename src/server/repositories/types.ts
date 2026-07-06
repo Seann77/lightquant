@@ -43,7 +43,8 @@ import type {
   UploadedFileScanStatus,
   User,
   UserLegalConsent,
-  UserMembership
+  UserMembership,
+  WechatGroupQrCode
 } from "@/server/domain";
 
 export type PaymentActionType = "mock" | "redirect" | "qr_code";
@@ -211,6 +212,19 @@ export type CreateAdminAuditLogInput = {
   requestId: string;
   requestIp: string | null;
   createdAt: string;
+};
+
+export type CreateAndActivateWechatGroupQrCodeInput = {
+  id: string;
+  storageKey: string;
+  imageMimeType: string;
+  imageSizeBytes: number;
+  imageSha256: string;
+  expiresAt: string;
+  uploadedByAdminUserId: string;
+  uploadedByAdminPhone: string;
+  createdAt: string;
+  activatedAt: string;
 };
 
 export type ApplyAdminCreditAdjustmentInput = {
@@ -596,6 +610,10 @@ export interface LightQuantRepository {
   createContactRequest(input: CreateContactRequestInput): Promise<ContactRequest>;
   countContactRequestsByUserSince(userId: string, since: string): Promise<number>;
   countContactRequestsByRequestIpSince(requestIp: string, since: string): Promise<number>;
+  getActiveWechatGroupQrCode(): Promise<WechatGroupQrCode | null>;
+  findWechatGroupQrCodeById(id: string): Promise<WechatGroupQrCode | null>;
+  listAdminWechatGroupQrCodes(limit: number): Promise<WechatGroupQrCode[]>;
+  createAndActivateWechatGroupQrCode(input: CreateAndActivateWechatGroupQrCodeInput): Promise<WechatGroupQrCode>;
   updateUserLastLogin(userId: string, lastLoginAt: string): Promise<User>;
   listAiModelProfiles(): Promise<AiModelProfile[]>;
   findAiModelProfileById(profileId: string): Promise<AiModelProfile | null>;
