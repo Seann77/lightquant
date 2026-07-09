@@ -477,7 +477,7 @@ export function RechargeModal({ onClose, onRechargeSuccess, open, points }: Rech
       <div
         aria-labelledby="recharge-modal-title"
         aria-modal="true"
-        className="relative max-h-[92vh] w-full max-w-[620px] overflow-y-auto rounded-xl border border-outline-variant/60 bg-paper p-xl shadow-modal"
+        className="relative max-h-[92vh] w-full max-w-[700px] overflow-y-auto rounded-xl border border-outline-variant/60 bg-paper p-xl shadow-modal"
         role="dialog"
       >
         <button
@@ -693,7 +693,9 @@ function PlanCard(props: {
           {badge}
         </span>
       ) : null}
-      <span className="mb-xs block pr-16 text-body-emphasis text-ink">{props.plan.name}</span>
+      <span className={`mb-xs block min-w-0 whitespace-nowrap text-[13px] font-bold leading-5 text-ink ${badge ? "pr-16" : ""}`}>
+        {props.plan.name}
+      </span>
       <span className="mb-xxs block text-price-md text-primary-bright">¥{trimPrice(props.plan.price)}</span>
       <div className="flex items-center justify-between gap-xs">
         <span className="min-w-0 text-caption-md text-on-surface-variant">获得 {props.plan.totalPoints.toLocaleString("zh-CN")} 积分</span>
