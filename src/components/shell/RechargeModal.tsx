@@ -20,6 +20,10 @@ type RechargePlan = {
   id: string;
   name: string;
   description: string;
+  planType: "permanent" | "monthly";
+  validityDays: number | null;
+  purchaseLimit: number | null;
+  alreadyPurchased: boolean;
   priceCents: number;
   price: string;
   points: number;
@@ -32,6 +36,7 @@ type RechargePlan = {
 type RechargeOrder = {
   id: string;
   orderNo: string;
+  planId: string;
   amountCents: number;
   price: string;
   totalPoints: number;
@@ -118,23 +123,24 @@ const paymentMethodMeta: Record<PayChannel, { icon: string; label: string }> = {
 };
 
 const fallbackPaymentMethods: PaymentMethod[] = [
-  { id: "mock", icon: paymentMethodMeta.mock.icon, label: paymentMethodMeta.mock.label, enabled: true },
-  { id: "wechat", icon: paymentMethodMeta.wechat.icon, label: paymentMethodMeta.wechat.label, enabled: true },
-  { id: "alipay", icon: paymentMethodMeta.alipay.icon, label: paymentMethodMeta.alipay.label, enabled: true }
+  { id: "alipay", icon: paymentMethodMeta.alipay.icon, label: paymentMethodMeta.alipay.label, enabled: true },
+  { id: "wechat", icon: paymentMethodMeta.wechat.icon, label: paymentMethodMeta.wechat.label, enabled: false }
 ];
 
 export function RechargeModal({ onClose, onRechargeSuccess, open, points }: RechargeModalProps) {
   const [plans, setPlans] = useState<RechargePlan[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(fallbackPaymentMethods);
-  const [selectedPlanId, setSelectedPlanId] = useState("standard");
-  const [paymentMethod, setPaymentMethod] = useState<PayChannel>("mock");
+  const [selectedPlanId, setSelectedPlanId] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<PayChannel>("alipay");
   const [orderData, setOrderData] = useState<CreateOrderData | null>(null);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
   const [loadingPlans, setLoadingPlans] = useState(false);
   const [creatingOrder, setCreatingOrder] = useState(false);
   const [confirmingPayment, setConfirmingPayment] = useState(false);
+  const [completingPayment, setCompletingPayment] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(false);
   const [redirectOpenBlocked, setRedirectOpenBlocked] = useState(false);
+  const [paidCreditGrantedOrderId, setPaidCreditGrantedOrderId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const settledOrderRef = useRef<string | null>(null);
@@ -163,11 +169,14 @@ export function RechargeModal({ onClose, onRechargeSuccess, open, points }: Rech
         if (!cancelled) {
           const nextPaymentMethods = normalizePaymentMethods(payload.data.paymentChannels);
           const defaultPayChannel = payload.data.defaultPayChannel ?? nextPaymentMethods.find((method) => method.enabled)?.id;
+          const firstAvailablePlan = payload.data.items.find((plan) => !isPlanDisabled(plan)) ?? payload.data.items[0];
 
           setPlans(payload.data.items);
-          setSelectedPlanId((current) => payload.data.items.find((plan) => plan.id === current)?.id ?? payload.data.items[0]?.id ?? "");
+          setSelectedPlanId((current) =>
+            payload.data.items.find((plan) => plan.id === current && !isPlanDisabled(plan))?.id ?? firstAvailablePlan?.id ?? ""
+          );
           setPaymentMethods(nextPaymentMethods);
-          setPaymentMethod((current) => nextPaymentMethods.find((method) => method.id === current && method.enabled)?.id ?? defaultPayChannel ?? current);
+          setPaymentMethod((current) => nextPaymentMethods.find((method) => method.id === current && method.enabled)?.id ?? defaultPayChannel ?? "alipay");
         }
       } catch (loadError) {
         if (!cancelled) {
@@ -203,15 +212,20 @@ export function RechargeModal({ onClose, onRechargeSuccess, open, points }: Rech
     };
   }, [open, orderData?.order.id, orderData?.order.status, orderData?.paymentAction?.type, orderData?.payment?.type]);
 
+  const permanentPlans = useMemo(() => plans.filter((plan) => plan.planType === "permanent"), [plans]);
+  const monthlyPlans = useMemo(() => plans.filter((plan) => plan.planType === "monthly"), [plans]);
   const activePlan = useMemo(
-    () => plans.find((plan) => plan.id === selectedPlanId) ?? plans[0],
+    () => plans.find((plan) => plan.id === selectedPlanId) ?? plans.find((plan) => !isPlanDisabled(plan)) ?? plans[0],
     [plans, selectedPlanId]
   );
   const activePayment = paymentMethods.find((method) => method.id === paymentMethod) ?? paymentMethods[0];
   const activePaymentEnabled = activePayment?.enabled ?? false;
+  const activePlanDisabled = activePlan ? isPlanDisabled(activePlan) : true;
   const paid = orderData?.order.status === "PAID";
+  const paidCreditGranted = Boolean(orderData && paid && paidCreditGrantedOrderId === orderData.order.id);
   const paymentAction = getPaymentAction(orderData);
   const pendingOrder = orderData?.order.status === "PENDING";
+  const canCompletePaidPayment = Boolean(paidCreditGranted && paymentAction?.type !== "mock");
   const canMockConfirm = Boolean(orderData && pendingOrder && paymentAction?.type === "mock");
   const canRefreshPayment = Boolean(orderData && pendingOrder && paymentAction && paymentAction.type !== "mock");
 
@@ -225,8 +239,13 @@ export function RechargeModal({ onClose, onRechargeSuccess, open, points }: Rech
       return;
     }
 
+    if (isPlanDisabled(activePlan)) {
+      setError("特惠包每个账号仅可购买一次");
+      return;
+    }
+
     if (!activePaymentEnabled) {
-      setError("当前支付方式未启用，请选择可用的支付方式。");
+      setError("当前支付方式暂不可用，请选择可用的支付方式。");
       return;
     }
 
@@ -236,6 +255,7 @@ export function RechargeModal({ onClose, onRechargeSuccess, open, points }: Rech
     setRedirectOpenBlocked(false);
     setError("");
     setMessage("");
+    setPaidCreditGrantedOrderId(null);
     settledOrderRef.current = null;
 
     try {
@@ -263,7 +283,7 @@ export function RechargeModal({ onClose, onRechargeSuccess, open, points }: Rech
       if (action?.type === "redirect") {
         const opened = openRedirectPayment(action, pendingPaymentWindow);
         setRedirectOpenBlocked(!opened);
-        setMessage(opened ? "请在新打开的支付宝页面完成支付。" : "浏览器可能阻止了支付宝页面，请点击重新打开支付宝页面。");
+        setMessage(opened ? "请在新打开的支付宝页面完成支付。" : "浏览器可能阻止了支付宝页面，请点击重新打开。");
       } else if (action?.type === "qr_code" && action.qrCodeText) {
         setQrCodeDataUrl(await QRCode.toDataURL(action.qrCodeText, { margin: 1, width: 192 }));
         setMessage("请使用微信扫码支付。");
@@ -272,12 +292,7 @@ export function RechargeModal({ onClose, onRechargeSuccess, open, points }: Rech
         setMessage("订单已创建，当前为模拟支付环境，请点击模拟支付确认。");
       } else {
         pendingPaymentWindow?.close();
-        setMessage(getTerminalOrderMessage(payload.data.order.status));
-
-        if (payload.data.order.status === "PAID") {
-          await onRechargeSuccess();
-          window.dispatchEvent(new Event("lightquant:credits-updated"));
-        }
+        setMessage(getTerminalOrderMessage(payload.data.order));
       }
     } catch (createError) {
       pendingPaymentWindow?.close();
@@ -335,13 +350,32 @@ export function RechargeModal({ onClose, onRechargeSuccess, open, points }: Rech
             }
           : current
       );
-      setMessage("支付成功，积分已到账。");
+      setMessage(getPaymentSuccessMessage(payload.data.order));
       await onRechargeSuccess();
       window.dispatchEvent(new Event("lightquant:credits-updated"));
     } catch (notifyError) {
       setError(notifyError instanceof Error ? notifyError.message : "支付确认失败");
     } finally {
       setConfirmingPayment(false);
+    }
+  }
+
+  async function handleCompletePaidPayment() {
+    if (!orderData || !paidCreditGranted) {
+      return;
+    }
+
+    setCompletingPayment(true);
+    setError("");
+
+    try {
+      await onRechargeSuccess();
+      window.dispatchEvent(new Event("lightquant:credits-updated"));
+      onClose();
+    } catch (completeError) {
+      setError(completeError instanceof Error ? completeError.message : "支付完成处理失败");
+    } finally {
+      setCompletingPayment(false);
     }
   }
 
@@ -378,11 +412,11 @@ export function RechargeModal({ onClose, onRechargeSuccess, open, points }: Rech
       setOrderData((current) => current ? { ...current, order: payload.data.order } : current);
 
       if (payload.data.payment.paid && payload.data.payment.creditGranted) {
+        setPaidCreditGrantedOrderId(payload.data.order.id);
+
         if (settledOrderRef.current !== payload.data.order.id) {
           settledOrderRef.current = payload.data.order.id;
-          setMessage("支付成功，积分已到账。");
-          await onRechargeSuccess();
-          window.dispatchEvent(new Event("lightquant:credits-updated"));
+          setMessage(getPaymentSuccessMessage(payload.data.order));
         }
         return;
       }
@@ -408,19 +442,32 @@ export function RechargeModal({ onClose, onRechargeSuccess, open, points }: Rech
   }
 
   function handlePlanChange(planId: string) {
+    const plan = plans.find((item) => item.id === planId);
+
+    if (plan && isPlanDisabled(plan)) {
+      return;
+    }
+
     setSelectedPlanId(planId);
-    setOrderData(null);
-    setQrCodeDataUrl("");
-    setRedirectOpenBlocked(false);
-    setMessage("");
-    setError("");
+    resetOrderState();
   }
 
   function handlePaymentChange(method: PayChannel) {
+    const nextMethod = paymentMethods.find((item) => item.id === method);
+
+    if (!nextMethod?.enabled) {
+      return;
+    }
+
     setPaymentMethod(method);
+    resetOrderState();
+  }
+
+  function resetOrderState() {
     setOrderData(null);
     setQrCodeDataUrl("");
     setRedirectOpenBlocked(false);
+    setPaidCreditGrantedOrderId(null);
     setMessage("");
     setError("");
   }
@@ -430,7 +477,7 @@ export function RechargeModal({ onClose, onRechargeSuccess, open, points }: Rech
       <div
         aria-labelledby="recharge-modal-title"
         aria-modal="true"
-        className="relative w-full max-w-[560px] rounded-xl border border-outline-variant/60 bg-paper p-xl shadow-modal"
+        className="relative max-h-[92vh] w-full max-w-[620px] overflow-y-auto rounded-xl border border-outline-variant/60 bg-paper p-xl shadow-modal"
         role="dialog"
       >
         <button
@@ -447,50 +494,34 @@ export function RechargeModal({ onClose, onRechargeSuccess, open, points }: Rech
             积分充值
           </h2>
           <p className="mt-xs text-caption-md text-secondary">
-            当前可用积分 <span className="font-bold text-primary-bright">{points}</span>
+            当前可用积分 <span className="font-bold text-primary-bright">{points.toLocaleString("zh-CN")}</span>
           </p>
         </div>
 
-        <div className="mb-lg grid grid-cols-1 gap-sm md:grid-cols-3">
-          {loadingPlans ? (
-            <div className="col-span-full rounded-xl border border-dashed border-steel/60 p-md text-caption-md text-secondary">正在加载充值套餐...</div>
-          ) : (
-            plans.map((plan) => {
-              const active = plan.id === selectedPlanId;
-              const recommended = plan.id === "standard";
-
-              return (
-                <button
-                  aria-pressed={active}
-                  className={`relative rounded-xl border p-md text-left transition-all ${
-                    active
-                      ? "border-primary-bright bg-primary-fixed shadow-soft-lift"
-                      : "border-steel/60 bg-paper hover:border-primary-soft hover:bg-surface-container-low"
-                  }`}
-                  key={plan.id}
-                  onClick={() => handlePlanChange(plan.id)}
-                  type="button"
-                >
-                  {recommended ? (
-                    <span className="absolute right-sm top-sm rounded-full bg-primary-bright px-xs py-xxs text-caption-sm font-bold text-on-primary">
-                      推荐
-                    </span>
-                  ) : null}
-                  <span className="mb-sm block text-body-emphasis text-ink">{plan.name}</span>
-                  <span className="mb-xs block text-price-md text-primary-bright">¥{trimPrice(plan.price)}</span>
-                  <span className="text-caption-md text-on-surface-variant">获得 {plan.totalPoints.toLocaleString("zh-CN")} 积分</span>
-                  {plan.bonusPoints > 0 ? (
-                    <span className="mt-xxs block text-caption-sm text-primary-bright">含赠送 {plan.bonusPoints.toLocaleString("zh-CN")} 积分</span>
-                  ) : null}
-                </button>
-              );
-            })
-          )}
-        </div>
+        {loadingPlans ? (
+          <div className="mb-lg rounded-xl border border-dashed border-steel/60 p-md text-caption-md text-secondary">正在加载充值套餐...</div>
+        ) : (
+          <div className="mb-lg space-y-md">
+            <PlanGroup
+              onSelect={handlePlanChange}
+              plans={permanentPlans}
+              note="基础积分长期有效"
+              selectedPlanId={activePlan?.id ?? ""}
+              title="基础积分包"
+            />
+            <PlanGroup
+              onSelect={handlePlanChange}
+              plans={monthlyPlans}
+              note="月卡积分 30 天内有效"
+              selectedPlanId={activePlan?.id ?? ""}
+              title="月卡"
+            />
+          </div>
+        )}
 
         <div className="mb-lg">
           <h3 className="mb-sm text-caption-bold text-ink">支付方式</h3>
-          <div className="grid grid-cols-3 gap-sm">
+          <div className="grid w-full grid-cols-2 gap-sm">
             {paymentMethods.map((method) => {
               const active = method.id === paymentMethod;
 
@@ -502,7 +533,7 @@ export function RechargeModal({ onClose, onRechargeSuccess, open, points }: Rech
                       ? "border-primary-bright bg-primary-soft text-primary"
                       : method.enabled
                         ? "border-steel/60 bg-paper text-secondary hover:bg-surface-container-low hover:text-primary"
-                        : "border-steel/40 bg-surface-container-low text-outline"
+                        : "cursor-not-allowed border-steel/40 bg-surface-container-low text-outline"
                   }`}
                   disabled={!method.enabled}
                   key={method.id}
@@ -516,6 +547,10 @@ export function RechargeModal({ onClose, onRechargeSuccess, open, points }: Rech
             })}
           </div>
         </div>
+
+        <p className="mb-md rounded-lg bg-surface-container-low px-sm py-sm text-caption-md text-secondary">
+          月卡积分优先消耗，基础积分长期有效。
+        </p>
 
         {orderData ? (
           <div className="mb-md rounded-lg border border-steel/50 bg-surface-container-low px-sm py-sm text-caption-md text-secondary">
@@ -565,7 +600,12 @@ export function RechargeModal({ onClose, onRechargeSuccess, open, points }: Rech
           </Button>
         ) : null}
 
-        {canMockConfirm ? (
+        {canCompletePaidPayment ? (
+          <Button className="w-full" disabled={completingPayment} onClick={() => void handleCompletePaidPayment()} type="button">
+            <MaterialIcon size={18}>check_circle</MaterialIcon>
+            {completingPayment ? "完成中..." : "支付完成"}
+          </Button>
+        ) : canMockConfirm ? (
           <Button className="w-full" disabled={confirmingPayment} onClick={handleMockNotify} type="button">
             <MaterialIcon size={18}>verified</MaterialIcon>
             {confirmingPayment ? "确认中..." : "模拟支付确认"}
@@ -576,9 +616,17 @@ export function RechargeModal({ onClose, onRechargeSuccess, open, points }: Rech
             {checkingStatus ? "刷新中..." : "我已完成支付 / 刷新支付状态"}
           </Button>
         ) : (
-          <Button className="w-full" disabled={loadingPlans || creatingOrder || !activePlan || !activePaymentEnabled || paid} onClick={handleCreateOrder} type="button">
+          <Button className="w-full" disabled={loadingPlans || creatingOrder || !activePlan || !activePaymentEnabled || activePlanDisabled || paid} onClick={handleCreateOrder} type="button">
             <MaterialIcon size={18}>payments</MaterialIcon>
-            {paid ? "支付已完成" : creatingOrder ? "创建中..." : activePaymentEnabled ? `${activePayment.label} ¥${activePlan ? trimPrice(activePlan.price) : "--"}` : "当前支付方式不可用"}
+            {paid
+              ? "支付已完成"
+              : creatingOrder
+                ? "创建中..."
+                : activePlanDisabled
+                  ? "已购买"
+                  : activePaymentEnabled
+                    ? `${activePayment.label} ¥${activePlan ? trimPrice(activePlan.price) : "--"}`
+                    : "当前支付方式不可用"}
           </Button>
         )}
       </div>
@@ -586,20 +634,91 @@ export function RechargeModal({ onClose, onRechargeSuccess, open, points }: Rech
   );
 }
 
+function PlanGroup(props: {
+  note: string;
+  onSelect: (planId: string) => void;
+  plans: RechargePlan[];
+  selectedPlanId: string;
+  title: string;
+}) {
+  if (props.plans.length === 0) {
+    return null;
+  }
+
+  return (
+    <section>
+      <div className="mb-sm flex items-baseline justify-between gap-sm">
+        <h3 className="text-caption-bold text-ink">{props.title}</h3>
+        <span className="text-caption-sm text-secondary">{props.note}</span>
+      </div>
+      <div className={`grid grid-cols-1 gap-sm ${props.title === "月卡" ? "md:grid-cols-2" : "md:grid-cols-3"}`}>
+        {props.plans.map((plan) => (
+          <PlanCard
+            active={plan.id === props.selectedPlanId}
+            disabled={isPlanDisabled(plan)}
+            key={plan.id}
+            onSelect={() => props.onSelect(plan.id)}
+            plan={plan}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function PlanCard(props: {
+  active: boolean;
+  disabled: boolean;
+  onSelect: () => void;
+  plan: RechargePlan;
+}) {
+  const badge = getPlanBadge(props.plan);
+
+  return (
+    <button
+      aria-pressed={props.active}
+      className={`relative flex h-[116px] flex-col rounded-xl border p-sm text-left transition-all ${
+        props.disabled
+          ? "cursor-not-allowed border-steel/40 bg-surface-container-low text-outline opacity-70"
+          : props.active
+            ? "border-primary-bright bg-primary-fixed shadow-soft-lift"
+            : "border-steel/60 bg-paper hover:border-primary-soft hover:bg-surface-container-low"
+      }`}
+      disabled={props.disabled}
+      onClick={props.onSelect}
+      type="button"
+    >
+      {badge ? (
+        <span className="absolute right-sm top-sm rounded-full bg-primary-bright px-xs py-xxs text-caption-sm font-bold text-on-primary">
+          {badge}
+        </span>
+      ) : null}
+      <span className="mb-xs block pr-16 text-body-emphasis text-ink">{props.plan.name}</span>
+      <span className="mb-xxs block text-price-md text-primary-bright">¥{trimPrice(props.plan.price)}</span>
+      <div className="flex items-center justify-between gap-xs">
+        <span className="min-w-0 text-caption-md text-on-surface-variant">获得 {props.plan.totalPoints.toLocaleString("zh-CN")} 积分</span>
+        {props.plan.planType === "monthly" ? (
+          <span className="inline-flex shrink-0 rounded-full bg-surface-container px-xs py-[1px] text-caption-sm leading-4 text-secondary">30 天内有效</span>
+        ) : null}
+      </div>
+    </button>
+  );
+}
+
 function getPaymentAction(data: CreateOrderData | null) {
   return data?.paymentAction ?? data?.payment ?? null;
 }
 
-function getTerminalOrderMessage(status: OrderStatus) {
-  if (status === "PAID") {
-    return "支付成功，积分已到账。";
+function getTerminalOrderMessage(order: RechargeOrder) {
+  if (order.status === "PAID") {
+    return getPaymentSuccessMessage(order);
   }
 
-  if (status === "CLOSED") {
+  if (order.status === "CLOSED") {
     return "订单已过期，请重新下单。";
   }
 
-  if (status === "FAILED") {
+  if (order.status === "FAILED") {
     return "支付初始化失败，请重新下单。";
   }
 
@@ -614,13 +733,21 @@ function normalizePaymentMethods(channels?: RechargePlansData["paymentChannels"]
   return channels.map((channel) => ({
     id: channel.id,
     icon: paymentMethodMeta[channel.id].icon,
-    label: paymentMethodMeta[channel.id].label,
+    label: channel.label || paymentMethodMeta[channel.id].label,
     enabled: channel.enabled,
     current: channel.current
   }));
 }
 
 function formatCreateOrderError(code: string, message: string, payChannel: PayChannel) {
+  if (code === "PROMO_PLAN_ALREADY_PURCHASED") {
+    return "特惠包每个账号仅可购买一次";
+  }
+
+  if (code === "ACTIVE_MONTHLY_CARD_EXISTS") {
+    return "当前已有有效月卡，到期后可重新购买。";
+  }
+
   if (code === "PAYMENT_CONFIG_ERROR") {
     return `${getPayChannelLabel(payChannel)}当前未启用或配置不完整，请选择已启用的支付方式。`;
   }
@@ -628,8 +755,30 @@ function formatCreateOrderError(code: string, message: string, payChannel: PayCh
   return message;
 }
 
+function getPaymentSuccessMessage(order: Pick<RechargeOrder, "planId">) {
+  return order.planId === "monthly_plus" || order.planId === "monthly_pro"
+    ? "月卡已开通，积分已到账。"
+    : "支付成功，积分已到账。";
+}
+
 function getPayChannelLabel(payChannel: PayChannel) {
   return paymentMethodMeta[payChannel]?.label ?? "当前支付方式";
+}
+
+function getPlanBadge(plan: RechargePlan) {
+  if (plan.id === "promo") {
+    return plan.alreadyPurchased ? "已购买" : "限购一次";
+  }
+
+  if (plan.id === "monthly_plus") {
+    return "推荐";
+  }
+
+  return null;
+}
+
+function isPlanDisabled(plan: RechargePlan) {
+  return !plan.enabled || (plan.id === "promo" && plan.alreadyPurchased);
 }
 
 function openRedirectPayment(action: PaymentAction, paymentWindow: Window | null) {

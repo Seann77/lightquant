@@ -2,6 +2,7 @@ import type { AiTask, CreditAccount, CreditLedger, CreditReservation, Pagination
 import { ApiError } from "@/server/http/api-response";
 import { getAiPerfNow, logAiPerf, measureAiPerf } from "@/server/ai/ai-perf";
 import { getRepository } from "@/server/repositories";
+import type { CreditLedgerFilters } from "@/server/repositories/types";
 
 const SIGNUP_BONUS_POINTS = 300;
 export const INVITE_BONUS_POINTS = 200;
@@ -22,6 +23,10 @@ export type CreditLedgerResponseItem = {
   sourceType: string;
   sourceId: string;
   remark: string;
+};
+
+type LedgerDisplayContext = {
+  orderNoById: Map<string, string>;
 };
 
 export async function ensureSignupBonus(userId: string, requestId: string) {
@@ -65,19 +70,22 @@ export async function applyInviteBonus(input: { inviterUserId: string; newUserId
 export async function applyRechargeCredit(order: RechargeOrder, requestId: string) {
   const now = new Date().toISOString();
   const repository = getRepository();
+  const planMeta = getRechargePlanCreditMeta(order.planId, order.paidAt ?? now);
 
   return repository.applyCreditLedger({
     userId: order.userId,
     requestId,
-    scene: "recharge",
+    scene: planMeta.scene,
     type: "recharge",
     direction: "in",
     amount: order.totalPoints,
     sourceType: "recharge",
     sourceId: order.id,
     idempotencyKey: `recharge:${order.id}`,
-    remark: `充值到账：订单 ${order.orderNo}，获得 ${order.totalPoints.toLocaleString("zh-CN")} 积分`,
-    createdAt: now
+    remark: `${planMeta.title}：订单 ${order.orderNo}，获得 ${order.totalPoints.toLocaleString("zh-CN")} 积分`,
+    createdAt: now,
+    grantType: planMeta.grantType,
+    grantExpiresAt: planMeta.expiresAt
   });
 }
 
@@ -90,6 +98,7 @@ export async function reserveCredits(input: { userId: string; taskId: string; am
   const repository = getRepository();
   const idempotencyKey = `ai_task_reserve:${input.taskId}`;
   const now = new Date().toISOString();
+  await repository.expireCreditGrantsForUser(input.userId, now, `reserve:${input.taskId}`);
 
   const reservation = await measureAiPerf("credits.reserve.create_reservation", {
     taskId: input.taskId,
@@ -199,18 +208,25 @@ export async function refundConfirmedAiTaskCost(task: AiTask, requestId: string)
 
 export async function getCreditAccountForUser(userId: string) {
   const repository = getRepository();
-  const account = await repository.ensureCreditAccount(userId, new Date().toISOString());
+  const now = new Date().toISOString();
+  await repository.expireCreditGrantsForUser(userId, now, `account:${userId}:${now}`);
+  const account = await repository.ensureCreditAccount(userId, now);
+  const grantSummary = await repository.getCreditGrantSummary(userId, now);
 
-  return toCreditAccountResponse(account);
+  return toCreditAccountResponse({
+    ...account,
+    ...grantSummary
+  });
 }
 
-export async function listCreditLedgerForUser(userId: string, pagination: Pagination) {
+export async function listCreditLedgerForUser(userId: string, pagination: Pagination, filters: CreditLedgerFilters = {}) {
   const repository = getRepository();
   const safePagination = normalizePagination(pagination);
-  const page = await repository.listCreditLedger(userId, safePagination);
+  const page = await repository.listCreditLedger(userId, safePagination, filters);
+  const orderNoById = await getRechargeOrderNoMap(page.items);
 
   return {
-    items: page.items.map(toCreditLedgerResponseItem),
+    items: page.items.map((item) => toCreditLedgerResponseItem(item, { orderNoById })),
     page: safePagination.page,
     pageSize: safePagination.pageSize,
     total: page.total,
@@ -222,10 +238,42 @@ export function toCreditAccountResponse(account: CreditAccount) {
   return {
     userId: account.userId,
     balance: account.balance,
+    monthlyBalance: account.monthlyBalance ?? 0,
+    permanentBalance: account.permanentBalance ?? account.balance,
+    monthlyPlanId: account.monthlyPlanId ?? null,
+    monthlyPlanName: account.monthlyPlanName ?? null,
+    monthlyExpiresAt: account.monthlyExpiresAt ?? null,
     totalEarned: account.totalEarned,
     totalSpent: account.totalSpent,
     version: account.version,
     updatedAt: account.updatedAt
+  };
+}
+
+function getRechargePlanCreditMeta(planId: string, paidAt: string) {
+  if (planId === "monthly_plus" || planId === "monthly_pro") {
+    return {
+      grantType: "monthly" as const,
+      expiresAt: new Date(new Date(paidAt).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      scene: "recharge_monthly",
+      title: "月卡充值到账"
+    };
+  }
+
+  if (planId === "promo") {
+    return {
+      grantType: "permanent" as const,
+      expiresAt: null,
+      scene: "recharge_promo",
+      title: "积分包充值到账"
+    };
+  }
+
+  return {
+    grantType: "permanent" as const,
+    expiresAt: null,
+    scene: "recharge_permanent",
+    title: "积分包充值到账"
   };
 }
 
@@ -241,7 +289,22 @@ function normalizePagination(pagination: Pagination): Pagination {
   return pagination;
 }
 
-function toCreditLedgerResponseItem(ledger: CreditLedger): CreditLedgerResponseItem {
+async function getRechargeOrderNoMap(items: CreditLedger[]) {
+  const repository = getRepository();
+  const orderIds = Array.from(new Set(
+    items
+      .filter((item) => item.type === "recharge" && item.sourceType === "recharge")
+      .map((item) => item.sourceId)
+  ));
+  const entries = await Promise.all(orderIds.map(async (orderId) => {
+    const order = await repository.findOrderById(orderId).catch(() => null);
+    return order ? [orderId, order.orderNo] as const : null;
+  }));
+
+  return new Map(entries.filter((entry): entry is readonly [string, string] => Boolean(entry)));
+}
+
+function toCreditLedgerResponseItem(ledger: CreditLedger, context: LedgerDisplayContext): CreditLedgerResponseItem {
   const signedAmount = ledger.direction === "in" ? ledger.amount : -ledger.amount;
 
   return {
@@ -250,7 +313,7 @@ function toCreditLedgerResponseItem(ledger: CreditLedger): CreditLedgerResponseI
     time: formatDateTime(ledger.createdAt),
     category: categoryForLedger(ledger),
     title: titleForLedger(ledger),
-    description: ledger.remark,
+    description: descriptionForLedger(ledger, context),
     scene: ledger.scene,
     type: ledger.type,
     direction: ledger.direction,
@@ -264,15 +327,7 @@ function toCreditLedgerResponseItem(ledger: CreditLedger): CreditLedgerResponseI
 }
 
 function categoryForLedger(ledger: CreditLedger) {
-  if (ledger.scene === "signup_bonus") {
-    return "注册赠送";
-  }
-
-  if (ledger.scene === "invite_bonus") {
-    return "邀请奖励";
-  }
-
-  if (ledger.direction === "in" && ledger.type === "refund") {
+  if (ledger.type === "refund") {
     return "退回";
   }
 
@@ -285,26 +340,88 @@ function categoryForLedger(ledger: CreditLedger) {
 
 function titleForLedger(ledger: CreditLedger) {
   if (ledger.scene === "signup_bonus") {
-    return "新用户注册赠送 300 基础积分";
+    return "注册赠送";
   }
 
   if (ledger.scene === "invite_bonus") {
-    return "推荐新用户注册奖励";
+    return "邀请奖励";
   }
 
-  if (ledger.scene === "recharge") {
-    return "充值到账";
+  if (ledger.scene === "recharge" || ledger.scene === "recharge_promo" || ledger.scene === "recharge_permanent" || ledger.scene === "recharge_monthly") {
+    if (ledger.scene === "recharge_monthly") {
+      return "月卡充值到账";
+    }
+
+    return "基础积分包充值到账";
   }
 
-  if (ledger.scene === "ai_task") {
-    return "AI 任务消耗";
+  if (ledger.scene === "ai_task" || ledger.scene === "ai_task_monthly" || ledger.scene === "ai_task_permanent") {
+    const taskLabel = taskLabelFromLedger(ledger);
+
+    return taskLabel ? `任务消耗——${taskLabel}` : "任务消耗";
+  }
+
+  if (ledger.scene === "monthly_expire") {
+    return "月卡积分过期";
   }
 
   if (ledger.scene === "ai_task_refund") {
-    return "AI 任务失败退回";
+    const taskLabel = taskLabelFromLedger(ledger);
+
+    return taskLabel ? `任务失败退回——${taskLabel}` : "任务失败退回";
   }
 
   return ledger.remark || "积分变动";
+}
+
+function descriptionForLedger(ledger: CreditLedger, context: LedgerDisplayContext) {
+  if (ledger.scene === "signup_bonus") {
+    return `注册赠送：获得 ${ledger.amount.toLocaleString("zh-CN")} 基础积分`;
+  }
+
+  if (ledger.scene === "invite_bonus") {
+    return `邀请奖励：获得 ${ledger.amount.toLocaleString("zh-CN")} 基础积分`;
+  }
+
+  if (ledger.scene === "recharge" || ledger.scene === "recharge_monthly" || ledger.scene === "recharge_promo" || ledger.scene === "recharge_permanent") {
+    const orderNo = getRechargeOrderNo(ledger, context);
+
+    if (ledger.scene === "recharge_monthly") {
+      return `月卡充值到账：订单 ${orderNo}，获得 ${ledger.amount.toLocaleString("zh-CN")} 月卡积分`;
+    }
+
+    return `基础积分包充值到账：订单 ${orderNo}，获得 ${ledger.amount.toLocaleString("zh-CN")} 基础积分`;
+  }
+
+  if (ledger.scene === "ai_task" || ledger.scene === "ai_task_monthly" || ledger.scene === "ai_task_permanent") {
+    const taskLabel = taskLabelFromLedger(ledger);
+    const sourceText = ledger.scene === "ai_task_monthly" ? "优先消耗月卡积分" : "消耗基础积分";
+
+    return taskLabel ? `${taskLabel}——${sourceText}` : `任务消耗——${sourceText}`;
+  }
+
+  if (ledger.scene === "ai_task_refund") {
+    const taskLabel = taskLabelFromLedger(ledger);
+    const sourceText = ledger.remark.includes("月卡积分") ? "月卡积分" : "基础积分";
+
+    return taskLabel
+      ? `${taskLabel}失败：退回 ${ledger.amount.toLocaleString("zh-CN")} ${sourceText}`
+      : `任务失败：退回 ${ledger.amount.toLocaleString("zh-CN")} ${sourceText}`;
+  }
+
+  if (ledger.scene === "monthly_expire") {
+    return `月卡积分过期：失效 ${ledger.amount.toLocaleString("zh-CN")} 月卡积分`;
+  }
+
+  return ledger.remark;
+}
+
+function getRechargeOrderNo(ledger: CreditLedger, context: LedgerDisplayContext) {
+  return context.orderNoById.get(ledger.sourceId) ?? extractOrderNo(ledger.remark) ?? ledger.sourceId;
+}
+
+function extractOrderNo(value: string) {
+  return value.match(/\bLQ[A-Z0-9]{10,}\b/)?.[0] ?? null;
 }
 
 function statusText(status: CreditLedger["status"]) {
@@ -328,8 +445,24 @@ function aiCostRemark(task: Pick<AiTask, "type">) {
   const label: Record<AiTask["type"], string> = {
     strategy_generation: "策略生成",
     code_conversion: "代码转换",
-    code_analysis: "代码解析"
+    code_analysis: "代码翻译解析"
   };
 
   return `${label[task.type]}消耗`;
+}
+
+function taskLabelFromLedger(ledger: CreditLedger) {
+  if (ledger.remark.includes("代码翻译解析") || ledger.remark.includes("代码解析")) {
+    return "代码翻译解析";
+  }
+
+  if (ledger.remark.includes("代码转换")) {
+    return "代码转换";
+  }
+
+  if (ledger.remark.includes("策略生成")) {
+    return "策略生成";
+  }
+
+  return null;
 }

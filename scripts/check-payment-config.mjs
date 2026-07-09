@@ -33,7 +33,7 @@ const result = {
   production: isProduction,
   featureEnabled,
   mockEnabled,
-  orderExpireMinutes: readPositiveInteger("PAYMENT_ORDER_EXPIRE_MINUTES", 30),
+  orderExpireMinutes: readPositiveInteger("PAYMENT_ORDER_EXPIRE_MINUTES", 5),
   notifyBaseUrl: describeUrl("PAYMENT_NOTIFY_BASE_URL"),
   returnBaseUrl: describeUrl("PAYMENT_RETURN_BASE_URL"),
   gatewayUrl: describeGateway(mode),
@@ -165,6 +165,8 @@ function validateRealPaymentUrls() {
     errors.push("PAYMENT_RETURN_BASE_URL must use HTTPS when configured for real payment returns.");
   }
 
+  validateReturnBaseMatchesSiteOrigin(returnBase);
+
   const gateway = describeGateway(mode);
   if (gateway.configured && !gateway.validUrl) {
     errors.push(`${mode === "alipay" ? "ALIPAY_GATEWAY_URL" : "WECHAT_PAY_GATEWAY_URL"} must be a valid URL when configured.`);
@@ -172,6 +174,20 @@ function validateRealPaymentUrls() {
 
   if (gateway.validUrl && !gateway.https) {
     errors.push(`${mode === "alipay" ? "ALIPAY_GATEWAY_URL" : "WECHAT_PAY_GATEWAY_URL"} must use HTTPS for real payment provider requests.`);
+  }
+}
+
+function validateReturnBaseMatchesSiteOrigin(returnBase) {
+  const site = describeUrl("NEXT_PUBLIC_SITE_URL");
+
+  if (!returnBase.configured || !returnBase.validUrl || !site.configured || !site.validUrl) {
+    return;
+  }
+
+  if (returnBase.origin !== site.origin) {
+    errors.push(
+      `PAYMENT_RETURN_BASE_URL origin must match NEXT_PUBLIC_SITE_URL origin so login cookies survive Alipay return. return=${returnBase.origin}, site=${site.origin}`
+    );
   }
 }
 
@@ -208,6 +224,7 @@ function describeUrl(name, fallback = "") {
       usesDefault: !raw && Boolean(fallback),
       validUrl: true,
       protocol: url.protocol,
+      origin: url.origin,
       hostType: getHostType(url.hostname),
       https: url.protocol === "https:"
     };

@@ -21,6 +21,8 @@ import type {
   ContactMethod,
   ContactRequest,
   CreditAccount,
+  CreditGrant,
+  CreditGrantType,
   CreditLedger,
   CreditLedgerDirection,
   CreditLedgerType,
@@ -48,6 +50,20 @@ import type {
 } from "@/server/domain";
 
 export type PaymentActionType = "mock" | "redirect" | "qr_code";
+
+export type ActiveMonthlyCard = {
+  planId: string;
+  planName: string;
+  expiresAt: string;
+};
+
+export type CreditGrantSummary = {
+  monthlyBalance: number;
+  permanentBalance: number;
+  monthlyPlanId: string | null;
+  monthlyPlanName: string | null;
+  monthlyExpiresAt: string | null;
+};
 
 export type AiCursor = {
   id: string;
@@ -199,6 +215,8 @@ export type ApplyCreditLedgerInput = {
   idempotencyKey: string;
   remark: string;
   createdAt: string;
+  grantType?: CreditGrantType;
+  grantExpiresAt?: string | null;
 };
 
 export type CreateAdminAuditLogInput = {
@@ -393,9 +411,18 @@ export type LedgerPage = {
   total: number;
 };
 
+export type CreditLedgerCategoryFilter = "all" | "income" | "consume" | "refund";
+
+export type CreditLedgerFilters = {
+  category?: CreditLedgerCategoryFilter;
+  createdFrom?: string;
+  createdToExclusive?: string;
+};
+
 export type AppliedCreditLedger = {
   account: CreditAccount;
   ledger: CreditLedger;
+  ledgers?: CreditLedger[];
   duplicated: boolean;
 };
 
@@ -629,12 +656,16 @@ export interface LightQuantRepository {
   upsertUserMembership(input: UpsertUserMembershipInput): Promise<UserMembership>;
   getCreditAccount(userId: string): Promise<CreditAccount | null>;
   ensureCreditAccount(userId: string, now: string): Promise<CreditAccount>;
+  getCreditGrantSummary(userId: string, now: string): Promise<CreditGrantSummary>;
+  getActiveMonthlyCardForUser(userId: string, now: string, exceptOrderId?: string): Promise<ActiveMonthlyCard | null>;
+  expireCreditGrantsForUser(userId: string, now: string, requestId: string): Promise<void>;
   applyCreditLedger(input: ApplyCreditLedgerInput): Promise<AppliedCreditLedger>;
   applyAdminCreditAdjustment(input: ApplyAdminCreditAdjustmentInput): Promise<AppliedCreditLedger>;
   createAdminAuditLog(input: CreateAdminAuditLogInput): Promise<void>;
-  listCreditLedger(userId: string, pagination: Pagination): Promise<LedgerPage>;
+  listCreditLedger(userId: string, pagination: Pagination, filters?: CreditLedgerFilters): Promise<LedgerPage>;
   listEnabledRechargePlans(): Promise<RechargePlan[]>;
   findRechargePlanById(id: string): Promise<RechargePlan | null>;
+  hasPaidRechargeOrderForPlan(userId: string, planId: string, exceptOrderId?: string): Promise<boolean>;
   findOrderById(id: string): Promise<RechargeOrder | null>;
   findOrderByOrderNo(orderNo: string): Promise<RechargeOrder | null>;
   findRechargeOrderByClientRequestId(userId: string, clientRequestId: string): Promise<RechargeOrder | null>;

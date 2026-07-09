@@ -201,6 +201,21 @@ export function isPaymentFeatureEnabled() {
   return getBoolean(process.env.PAYMENT_FEATURE_ENABLED, process.env.NODE_ENV !== "production");
 }
 
+export function getPaymentTestAmountCents() {
+  if (process.env.NODE_ENV === "production") {
+    return null;
+  }
+
+  const raw = process.env.PAYMENT_TEST_AMOUNT_CENTS?.trim();
+  if (!raw) {
+    return null;
+  }
+
+  const value = Number(raw);
+
+  return Number.isInteger(value) && value > 0 ? value : null;
+}
+
 export function isAdminWriteEnabled() {
   return isExplicitlyEnabled(process.env.ADMIN_WRITE_ENABLED);
 }

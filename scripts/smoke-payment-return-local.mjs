@@ -71,7 +71,19 @@ try {
   assertEqual("order-status", order.status, "PENDING");
   assertEqual("payment-action-type", paymentAction.type, "redirect");
 
-  const returnVisit = await requestRaw("GET", `/credits?paymentReturn=1&orderId=${encodeURIComponent(order.id)}`);
+  const redirectUrl = new URL(paymentAction.redirectUrl);
+  const returnUrlValue = redirectUrl.searchParams.get("return_url");
+
+  if (!returnUrlValue) {
+    throw new Error("alipay-redirect-url missing return_url");
+  }
+
+  const returnUrl = new URL(returnUrlValue);
+  assertEqual("return-url-path", returnUrl.pathname, "/credits");
+  assertEqual("return-url-payment-return", returnUrl.searchParams.get("paymentReturn"), "1");
+  assertEqual("return-url-order-id", returnUrl.searchParams.get("orderId"), order.id);
+
+  const returnVisit = await requestRaw("GET", `${returnUrl.pathname}${returnUrl.search}`);
 
   assertStatus("credits-return-page", returnVisit, 200);
   assertIncludes("credits-return-page-html", returnVisit.text, "LightQuant");
@@ -101,6 +113,7 @@ try {
         },
         returnPage: {
           status: returnVisit.status,
+          parsedFromRedirectUrl: true,
           onlyQueriesStatus: true
         }
       },
@@ -127,6 +140,10 @@ function assertCreditsClientReturnGuard() {
 
   assertIncludes("credits-client-status-endpoint", source, "/api/v1/payments/");
   assertIncludes("credits-client-status-route", source, "/status");
+  assertIncludes("credits-client-login-required-message", source, "请登录后继续确认支付状态");
+  assertIncludes("credits-client-open-login-event", source, "lightquant:open-login");
+  assertIncludes("credits-client-auth-updated-event", source, "lightquant:auth-updated");
+  assertIncludes("credits-client-return-order-preserved", source, "getPaymentReturnOrderId");
   assertNotIncludes("credits-client-no-mock-notify", source, "/api/v1/payments/mock/notify");
   assertNotIncludes("credits-client-no-order-create", source, "/api/v1/orders/recharge");
   assertNotIncludes("credits-client-no-direct-credit-write", source, "POST /api/v1/credits");

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, BadgeCheck, CalendarDays, DollarSign, FileText, Filter, LineChart } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { BadgeCheck, CalendarDays, DollarSign, FileText } from "lucide-react";
 import { creditFilters } from "@/lib/mock-data";
 
 type ApiResponse<T> =
@@ -21,6 +21,11 @@ type ApiResponse<T> =
 
 type CreditAccount = {
   balance: number;
+  monthlyBalance: number;
+  permanentBalance: number;
+  monthlyPlanId: string | null;
+  monthlyPlanName: string | null;
+  monthlyExpiresAt: string | null;
   totalEarned: number;
   totalSpent: number;
   version: number;
@@ -61,6 +66,7 @@ type ReturnedPaymentStatus = {
   order: {
     id: string;
     orderNo: string;
+    planId: string;
     status: string;
     expiresAt?: string;
   };
@@ -79,6 +85,16 @@ type PaymentReturnNotice = {
   orderId: string;
   message: string;
   checking: boolean;
+  requiresLogin?: boolean;
+};
+
+type CreditFilter = (typeof creditFilters)[number];
+type TimeRangePreset = "all" | "today" | "7d" | "30d" | "custom";
+
+type AppliedTimeRange = {
+  preset: TimeRangePreset;
+  startDate: string;
+  endDate: string;
 };
 
 function amountClass(amount: number) {
@@ -97,13 +113,13 @@ function formatAmount(amount: number) {
   return `${amount > 0 ? "+" : ""}${amount.toLocaleString("zh-CN")}`;
 }
 
-function EmptyCreditState({ message = "请先登录" }: { message?: string }) {
+function EmptyCreditState({ title = "暂无积分流水", message = "请先登录" }: { title?: string; message?: string }) {
   return (
     <div className="lq-empty-ledger">
       <div className="lq-empty-ledger-icon">
         <FileText aria-hidden="true" size={27} />
       </div>
-      <h2>暂无积分流水</h2>
+      <h2>{title}</h2>
       <p>{message}</p>
     </div>
   );
@@ -112,23 +128,34 @@ function EmptyCreditState({ message = "请先登录" }: { message?: string }) {
 export function CreditsClient() {
   const [account, setAccount] = useState<CreditAccount | null>(null);
   const [ledger, setLedger] = useState<LedgerData | null>(null);
+  const [activeFilter, setActiveFilter] = useState<CreditFilter>("全部");
+  const [timeRange, setTimeRange] = useState<AppliedTimeRange>({ preset: "all", startDate: "", endDate: "" });
+  const [timeRangeOpen, setTimeRangeOpen] = useState(false);
+  const [customDateOpen, setCustomDateOpen] = useState(false);
+  const [draftStartDate, setDraftStartDate] = useState("");
+  const [draftEndDate, setDraftEndDate] = useState("");
+  const [dateError, setDateError] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [betaVipActive, setBetaVipActive] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [paymentReturnNotice, setPaymentReturnNotice] = useState<PaymentReturnNotice | null>(null);
+  const loadCreditsRequestIdRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
+    const currentRequestId = loadCreditsRequestIdRef.current + 1;
+    loadCreditsRequestIdRef.current = currentRequestId;
 
     async function loadCredits() {
       setLoading(true);
       setError("");
 
       try {
+        const ledgerQuery = buildLedgerQuery(activeFilter, timeRange);
         const [accountResponse, ledgerResponse] = await Promise.all([
           fetch("/api/v1/credits/account", { cache: "no-store" }),
-          fetch("/api/v1/credits/ledger?page=1&pageSize=20", { cache: "no-store" })
+          fetch(`/api/v1/credits/ledger?${ledgerQuery}`, { cache: "no-store" })
         ]);
         const profileResponse = await fetch("/api/v1/me", { cache: "no-store" }).catch(() => null);
         const accountPayload = (await accountResponse.json()) as ApiResponse<{ account: CreditAccount }>;
@@ -136,6 +163,10 @@ export function CreditsClient() {
         const profilePayload = profileResponse ? ((await profileResponse.json().catch(() => null)) as ApiResponse<CurrentUserProfile> | null) : null;
 
         if (!accountPayload.success) {
+          if (accountPayload.error.code === "UNAUTHORIZED" && getPaymentReturnOrderId()) {
+            throw new Error("请登录后继续确认支付状态");
+          }
+
           throw new Error(accountPayload.error.message);
         }
 
@@ -143,20 +174,20 @@ export function CreditsClient() {
           throw new Error(ledgerPayload.error.message);
         }
 
-        if (!cancelled) {
+        if (!cancelled && currentRequestId === loadCreditsRequestIdRef.current) {
           setAccount(accountPayload.data.account);
           setLedger(ledgerPayload.data);
           setBetaVipActive(profilePayload?.success === true && profilePayload.data.membership?.betaVip?.active === true);
         }
       } catch (loadError) {
-        if (!cancelled) {
+        if (!cancelled && currentRequestId === loadCreditsRequestIdRef.current) {
           setAccount(null);
           setLedger(null);
           setBetaVipActive(false);
           setError(loadError instanceof Error ? loadError.message : "积分数据加载失败");
         }
       } finally {
-        if (!cancelled) {
+        if (!cancelled && currentRequestId === loadCreditsRequestIdRef.current) {
           setLoading(false);
         }
       }
@@ -167,7 +198,7 @@ export function CreditsClient() {
     return () => {
       cancelled = true;
     };
-  }, [refreshKey]);
+  }, [refreshKey, activeFilter, timeRange]);
 
   useEffect(() => {
     function handleCreditsUpdated() {
@@ -199,12 +230,30 @@ export function CreditsClient() {
     void refreshReturnedPaymentStatus(orderId, false);
   }, []);
 
+  useEffect(() => {
+    function handleAuthUpdated() {
+      setRefreshKey((value) => value + 1);
+
+      const orderId = getPaymentReturnOrderId();
+      if (orderId) {
+        void refreshReturnedPaymentStatus(orderId, false);
+      }
+    }
+
+    window.addEventListener("lightquant:auth-updated", handleAuthUpdated);
+
+    return () => {
+      window.removeEventListener("lightquant:auth-updated", handleAuthUpdated);
+    };
+  }, []);
+
   async function refreshReturnedPaymentStatus(orderId: string, manual: boolean) {
     setPaymentReturnNotice((current) => ({
       kind: current?.kind ?? "info",
       orderId,
       message: manual ? "正在刷新支付状态，请稍候。" : current?.message ?? "正在查询服务端支付确认状态。",
-      checking: true
+      checking: true,
+      requiresLogin: false
     }));
 
     try {
@@ -214,6 +263,17 @@ export function CreditsClient() {
       const payload = (await response.json()) as ApiResponse<ReturnedPaymentStatus>;
 
       if (!payload.success) {
+        if (payload.error.code === "UNAUTHORIZED") {
+          setPaymentReturnNotice({
+            kind: "info",
+            orderId,
+            message: "请登录后继续确认支付状态",
+            checking: false,
+            requiresLogin: true
+          });
+          return;
+        }
+
         throw new Error(payload.error.message);
       }
 
@@ -221,7 +281,7 @@ export function CreditsClient() {
         setPaymentReturnNotice({
           kind: "success",
           orderId,
-          message: "支付成功，积分已到账。",
+          message: getPaymentSuccessMessage(payload.data.order.planId),
           checking: false
         });
         setRefreshKey((value) => value + 1);
@@ -256,17 +316,65 @@ export function CreditsClient() {
   }
 
   const summary = useMemo(() => {
-    const monthlyChange = ledger?.items.reduce((total, item) => total + item.amount, 0) ?? 0;
+    const monthlyExpiresAt = account?.monthlyExpiresAt ?? null;
+    const hasMonthlyCard = Boolean(account?.monthlyPlanName && monthlyExpiresAt);
 
     return [
-      { icon: DollarSign, label: "当前积分余额", value: account?.balance.toLocaleString("zh-CN") ?? "-", primary: true },
-      { icon: ArrowUp, label: "累计获得", value: account?.totalEarned.toLocaleString("zh-CN") ?? "0", primary: false },
-      { icon: ArrowDown, label: "累计消耗", value: account?.totalSpent.toLocaleString("zh-CN") ?? "0", primary: false },
-      { icon: LineChart, label: "本页变化", value: `${monthlyChange > 0 ? "+" : ""}${monthlyChange.toLocaleString("zh-CN")}`, primary: false }
+      { icon: BadgeCheck, label: "基础积分", value: account?.permanentBalance.toLocaleString("zh-CN") ?? "0", dueText: "", tag: null, primary: false },
+      {
+        icon: CalendarDays,
+        label: "月卡积分",
+        value: account?.monthlyBalance.toLocaleString("zh-CN") ?? "0",
+        dueText: hasMonthlyCard && monthlyExpiresAt ? `到期时间 ${formatDateOnly(monthlyExpiresAt)}` : "",
+        tag: hasMonthlyCard && account?.monthlyPlanName ? account.monthlyPlanName : null,
+        primary: false
+      },
+      { icon: DollarSign, label: "总可用积分", value: account?.balance.toLocaleString("zh-CN") ?? "-", dueText: "", tag: null, primary: true }
     ];
-  }, [account, ledger]);
+  }, [account]);
   const records = ledger?.items ?? [];
   const hasTransactions = records.length > 0;
+  const hasActiveLedgerFilter = activeFilter !== "全部" || timeRange.preset !== "all";
+  const timeRangeLabel = getTimeRangeLabel(timeRange);
+
+  function applyPreset(preset: Exclude<TimeRangePreset, "custom">) {
+    setTimeRange({ preset, startDate: "", endDate: "" });
+    setTimeRangeOpen(false);
+    setCustomDateOpen(false);
+    setDateError("");
+  }
+
+  function openCustomDate() {
+    setCustomDateOpen(true);
+    setDraftStartDate(timeRange.preset === "custom" ? timeRange.startDate : "");
+    setDraftEndDate(timeRange.preset === "custom" ? timeRange.endDate : "");
+    setDateError("");
+  }
+
+  function applyCustomDate() {
+    if (draftStartDate && draftEndDate && draftStartDate > draftEndDate) {
+      setDateError("开始日期不能晚于结束日期");
+      return;
+    }
+
+    setTimeRange({
+      preset: "custom",
+      startDate: draftStartDate,
+      endDate: draftEndDate
+    });
+    setTimeRangeOpen(false);
+    setCustomDateOpen(false);
+    setDateError("");
+  }
+
+  function resetTimeRange() {
+    setTimeRange({ preset: "all", startDate: "", endDate: "" });
+    setDraftStartDate("");
+    setDraftEndDate("");
+    setDateError("");
+    setTimeRangeOpen(false);
+    setCustomDateOpen(false);
+  }
 
   return (
     <section className="lq-ledger-page">
@@ -296,10 +404,17 @@ export function CreditsClient() {
             <button
               className="rounded-md border border-current px-sm py-xs text-caption-bold disabled:cursor-not-allowed disabled:opacity-60"
               disabled={paymentReturnNotice.checking}
-              onClick={() => void refreshReturnedPaymentStatus(paymentReturnNotice.orderId, true)}
+              onClick={() => {
+                if (paymentReturnNotice.requiresLogin) {
+                  window.dispatchEvent(new Event("lightquant:open-login"));
+                  return;
+                }
+
+                void refreshReturnedPaymentStatus(paymentReturnNotice.orderId, true);
+              }}
               type="button"
             >
-              {paymentReturnNotice.checking ? "查询中..." : "刷新支付状态"}
+              {paymentReturnNotice.checking ? "查询中..." : paymentReturnNotice.requiresLogin ? "登录后继续" : "刷新支付状态"}
             </button>
           </div>
         </section>
@@ -311,13 +426,25 @@ export function CreditsClient() {
 
           return (
             <article className={`lq-stat-card ${item.primary ? "is-primary" : ""}`} key={item.label}>
-              <p className="lq-stat-label">
-                <span className="lq-stat-icon">
-                  <Icon aria-hidden="true" size={16} />
-                </span>
-                {item.label}
-              </p>
-              <p className="lq-stat-value">{item.value}</p>
+              <div className="flex items-start justify-between gap-sm">
+                <p className="lq-stat-label">
+                  <span className="lq-stat-icon">
+                    <Icon aria-hidden="true" size={16} />
+                  </span>
+                  {item.label}
+                </p>
+                {item.tag ? (
+                  <span className={`shrink-0 rounded-full px-xs py-[2px] text-caption-sm font-bold ${item.tag === "月卡 Pro" ? "bg-[#eef5ff] text-[#0b63ff]" : "bg-[#ecfff7] text-[#047857]"}`}>
+                    {item.tag}
+                  </span>
+                ) : null}
+              </div>
+              <div className="lq-stat-value-row">
+                <p className="lq-stat-value">{item.value}</p>
+                {item.dueText ? (
+                  <p className="lq-stat-due">{item.dueText}</p>
+                ) : null}
+              </div>
             </article>
           );
         })}
@@ -333,22 +460,76 @@ export function CreditsClient() {
       <section className="lq-ledger-panel">
         <div className="lq-ledger-tools">
           <div className="lq-filter-tabs">
-            {creditFilters.map((filter, index) => (
-              <button className={`lq-filter-tab ${index === 0 ? "is-active" : ""}`} key={filter} type="button">
+            {creditFilters.map((filter) => (
+              <button className={`lq-filter-tab ${filter === activeFilter ? "is-active" : ""}`} key={filter} onClick={() => setActiveFilter(filter)} type="button">
                 {filter}
               </button>
             ))}
           </div>
 
           <div className="lq-filter-buttons">
-            <button className="lq-filter-btn" type="button">
-              <CalendarDays aria-hidden="true" size={16} />
-              时间范围
-            </button>
-            <button className="lq-filter-btn" type="button">
-              <Filter aria-hidden="true" size={16} />
-              来源类型
-            </button>
+            <div className="relative">
+              {timeRangeOpen ? (
+                <button
+                  aria-label="关闭时间范围筛选"
+                  className="fixed inset-0 z-30 cursor-default bg-transparent"
+                  onClick={() => setTimeRangeOpen(false)}
+                  type="button"
+                />
+              ) : null}
+              <button
+                aria-expanded={timeRangeOpen}
+                className={`lq-filter-btn ${timeRangeOpen || timeRange.preset !== "all" ? "is-active-soft" : ""}`}
+                onClick={() => setTimeRangeOpen((open) => !open)}
+                type="button"
+              >
+                <CalendarDays aria-hidden="true" size={16} />
+                {timeRangeLabel}
+              </button>
+              {timeRangeOpen ? (
+                <div className="lq-time-filter-popover">
+                  <div className="lq-time-filter-options">
+                    <button className={`lq-time-filter-option ${timeRange.preset === "all" ? "is-active" : ""}`} onClick={() => applyPreset("all")} type="button">
+                      全部时间
+                    </button>
+                    <button className={`lq-time-filter-option ${timeRange.preset === "today" ? "is-active" : ""}`} onClick={() => applyPreset("today")} type="button">
+                      今天
+                    </button>
+                    <button className={`lq-time-filter-option ${timeRange.preset === "7d" ? "is-active" : ""}`} onClick={() => applyPreset("7d")} type="button">
+                      最近 7 天
+                    </button>
+                    <button className={`lq-time-filter-option ${timeRange.preset === "30d" ? "is-active" : ""}`} onClick={() => applyPreset("30d")} type="button">
+                      最近 30 天
+                    </button>
+                    <button className={`lq-time-filter-option ${timeRange.preset === "custom" ? "is-active" : ""}`} onClick={openCustomDate} type="button">
+                      自定义日期
+                    </button>
+                  </div>
+
+                  {customDateOpen ? (
+                    <div className="lq-time-filter-custom">
+                      <label>
+                        <span>开始日期</span>
+                        <input onChange={(event) => setDraftStartDate(event.target.value)} type="date" value={draftStartDate} />
+                      </label>
+                      <label>
+                        <span>结束日期</span>
+                        <input onChange={(event) => setDraftEndDate(event.target.value)} type="date" value={draftEndDate} />
+                      </label>
+                      {dateError ? <p className="lq-time-filter-error">{dateError}</p> : null}
+                      <div className="lq-time-filter-actions">
+                        <button onClick={resetTimeRange} type="button">
+                          重置
+                        </button>
+                        <button className="is-primary" onClick={applyCustomDate} type="button">
+                          应用
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
 
@@ -356,31 +537,39 @@ export function CreditsClient() {
           <div className="lq-ledger-scroll app-scrollbar">
             <div className="lq-ledger-table-body">
               <table className="lq-ledger-table">
+                <colgroup>
+                  <col className="lq-ledger-col-time" />
+                  <col className="lq-ledger-col-category" />
+                  <col className="lq-ledger-col-detail" />
+                  <col className="lq-ledger-col-amount" />
+                  <col className="lq-ledger-col-balance" />
+                  <col className="lq-ledger-col-status" />
+                </colgroup>
                 <thead>
                   <tr>
-                    <th>时间</th>
-                    <th>类型</th>
-                    <th>事项 / 描述</th>
-                    <th className="text-right">积分变化</th>
-                    <th className="text-right">余额</th>
-                    <th className="text-right">状态</th>
+                    <th className="lq-ledger-cell-time">时间</th>
+                    <th className="lq-ledger-cell-category">类型</th>
+                    <th className="lq-ledger-cell-detail">事项 / 描述</th>
+                    <th className="lq-ledger-cell-amount">积分变化</th>
+                    <th className="lq-ledger-cell-balance">余额</th>
+                    <th className="lq-ledger-cell-status">状态</th>
                   </tr>
                 </thead>
                 <tbody>
                   {records.map((record) => (
                     <tr key={record.id}>
-                      <td className="whitespace-nowrap">{record.time}</td>
-                      <td>
-                        <span className="rounded bg-[#eaf2ff] px-2 py-1 text-xs font-bold text-[#0b63ff]">{record.category}</span>
+                      <td className="lq-ledger-cell-time">{record.time}</td>
+                      <td className="lq-ledger-cell-category">
+                        <span className="lq-ledger-category-badge">{record.category}</span>
                       </td>
-                      <td>
+                      <td className="lq-ledger-cell-detail">
                         <p className="m-0 font-extrabold text-[#111827]">{record.title}</p>
                         <p className="m-0 text-xs text-[#5b6472]">{record.description}</p>
                       </td>
-                      <td className={`whitespace-nowrap text-right font-extrabold ${amountClass(record.amount)}`}>{formatAmount(record.amount)}</td>
-                      <td className="whitespace-nowrap text-right">{record.balanceAfter.toLocaleString("zh-CN")}</td>
-                      <td className="whitespace-nowrap text-right">
-                        <span className={`rounded-full px-2 py-1 text-xs font-bold ${statusClass(record.status)}`}>{record.status}</span>
+                      <td className={`lq-ledger-cell-amount font-extrabold ${amountClass(record.amount)}`}>{formatAmount(record.amount)}</td>
+                      <td className="lq-ledger-cell-balance">{record.balanceAfter.toLocaleString("zh-CN")}</td>
+                      <td className="lq-ledger-cell-status">
+                        <span className={`lq-ledger-status-badge ${statusClass(record.status)}`}>{record.status}</span>
                       </td>
                     </tr>
                   ))}
@@ -404,10 +593,151 @@ export function CreditsClient() {
               <span className="text-right">余额</span>
               <span className="text-right">状态</span>
             </div>
-            <EmptyCreditState message={loading ? "正在加载积分流水..." : error || "请先登录"} />
+            <EmptyCreditState
+              message={loading ? "正在加载积分流水..." : error || (hasActiveLedgerFilter ? "请调整时间范围后再试。" : "暂无积分流水记录")}
+              title={hasActiveLedgerFilter && !loading && !error ? "暂无符合条件的积分流水" : "暂无积分流水"}
+            />
           </>
         )}
       </section>
     </section>
   );
+}
+
+function formatDateOnly(value: string) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  })
+    .format(new Date(value))
+    .replace(/\//g, "-");
+}
+
+function buildLedgerQuery(activeFilter: CreditFilter, timeRange: AppliedTimeRange) {
+  const params = new URLSearchParams({
+    page: "1",
+    pageSize: "20",
+    category: categoryParamForFilter(activeFilter)
+  });
+  const range = getDateRangeParams(timeRange);
+
+  if (range.createdFrom) {
+    params.set("createdFrom", range.createdFrom);
+  }
+
+  if (range.createdTo) {
+    params.set("createdTo", range.createdTo);
+  }
+
+  return params.toString();
+}
+
+function categoryParamForFilter(filter: CreditFilter) {
+  const categoryByFilter: Record<CreditFilter, "all" | "income" | "consume" | "refund"> = {
+    全部: "all",
+    获取: "income",
+    消耗: "consume",
+    退回: "refund"
+  };
+
+  return categoryByFilter[filter];
+}
+
+function getDateRangeParams(timeRange: AppliedTimeRange) {
+  if (timeRange.preset === "today") {
+    return {
+      createdFrom: formatDateInput(new Date()),
+      createdTo: ""
+    };
+  }
+
+  if (timeRange.preset === "7d") {
+    return {
+      createdFrom: formatDateInput(addLocalDays(new Date(), -6)),
+      createdTo: ""
+    };
+  }
+
+  if (timeRange.preset === "30d") {
+    return {
+      createdFrom: formatDateInput(addLocalDays(new Date(), -29)),
+      createdTo: ""
+    };
+  }
+
+  if (timeRange.preset === "custom") {
+    return {
+      createdFrom: timeRange.startDate,
+      createdTo: timeRange.endDate
+    };
+  }
+
+  return {
+    createdFrom: "",
+    createdTo: ""
+  };
+}
+
+function getTimeRangeLabel(timeRange: AppliedTimeRange) {
+  if (timeRange.preset === "today") {
+    return "今天";
+  }
+
+  if (timeRange.preset === "7d") {
+    return "最近 7 天";
+  }
+
+  if (timeRange.preset === "30d") {
+    return "最近 30 天";
+  }
+
+  if (timeRange.preset === "custom") {
+    if (timeRange.startDate && timeRange.endDate) {
+      return `${timeRange.startDate} 至 ${timeRange.endDate}`;
+    }
+
+    if (timeRange.startDate) {
+      return `${timeRange.startDate} 至今`;
+    }
+
+    if (timeRange.endDate) {
+      return `截至 ${timeRange.endDate}`;
+    }
+
+    return "自定义日期";
+  }
+
+  return "时间范围";
+}
+
+function formatDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function addLocalDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+
+  return next;
+}
+
+function getPaymentReturnOrderId() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+
+  return params.get("paymentReturn") === "1" ? params.get("orderId") : null;
+}
+
+function getPaymentSuccessMessage(planId: string) {
+  return planId === "monthly_plus" || planId === "monthly_pro"
+    ? "月卡已开通，积分已到账。"
+    : "支付成功，积分已到账。";
 }

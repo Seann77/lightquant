@@ -78,6 +78,9 @@ function isRepositoryShapeCurrent(repository: LightQuantRepository) {
     typeof repository.setActiveAiModelProfile === "function" &&
     typeof repository.listAiModelSecrets === "function" &&
     typeof repository.findAiModelSecretById === "function" &&
-    typeof repository.upsertAiModelSecret === "function"
+    typeof repository.upsertAiModelSecret === "function" &&
+    typeof repository.getCreditGrantSummary === "function" &&
+    typeof repository.expireCreditGrantsForUser === "function" &&
+    typeof repository.hasPaidRechargeOrderForPlan === "function"
   );
 }

@@ -207,12 +207,20 @@ export async function loginWithSmsCode(input: {
             requestId: input.requestId
           })
         : EMPTY_INVITE_REWARD;
+    if (!isNewUser) {
+      await repository.expireCreditGrantsForUser(user.id, now, `login:${user.id}:${now}`);
+    }
+
     const creditAccount = signupBonusResult?.account ?? await repository.ensureCreditAccount(user.id, now);
+    const grantSummary = await repository.getCreditGrantSummary(user.id, now);
     const membership = await getMembershipProfileForUser(user.id, now);
 
     return {
       user: toUserResponse(user),
-      creditAccount: toCreditAccountResponse(creditAccount),
+      creditAccount: toCreditAccountResponse({
+        ...creditAccount,
+        ...grantSummary
+      }),
       membership,
       isNewUser,
       signupBonusGranted: signupBonusResult ? !signupBonusResult.duplicated : false,
@@ -317,12 +325,17 @@ export async function getCurrentUserProfile(userId: string) {
   }
 
   const now = new Date().toISOString();
+  await repository.expireCreditGrantsForUser(user.id, now, `me:${user.id}:${now}`);
   const account = await repository.ensureCreditAccount(user.id, now);
+  const grantSummary = await repository.getCreditGrantSummary(user.id, now);
   const membership = await getMembershipProfileForUser(user.id, now);
 
   return {
     user: toUserResponse(user),
-    creditAccount: toCreditAccountResponse(account),
+    creditAccount: toCreditAccountResponse({
+      ...account,
+      ...grantSummary
+    }),
     membership
   };
 }

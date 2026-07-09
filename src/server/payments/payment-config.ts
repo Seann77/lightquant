@@ -41,13 +41,13 @@ export type WechatPayConfig = {
   notifyUrl: string;
 };
 
-const DEFAULT_ORDER_EXPIRE_MINUTES = 30;
+const DEFAULT_ORDER_EXPIRE_MINUTES = 5;
 const DEFAULT_ALIPAY_GATEWAY = "https://openapi.alipay.com/gateway.do";
 const DEFAULT_WECHAT_GATEWAY = "https://api.mch.weixin.qq.com";
 const PAYMENT_CHANNELS: Array<{ id: PayChannel; label: string }> = [
-  { id: "mock", label: "模拟支付" },
+  { id: "alipay", label: "支付宝" },
   { id: "wechat", label: "微信支付" },
-  { id: "alipay", label: "支付宝" }
+  { id: "mock", label: "模拟支付" }
 ];
 
 export function getPaymentConfig(): PaymentConfig {
@@ -85,6 +85,10 @@ export function assertPayChannelAvailable(payChannel: PayChannel) {
 
   const config = getPaymentConfig();
 
+  if (payChannel === "wechat") {
+    throw new ApiError("PAYMENT_CONFIG_ERROR", "微信支付暂未开通", 500);
+  }
+
   if (config.mode === "mock") {
     if (!config.mockEnabled || payChannel !== "mock") {
       throw new ApiError("PAYMENT_CONFIG_ERROR", "当前仅启用模拟支付", 500);
@@ -114,8 +118,10 @@ export function assertMockPaymentAvailable() {
 }
 
 export function listPaymentChannelAvailability(): PaymentChannelAvailability[] {
+  const visibleChannels = getVisiblePaymentChannels();
+
   if (!isPaymentFeatureEnabled()) {
-    return PAYMENT_CHANNELS.map((channel) => ({
+    return visibleChannels.map((channel) => ({
       ...channel,
       enabled: false,
       current: false
@@ -124,7 +130,7 @@ export function listPaymentChannelAvailability(): PaymentChannelAvailability[] {
 
   const config = getPaymentConfig();
 
-  return PAYMENT_CHANNELS.map((channel) => ({
+  return visibleChannels.map((channel) => ({
     ...channel,
     enabled: isPaymentChannelConfigured(channel.id, config),
     current: channel.id === config.mode
@@ -215,6 +221,10 @@ function requireWechatApiV3Key() {
 }
 
 function isPaymentChannelConfigured(channel: PayChannel, config: PaymentConfig) {
+  if (channel === "wechat") {
+    return false;
+  }
+
   if (channel !== config.mode) {
     return false;
   }
@@ -238,6 +248,20 @@ function isPaymentChannelConfigured(channel: PayChannel, config: PaymentConfig) 
   } catch {
     return false;
   }
+}
+
+function getVisiblePaymentChannels() {
+  let mode: PaymentMode | null = null;
+
+  try {
+    mode = getPaymentMode();
+  } catch {
+    mode = null;
+  }
+
+  return PAYMENT_CHANNELS.filter((channel) =>
+    channel.id !== "mock" || (mode === "mock" && process.env.NODE_ENV !== "production")
+  );
 }
 
 function requireConfiguredValue(value: string | null, _name: string) {

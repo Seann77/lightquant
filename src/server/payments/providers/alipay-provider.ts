@@ -3,6 +3,7 @@ import type { RechargeOrder } from "@/server/domain";
 import { ApiError } from "@/server/http/api-response";
 import { getAlipayConfig, getPaymentOrderExpireMinutes, joinUrl } from "@/server/payments/payment-config";
 import { basePaymentAction, type PaymentAction } from "@/server/payments/payment-action";
+import { getPaymentProductCopy } from "@/server/payments/payment-product-copy";
 
 type AlipayNotify = {
   appId: string;
@@ -17,12 +18,14 @@ type AlipayNotify = {
 
 export function createAlipayPaymentAction(order: RechargeOrder): PaymentAction {
   const config = getAlipayConfig();
+  const returnUrl = joinUrl(config.returnBaseUrl, `/credits?paymentReturn=1&orderId=${encodeURIComponent(order.id)}`);
+  const productCopy = getPaymentProductCopy(order);
   const bizContent = JSON.stringify({
     out_trade_no: order.orderNo,
     product_code: "FAST_INSTANT_TRADE_PAY",
     total_amount: centsToAmount(order.amountCents),
-    subject: `LightQuant ${order.totalPoints} 积分充值`,
-    body: `LightQuant 订单 ${order.orderNo}`,
+    subject: productCopy.subject,
+    body: productCopy.body,
     timeout_express: `${getPaymentOrderExpireMinutes()}m`
   });
   const params: Record<string, string> = {
@@ -34,9 +37,10 @@ export function createAlipayPaymentAction(order: RechargeOrder): PaymentAction {
     timestamp: formatAlipayTimestamp(new Date()),
     version: "1.0",
     notify_url: config.notifyUrl,
-    return_url: joinUrl(config.returnBaseUrl, `/credits?paymentReturn=1&orderId=${encodeURIComponent(order.id)}`),
+    return_url: returnUrl,
     biz_content: bizContent
   };
+  logAlipayReturnUrl(returnUrl, order.id);
   const signText = buildAlipaySignText(params);
   const sign = createSign("RSA-SHA256").update(signText, "utf8").sign(config.privateKey, "base64");
   const redirectUrl = `${config.gatewayUrl}?${new URLSearchParams({
@@ -140,6 +144,34 @@ function formatAlipayTimestamp(date: Date) {
   const pad = (value: number) => String(value).padStart(2, "0");
 
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function logAlipayReturnUrl(returnUrl: string, orderId: string) {
+  try {
+    const url = new URL(returnUrl);
+
+    console.info(
+      JSON.stringify({
+        event: "alipay.return_url.generated",
+        orderId,
+        returnUrl: {
+          origin: url.origin,
+          path: url.pathname,
+          search: url.search
+        }
+      })
+    );
+  } catch {
+    console.info(
+      JSON.stringify({
+        event: "alipay.return_url.generated",
+        orderId,
+        returnUrl: {
+          invalid: true
+        }
+      })
+    );
+  }
 }
 
 function sanitizeAlipayPayload(payload: Record<string, string>) {

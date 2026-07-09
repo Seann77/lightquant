@@ -11,6 +11,7 @@ import type {
   AiModelSecret,
   ContactRequest,
   CreditAccount,
+  CreditGrant,
   CreditLedger,
   CreditReservation,
   PaymentTransaction,
@@ -60,6 +61,7 @@ import type {
   CreateUploadedFileInput,
   CreateUserLegalConsentInput,
   CreateUserInput,
+  CreditLedgerFilters,
   LedgerPage,
   LightQuantRepository,
   SetActiveAiModelProfileInput,
@@ -73,48 +75,112 @@ import type {
 
 const MOCK_PLAN_TIMESTAMP = "2026-01-01T00:00:00.000Z";
 
+function matchesCreditLedgerFilters(item: CreditLedger, filters: CreditLedgerFilters) {
+  if (filters.category === "income" && (item.direction !== "in" || item.type === "refund")) {
+    return false;
+  }
+
+  if (filters.category === "consume" && item.direction !== "out") {
+    return false;
+  }
+
+  if (filters.category === "refund" && item.type !== "refund") {
+    return false;
+  }
+
+  if (filters.createdFrom && item.createdAt < filters.createdFrom) {
+    return false;
+  }
+
+  if (filters.createdToExclusive && item.createdAt >= filters.createdToExclusive) {
+    return false;
+  }
+
+  return true;
+}
+
 const mockRechargePlans: RechargePlan[] = [
   {
-    id: "starter",
-    name: "入门包",
-    description: "适合轻量体验与少量策略生成",
+    id: "promo",
+    name: "特惠",
+    description: "每个账号限购一次。",
+    planType: "permanent",
+    validityDays: null,
+    purchaseLimit: 1,
     priceCents: 990,
-    points: 1000,
+    points: 900,
     bonusPoints: 0,
-    totalPoints: 1000,
+    totalPoints: 900,
     enabled: true,
     sort: 10,
     createdAt: MOCK_PLAN_TIMESTAMP,
     updatedAt: MOCK_PLAN_TIMESTAMP
   },
   {
-    id: "standard",
-    name: "标准包",
-    description: "推荐日常使用，含 500 赠送积分",
-    priceCents: 2990,
-    points: 3000,
-    bonusPoints: 500,
-    totalPoints: 3500,
+    id: "monthly_plus",
+    name: "月卡 Plus",
+    description: "30 天内有效。",
+    planType: "monthly",
+    validityDays: 30,
+    purchaseLimit: null,
+    priceCents: 5800,
+    points: 6000,
+    bonusPoints: 0,
+    totalPoints: 6000,
     enabled: true,
     sort: 20,
     createdAt: MOCK_PLAN_TIMESTAMP,
     updatedAt: MOCK_PLAN_TIMESTAMP
   },
   {
-    id: "pro",
-    name: "专业包",
-    description: "适合高频转换与策略迭代，含 1,000 赠送积分",
-    priceCents: 5990,
-    points: 7000,
-    bonusPoints: 1000,
-    totalPoints: 8000,
+    id: "monthly_pro",
+    name: "月卡 Pro",
+    description: "30 天内有效。",
+    planType: "monthly",
+    validityDays: 30,
+    purchaseLimit: null,
+    priceCents: 8800,
+    points: 10000,
+    bonusPoints: 0,
+    totalPoints: 10000,
     enabled: true,
     sort: 30,
     createdAt: MOCK_PLAN_TIMESTAMP,
     updatedAt: MOCK_PLAN_TIMESTAMP
+  },
+  {
+    id: "points_plus",
+    name: "基础积分包 Plus",
+    description: "基础积分包。",
+    planType: "permanent",
+    validityDays: null,
+    purchaseLimit: null,
+    priceCents: 9900,
+    points: 7000,
+    bonusPoints: 0,
+    totalPoints: 7000,
+    enabled: true,
+    sort: 40,
+    createdAt: MOCK_PLAN_TIMESTAMP,
+    updatedAt: MOCK_PLAN_TIMESTAMP
+  },
+  {
+    id: "points_pro",
+    name: "基础积分包 Pro",
+    description: "基础积分包。",
+    planType: "permanent",
+    validityDays: null,
+    purchaseLimit: null,
+    priceCents: 19900,
+    points: 17000,
+    bonusPoints: 0,
+    totalPoints: 17000,
+    enabled: true,
+    sort: 50,
+    createdAt: MOCK_PLAN_TIMESTAMP,
+    updatedAt: MOCK_PLAN_TIMESTAMP
   }
 ];
-
 export class MockLightQuantRepository implements LightQuantRepository {
   private readonly users = new Map<string, User>();
   private readonly usersByPhone = new Map<string, string>();
@@ -125,6 +191,7 @@ export class MockLightQuantRepository implements LightQuantRepository {
   private readonly userMembershipsBySource = new Map<string, string>();
   private readonly smsCodes = new Map<string, SmsCodeRecord>();
   private readonly creditAccounts = new Map<string, CreditAccount>();
+  private readonly creditGrants = new Map<string, CreditGrant>();
   private readonly creditLedger = new Map<string, CreditLedger>();
   private readonly ledgerByIdempotencyKey = new Map<string, string>();
   private readonly rechargePlans = new Map<string, RechargePlan>(mockRechargePlans.map((plan) => [plan.id, plan]));
@@ -508,11 +575,155 @@ export class MockLightQuantRepository implements LightQuantRepository {
       totalEarned: 0,
       totalSpent: 0,
       version: 0,
-      updatedAt: now
+      updatedAt: now,
+      monthlyBalance: 0,
+      permanentBalance: 0,
+      monthlyPlanId: null,
+      monthlyPlanName: null,
+      monthlyExpiresAt: null
     };
 
     this.creditAccounts.set(userId, account);
     return account;
+  }
+
+  async getCreditGrantSummary(userId: string, now: string) {
+    const activeGrants = [...this.creditGrants.values()]
+      .filter((grant) => grant.userId === userId && grant.remainingAmount > 0);
+    const monthlyGrants = activeGrants
+      .filter((grant) => grant.grantType === "monthly" && grant.expiresAt && grant.expiresAt > now)
+      .sort((left, right) => (left.expiresAt ?? "").localeCompare(right.expiresAt ?? ""));
+    const activeMonthlyCard = await this.getActiveMonthlyCardForUser(userId, now);
+
+    return {
+      monthlyBalance: monthlyGrants.reduce((total, grant) => total + grant.remainingAmount, 0),
+      permanentBalance: activeGrants
+        .filter((grant) => grant.grantType === "permanent")
+        .reduce((total, grant) => total + grant.remainingAmount, 0),
+      monthlyPlanId: activeMonthlyCard?.planId ?? null,
+      monthlyPlanName: activeMonthlyCard?.planName ?? null,
+      monthlyExpiresAt: activeMonthlyCard?.expiresAt ?? monthlyGrants[0]?.expiresAt ?? null
+    };
+  }
+
+  async getActiveMonthlyCardForUser(userId: string, now: string, exceptOrderId?: string) {
+    const grant = [...this.creditGrants.values()]
+      .filter((item) =>
+        item.userId === userId &&
+        item.grantType === "monthly" &&
+        item.remainingAmount > 0 &&
+        item.sourceId !== exceptOrderId &&
+        item.expiresAt !== null &&
+        item.expiresAt > now
+      )
+      .sort((left, right) => (left.expiresAt ?? "").localeCompare(right.expiresAt ?? ""))[0] ?? null;
+
+    return this.getActiveMonthlyCardFromGrant(grant, userId);
+  }
+
+  private getActiveMonthlyCardFromGrant(grant: CreditGrant | null, userId: string) {
+    if (!grant?.expiresAt) {
+      return null;
+    }
+
+    const order = this.findMonthlyRechargeOrderForGrant(grant, userId);
+    const plan = order ? this.rechargePlans.get(order.planId) : null;
+
+    if (!plan || plan.planType !== "monthly") {
+      return null;
+    }
+
+    return {
+      planId: plan.id,
+      planName: plan.name,
+      expiresAt: grant.expiresAt
+    };
+  }
+
+  private findMonthlyRechargeOrderForGrant(grant: CreditGrant, userId: string) {
+    if (!grant.expiresAt) {
+      return null;
+    }
+
+    const directOrder = this.orders.get(grant.sourceId);
+
+    if (directOrder?.userId === userId && this.rechargePlans.get(directOrder.planId)?.planType === "monthly") {
+      return directOrder;
+    }
+
+    const ledger = [...this.creditLedger.values()]
+      .filter((item) => item.userId === userId && item.type === "recharge" && item.direction === "in" && item.sourceType === "recharge" && item.sourceId === grant.sourceId)
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
+    const ledgerOrder = ledger ? this.orders.get(ledger.sourceId) : null;
+
+    if (ledgerOrder?.userId === userId && this.rechargePlans.get(ledgerOrder.planId)?.planType === "monthly") {
+      return ledgerOrder;
+    }
+
+    const expiresAt = grant.expiresAt;
+    const startsAt = new Date(new Date(expiresAt).getTime() - 31 * 24 * 60 * 60 * 1000).toISOString();
+
+    return [...this.orders.values()]
+      .filter((order) =>
+        order.userId === userId &&
+        order.status === "PAID" &&
+        (order.planId === "monthly_plus" || order.planId === "monthly_pro") &&
+        (order.paidAt ?? order.createdAt) <= expiresAt &&
+        (order.paidAt ?? order.createdAt) >= startsAt
+      )
+      .sort((left, right) => (right.paidAt ?? right.createdAt).localeCompare(left.paidAt ?? left.createdAt))[0] ?? null;
+  }
+
+  async expireCreditGrantsForUser(userId: string, now: string, requestId: string) {
+    const expiredGrants = [...this.creditGrants.values()]
+      .filter((grant) => grant.userId === userId && grant.grantType === "monthly" && grant.remainingAmount > 0 && grant.expiresAt && grant.expiresAt <= now)
+      .sort((left, right) => (left.expiresAt ?? "").localeCompare(right.expiresAt ?? ""));
+
+    for (const grant of expiredGrants) {
+      const idempotencyKey = `credit_grant_expire:${grant.id}`;
+
+      if (this.ledgerByIdempotencyKey.has(idempotencyKey)) {
+        this.creditGrants.set(grant.id, {
+          ...grant,
+          remainingAmount: 0,
+          updatedAt: now
+        });
+        continue;
+      }
+
+      const previousAccount = await this.ensureCreditAccount(userId, now);
+      const account: CreditAccount = {
+        ...previousAccount,
+        balance: Math.max(0, previousAccount.balance - grant.remainingAmount),
+        version: previousAccount.version + 1,
+        updatedAt: now
+      };
+      const ledger: CreditLedger = {
+        id: randomUUID(),
+        userId,
+        requestId,
+        scene: "monthly_expire",
+        type: "consume",
+        direction: "out",
+        amount: grant.remainingAmount,
+        balanceAfter: account.balance,
+        status: "posted",
+        sourceType: "credit_grant",
+        sourceId: grant.id,
+        idempotencyKey,
+        remark: `月卡积分过期：${grant.remainingAmount.toLocaleString("zh-CN")} 积分`,
+        createdAt: now
+      };
+
+      this.creditAccounts.set(userId, account);
+      this.creditGrants.set(grant.id, {
+        ...grant,
+        remainingAmount: 0,
+        updatedAt: now
+      });
+      this.creditLedger.set(ledger.id, ledger);
+      this.ledgerByIdempotencyKey.set(idempotencyKey, ledger.id);
+    }
   }
 
   async applyCreditLedger(input: ApplyCreditLedgerInput): Promise<AppliedCreditLedger> {
@@ -531,13 +742,17 @@ export class MockLightQuantRepository implements LightQuantRepository {
       }
     }
 
+    if (input.direction === "out") {
+      return this.applyCreditConsumption(input);
+    }
+
     const previousAccount = await this.ensureCreditAccount(input.userId, input.createdAt);
     const signedAmount = input.direction === "in" ? input.amount : -input.amount;
     const account: CreditAccount = {
       ...previousAccount,
       balance: previousAccount.balance + signedAmount,
-      totalEarned: input.direction === "in" ? previousAccount.totalEarned + input.amount : previousAccount.totalEarned,
-      totalSpent: input.direction === "out" ? previousAccount.totalSpent + input.amount : previousAccount.totalSpent,
+      totalEarned: previousAccount.totalEarned + input.amount,
+      totalSpent: previousAccount.totalSpent,
       version: previousAccount.version + 1,
       updatedAt: input.createdAt
     };
@@ -551,10 +766,101 @@ export class MockLightQuantRepository implements LightQuantRepository {
     this.creditAccounts.set(input.userId, account);
     this.creditLedger.set(ledger.id, ledger);
     this.ledgerByIdempotencyKey.set(ledger.idempotencyKey, ledger.id);
+    const grantId = randomUUID();
+    this.creditGrants.set(grantId, {
+      id: grantId,
+      userId: input.userId,
+      grantType: input.grantType ?? "permanent",
+      sourceType: input.sourceType,
+      sourceId: input.sourceId,
+      initialAmount: input.amount,
+      remainingAmount: input.amount,
+      expiresAt: input.grantExpiresAt ?? null,
+      createdAt: input.createdAt,
+      updatedAt: input.createdAt
+    });
 
     return {
       account,
       ledger,
+      duplicated: false
+    };
+  }
+
+  private async applyCreditConsumption(input: ApplyCreditLedgerInput): Promise<AppliedCreditLedger> {
+    const previousAccount = await this.ensureCreditAccount(input.userId, input.createdAt);
+    const grants = [...this.creditGrants.values()]
+      .filter((grant) =>
+        grant.userId === input.userId &&
+        grant.remainingAmount > 0 &&
+        (grant.grantType === "permanent" || (grant.expiresAt !== null && grant.expiresAt > input.createdAt))
+      )
+      .sort((left, right) =>
+        left.grantType.localeCompare(right.grantType) ||
+        (left.expiresAt ?? "9999").localeCompare(right.expiresAt ?? "9999") ||
+        left.createdAt.localeCompare(right.createdAt)
+      );
+    const available = grants.reduce((total, grant) => total + grant.remainingAmount, 0);
+
+    if (available < input.amount || previousAccount.balance < input.amount) {
+      throw new ApiError("INSUFFICIENT_CREDITS", "积分余额不足，请先充值", 402);
+    }
+
+    let remaining = input.amount;
+    let runningBalance = previousAccount.balance;
+    const ledgers: CreditLedger[] = [];
+
+    for (const grant of grants) {
+      if (remaining <= 0) {
+        break;
+      }
+
+      const amount = Math.min(remaining, grant.remainingAmount);
+      remaining -= amount;
+      runningBalance -= amount;
+
+      this.creditGrants.set(grant.id, {
+        ...grant,
+        remainingAmount: grant.remainingAmount - amount,
+        updatedAt: input.createdAt
+      });
+
+      const ledger: CreditLedger = {
+        id: randomUUID(),
+        userId: input.userId,
+        requestId: input.requestId,
+        scene: `${input.scene}_${grant.grantType}`,
+        type: input.type,
+        direction: input.direction,
+        amount,
+        balanceAfter: runningBalance,
+        status: "posted",
+        sourceType: grant.grantType === "monthly" ? "monthly_credit" : "permanent_credit",
+        sourceId: input.sourceId,
+        idempotencyKey: ledgers.length === 0 ? input.idempotencyKey : `${input.idempotencyKey}:${grant.grantType}:${grant.id}`,
+        remark: `${input.remark}（${grant.grantType === "monthly" ? "月卡积分" : "基础积分"}）`,
+        createdAt: input.createdAt
+      };
+
+      this.creditLedger.set(ledger.id, ledger);
+      this.ledgerByIdempotencyKey.set(ledger.idempotencyKey, ledger.id);
+      ledgers.push(ledger);
+    }
+
+    const account: CreditAccount = {
+      ...previousAccount,
+      balance: runningBalance,
+      totalSpent: previousAccount.totalSpent + input.amount,
+      version: previousAccount.version + 1,
+      updatedAt: input.createdAt
+    };
+
+    this.creditAccounts.set(input.userId, account);
+
+    return {
+      account,
+      ledger: ledgers[0],
+      ledgers,
       duplicated: false
     };
   }
@@ -582,9 +888,10 @@ export class MockLightQuantRepository implements LightQuantRepository {
     });
   }
 
-  async listCreditLedger(userId: string, pagination: { page: number; pageSize: number }): Promise<LedgerPage> {
+  async listCreditLedger(userId: string, pagination: { page: number; pageSize: number }, filters: CreditLedgerFilters = {}): Promise<LedgerPage> {
     const allItems = [...this.creditLedger.values()]
       .filter((item) => item.userId === userId)
+      .filter((item) => matchesCreditLedgerFilters(item, filters))
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
     const start = (pagination.page - 1) * pagination.pageSize;
 
@@ -602,6 +909,15 @@ export class MockLightQuantRepository implements LightQuantRepository {
 
   async findRechargePlanById(id: string) {
     return this.rechargePlans.get(id) ?? null;
+  }
+
+  async hasPaidRechargeOrderForPlan(userId: string, planId: string, exceptOrderId?: string) {
+    return [...this.orders.values()].some((order) =>
+      order.userId === userId &&
+      order.planId === planId &&
+      order.status === "PAID" &&
+      order.id !== exceptOrderId
+    );
   }
 
   async findOrderById(id: string) {

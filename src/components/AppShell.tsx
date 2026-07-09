@@ -45,6 +45,9 @@ type CurrentUserData = {
   };
   creditAccount: {
     balance: number;
+    monthlyPlanId?: string | null;
+    monthlyPlanName?: string | null;
+    monthlyExpiresAt?: string | null;
     totalEarned: number;
     totalSpent: number;
     version: number;
@@ -352,16 +355,22 @@ export function AppShell({ children, initialCurrentUser = null, paymentFeatureEn
       setLoginOpen(true);
     }
 
+    function handleOpenLogin() {
+      setLoginOpen(true);
+    }
+
     window.addEventListener("lightquant:credits-updated", handleCreditsUpdated);
     window.addEventListener("lightquant:ai-tasks-updated", handleAiTasksUpdated);
     window.addEventListener("lightquant:open-wechat", handleOpenWechat);
     window.addEventListener("lightquant:open-recharge", handleOpenRecharge);
+    window.addEventListener("lightquant:open-login", handleOpenLogin);
 
     return () => {
       window.removeEventListener("lightquant:credits-updated", handleCreditsUpdated);
       window.removeEventListener("lightquant:ai-tasks-updated", handleAiTasksUpdated);
       window.removeEventListener("lightquant:open-wechat", handleOpenWechat);
       window.removeEventListener("lightquant:open-recharge", handleOpenRecharge);
+      window.removeEventListener("lightquant:open-login", handleOpenLogin);
     };
   }, [isLoggedIn, paymentFeatureEnabled, refreshCurrentUser, refreshRecentConversations]);
 
@@ -382,6 +391,7 @@ export function AppShell({ children, initialCurrentUser = null, paymentFeatureEn
     setInviteOpen(false);
     setLoginOpen(false);
     setRechargeOpen(false);
+    window.dispatchEvent(new Event("lightquant:auth-updated"));
   }
 
   function handleOpenRechargeFromMenu() {
@@ -554,6 +564,8 @@ export function AppShell({ children, initialCurrentUser = null, paymentFeatureEn
           <CreditActionPopover
             betaVipActive={betaVipActive}
             betaVipExpiryLabel={betaVipExpiryLabel}
+            monthlyExpiresAt={currentUser?.creditAccount.monthlyExpiresAt ?? null}
+            monthlyPlanName={currentUser?.creditAccount.monthlyPlanName ?? null}
             onClose={() => setCreditActionsOpen(false)}
             onLogout={handleLogout}
             onOpenInvite={handleOpenInviteFromMenu}
@@ -580,7 +592,7 @@ export function AppShell({ children, initialCurrentUser = null, paymentFeatureEn
             </span>
             <span className="lq-login-content">
               <p className="lq-login-title">{currentUser?.user.displayName ?? "未登录"}</p>
-              <p className="lq-login-subtitle">{isLoggedIn ? `积分余额 ${userPoints.toLocaleString("zh-CN")}` : "登录后查看积分"}</p>
+              <p className="lq-login-subtitle">{isLoggedIn ? `总可用积分 ${userPoints.toLocaleString("zh-CN")}` : "登录后查看积分"}</p>
             </span>
           </button>
         </div>

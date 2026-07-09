@@ -122,6 +122,11 @@ export type CreditAccount = {
   totalSpent: number;
   version: number;
   updatedAt: string;
+  monthlyBalance: number;
+  permanentBalance: number;
+  monthlyPlanId: string | null;
+  monthlyPlanName: string | null;
+  monthlyExpiresAt: string | null;
 };
 
 export type CreditLedgerDirection = "in" | "out";
@@ -145,6 +150,21 @@ export type CreditLedger = {
   createdAt: string;
 };
 
+export type CreditGrantType = "permanent" | "monthly";
+
+export type CreditGrant = {
+  id: string;
+  userId: string;
+  grantType: CreditGrantType;
+  sourceType: string;
+  sourceId: string;
+  initialAmount: number;
+  remainingAmount: number;
+  expiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type Pagination = {
   page: number;
   pageSize: number;
@@ -159,6 +179,9 @@ export type RechargePlan = {
   id: string;
   name: string;
   description: string;
+  planType: CreditGrantType;
+  validityDays: number | null;
+  purchaseLimit: number | null;
   priceCents: number;
   points: number;
   bonusPoints: number;

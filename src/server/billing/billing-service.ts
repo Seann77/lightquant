@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { applyRechargeCredit } from "@/server/credits/credit-service";
 import type { OrderStatus, PayChannel, PaymentProvider, PaymentTransaction, RechargeOrder, RechargePlan } from "@/server/domain";
-import { isPaymentFeatureEnabled } from "@/server/env";
+import { getPaymentTestAmountCents, isPaymentFeatureEnabled } from "@/server/env";
 import { ApiError } from "@/server/http/api-response";
 import { requireAdmin } from "@/server/admin/admin-auth";
 import { createPaymentAction } from "@/server/payments/payment-provider";
@@ -34,7 +34,7 @@ type MaintenanceInput = {
   maintenanceSecret?: string | null;
 };
 
-export async function listRechargePlans() {
+export async function listRechargePlans(userId?: string | null) {
   const paymentChannels = listPaymentChannelAvailability();
   if (!isPaymentFeatureEnabled()) {
     return {
@@ -45,10 +45,13 @@ export async function listRechargePlans() {
   }
 
   const plans = await getRepository().listEnabledRechargePlans();
+  const promoPurchased = userId ? await getRepository().hasPaidRechargeOrderForPlan(userId, "promo") : false;
   const defaultPayChannel = paymentChannels.find((channel) => channel.enabled)?.id ?? null;
 
   return {
-    items: plans.map(toRechargePlanResponse),
+    items: plans.map((plan) => toRechargePlanResponse(plan, {
+      alreadyPurchased: plan.id === "promo" && promoPurchased
+    })),
     paymentChannels,
     defaultPayChannel
   };
@@ -93,6 +96,11 @@ export async function createRechargeOrder(userId: string, input: CreateRechargeO
       };
     }
 
+    const existingPlan = await repository.findRechargePlanById(existingOrder.planId);
+    if (existingPlan) {
+      await assertPlanPurchaseAllowed(userId, existingPlan, existingOrder.id);
+    }
+
     assertPayChannelAvailable(payChannel);
     const paymentAction = await createPaymentAction(existingOrder);
 
@@ -111,11 +119,13 @@ export async function createRechargeOrder(userId: string, input: CreateRechargeO
     throw new ApiError("NOT_FOUND", "充值套餐不存在或已下架", 404);
   }
 
+  await assertPlanPurchaseAllowed(userId, plan);
+
   const order = await repository.createRechargeOrder({
     orderNo: createOrderNo(),
     userId,
     planId: plan.id,
-    amountCents: plan.priceCents,
+    amountCents: getEffectiveRechargePriceCents(plan),
     points: plan.points,
     bonusPoints: plan.bonusPoints,
     totalPoints: plan.totalPoints,
@@ -254,6 +264,11 @@ export async function handleMockPaymentNotify(input: MockNotifyInput, requestId:
 
     if (order.status === "FAILED") {
       throw new ApiError("FORBIDDEN", "失败订单不允许自动支付入账", 403);
+    }
+
+    const plan = await repository.findRechargePlanById(order.planId);
+    if (plan) {
+      await assertPlanPurchaseAllowed(order.userId, plan, order.id);
     }
 
     if (isOrderExpired(order.createdAt, new Date(now))) {
@@ -412,6 +427,11 @@ export async function handleVerifiedPaymentNotify(input: VerifiedPaymentNotifyIn
       throw new ApiError("FORBIDDEN", "失败订单不允许自动支付入账", 403);
     }
 
+    const plan = await repository.findRechargePlanById(order.planId);
+    if (plan) {
+      await assertPlanPurchaseAllowed(order.userId, plan, order.id);
+    }
+
     if (isOrderExpired(order.createdAt, new Date(now))) {
       const closeResult = await repository.closeExpiredRechargeOrders(paymentCutoff(now), now);
       const closedOrder = closeResult.count > 0 ? await repository.findOrderById(order.id) : null;
@@ -479,19 +499,49 @@ export async function closeExpiredOrders(input: MaintenanceInput = {}) {
   };
 }
 
-function toRechargePlanResponse(plan: RechargePlan) {
+async function assertPlanPurchaseAllowed(userId: string, plan: RechargePlan, exceptOrderId?: string) {
+  const repository = getRepository();
+
+  if (plan.id === "promo") {
+    const alreadyPurchased = await repository.hasPaidRechargeOrderForPlan(userId, plan.id, exceptOrderId);
+
+    if (alreadyPurchased) {
+      throw new ApiError("PROMO_PLAN_ALREADY_PURCHASED", "特惠包每个账号仅可购买一次", 409);
+    }
+  }
+
+  if (plan.planType === "monthly") {
+    const activeMonthlyCard = await repository.getActiveMonthlyCardForUser(userId, new Date().toISOString(), exceptOrderId);
+
+    if (activeMonthlyCard) {
+      throw new ApiError("ACTIVE_MONTHLY_CARD_EXISTS", "当前已有有效月卡，到期后可重新购买。", 409);
+    }
+  }
+}
+
+function toRechargePlanResponse(plan: RechargePlan, state: { alreadyPurchased?: boolean } = {}) {
+  const priceCents = getEffectiveRechargePriceCents(plan);
+
   return {
     id: plan.id,
     name: plan.name,
     description: plan.description,
-    priceCents: plan.priceCents,
-    price: (plan.priceCents / 100).toFixed(2),
+    planType: plan.planType,
+    validityDays: plan.validityDays,
+    purchaseLimit: plan.purchaseLimit,
+    alreadyPurchased: Boolean(state.alreadyPurchased),
+    priceCents,
+    price: (priceCents / 100).toFixed(2),
     points: plan.points,
     bonusPoints: plan.bonusPoints,
     totalPoints: plan.totalPoints,
     enabled: plan.enabled,
     sort: plan.sort
   };
+}
+
+function getEffectiveRechargePriceCents(plan: RechargePlan) {
+  return getPaymentTestAmountCents() ?? plan.priceCents;
 }
 
 function toOrderResponse(order: RechargeOrder) {

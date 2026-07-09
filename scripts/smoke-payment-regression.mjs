@@ -66,6 +66,14 @@ const steps = [
     args: ["run", "smoke:payment:expired-notify"]
   },
   {
+    name: "smoke:payment:credit-buckets",
+    args: ["run", "smoke:payment:credit-buckets"]
+  },
+  {
+    name: "smoke:payment:recharge-modal-ui",
+    args: ["run", "smoke:payment:recharge-modal-ui"]
+  },
+  {
     name: "smoke:payment:notify",
     args: ["run", "smoke:payment:notify"]
   },

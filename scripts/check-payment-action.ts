@@ -108,11 +108,11 @@ function createPreviewOrder(payChannel: PayChannel, date: Date): RechargeOrder {
     id: "payment-action-preflight-order-id",
     orderNo: `LQPRE${date.toISOString().replace(/\D/g, "").slice(0, 14)}000001`,
     userId: "payment-action-preflight-user-id",
-    planId: "payment-action-preflight-plan-id",
+    planId: "monthly_plus",
     amountCents: 1,
-    points: 1,
+    points: 6000,
     bonusPoints: 0,
-    totalPoints: 1,
+    totalPoints: 6000,
     payChannel,
     status: "PENDING",
     clientRequestId: "payment-action-preflight",
@@ -209,8 +209,10 @@ function describeRedirectUrl(value: string) {
       totalAmount: typeof bizContent?.total_amount === "string" ? bizContent.total_amount : null,
       outTradeNoConfigured: Boolean(bizContent?.out_trade_no),
       productCode: typeof bizContent?.product_code === "string" ? bizContent.product_code : null,
+      subject: typeof bizContent?.subject === "string" ? bizContent.subject : null,
+      body: typeof bizContent?.body === "string" ? bizContent.body : null,
       timeoutExpress: typeof bizContent?.timeout_express === "string" ? bizContent.timeout_express : null,
-      timeoutMatchesConfig: bizContent?.timeout_express === `${readPositiveInteger("PAYMENT_ORDER_EXPIRE_MINUTES", 30)}m`
+      timeoutMatchesConfig: bizContent?.timeout_express === `${readPositiveInteger("PAYMENT_ORDER_EXPIRE_MINUTES", 5)}m`
     };
   } catch {
     return {
@@ -245,6 +247,7 @@ function describeProviderRequest(mode: PayChannel, capturedFetch?: CapturedFetch
     hasNotifyUrl: Boolean(body?.notify_url),
     notifyUrl: typeof body?.notify_url === "string" ? describeNestedUrl(body.notify_url) : null,
     amountCents: isRecord(body?.amount) ? body.amount.total : null,
+    description: typeof body?.description === "string" ? body.description : null,
     timeExpireConfigured: Boolean(body?.time_expire),
     timeExpire: typeof body?.time_expire === "string" ? body.time_expire : null,
     timeExpireFormatValid: typeof body?.time_expire === "string" && isWechatRfc3339(body.time_expire)
@@ -266,7 +269,9 @@ function describeNestedUrl(value: unknown) {
       validUrl: true,
       protocol: url.protocol,
       hostType: getHostType(url.hostname),
-      path: url.pathname
+      path: url.pathname,
+      paymentReturn: url.searchParams.get("paymentReturn"),
+      orderId: url.searchParams.get("orderId")
     };
   } catch {
     return {
@@ -344,6 +349,27 @@ function validatePreflight(mode: PayChannel, action: Record<string, unknown>, pr
     if (redirect?.timeoutMatchesConfig !== true) {
       errors.push("Alipay timeout_express does not match PAYMENT_ORDER_EXPIRE_MINUTES.");
     }
+
+    if (redirect?.subject !== "LightQuant 月卡 Plus（6000积分/30天）") {
+      errors.push("Alipay subject must describe monthly Plus instead of generic credits.");
+    }
+
+    if (redirect?.body !== "月卡积分 30 天内有效，优先消耗") {
+      errors.push("Alipay body must describe monthly validity and priority consumption.");
+    }
+
+    const returnUrl = isRecord(redirect?.returnUrl) ? redirect.returnUrl : null;
+    if (returnUrl?.path !== "/credits") {
+      errors.push("Alipay return_url path must be /credits.");
+    }
+
+    if (returnUrl?.paymentReturn !== "1") {
+      errors.push("Alipay return_url must include paymentReturn=1.");
+    }
+
+    if (returnUrl?.orderId !== "payment-action-preflight-order-id") {
+      errors.push("Alipay return_url must include the orderId query parameter.");
+    }
   }
 
   if (mode === "wechat") {
@@ -353,6 +379,10 @@ function validatePreflight(mode: PayChannel, action: Record<string, unknown>, pr
 
     if (providerRequest?.timeExpireFormatValid !== true) {
       errors.push("WeChat native prepay time_expire must be second-level RFC3339 with timezone.");
+    }
+
+    if (providerRequest?.description !== "LightQuant 月卡 Plus（6000积分/30天）") {
+      errors.push("WeChat native prepay description must describe monthly Plus.");
     }
   }
 

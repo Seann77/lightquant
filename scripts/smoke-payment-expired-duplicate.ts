@@ -5,7 +5,7 @@ const createdAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 process.env.LIGHTQUANT_DATA_MODE = "mock";
 process.env.LIGHTQUANT_PAYMENT_MODE = "mock";
 process.env.PAYMENT_MOCK_ENABLED = "true";
-process.env.PAYMENT_ORDER_EXPIRE_MINUTES = "30";
+process.env.PAYMENT_ORDER_EXPIRE_MINUTES = "5";
 
 console.log("LightQuant expired duplicate recharge order smoke test");
 console.log(

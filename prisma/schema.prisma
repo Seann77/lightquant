@@ -153,6 +153,7 @@ model User {
 
   creditAccount      CreditAccount?
   creditLedger       CreditLedger[]
+  creditGrants       CreditGrant[]
   creditReservations CreditReservation[]
   rechargeOrders     RechargeOrder[]
   aiTasks            AiTask[]
@@ -258,6 +259,26 @@ model CreditLedger {
   @@index([userId, createdAt])
   @@index([createdAt])
   @@map("credit_ledger")
+}
+
+model CreditGrant {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  grantType       String   @map("grant_type") @db.VarChar(20)
+  sourceType      String   @map("source_type") @db.VarChar(80)
+  sourceId        String   @map("source_id") @db.VarChar(120)
+  initialAmount   Int      @map("initial_amount")
+  remainingAmount Int      @map("remaining_amount")
+  expiresAt       DateTime? @map("expires_at") @db.Timestamptz(3)
+  createdAt       DateTime @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime @map("updated_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceType, sourceId, grantType])
+  @@index([userId, grantType, expiresAt])
+  @@index([userId, remainingAmount])
+  @@map("credit_grants")
 }
 
 model CreditReservation {
@@ -390,6 +411,9 @@ model RechargePlan {
   id          String   @id @db.VarChar(40)
   name        String   @db.VarChar(80)
   description String   @db.Text
+  planType    String   @default("permanent") @map("plan_type") @db.VarChar(20)
+  validityDays Int?    @map("validity_days")
+  purchaseLimit Int?   @map("purchase_limit")
   priceCents  Int      @map("price_cents")
   points      Int
   bonusPoints Int      @map("bonus_points")

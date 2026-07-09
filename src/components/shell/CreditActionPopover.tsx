@@ -5,6 +5,8 @@ import { CreditCard, FileText, Gift, LogOut } from "lucide-react";
 type CreditActionPopoverProps = {
   betaVipActive?: boolean;
   betaVipExpiryLabel?: string;
+  monthlyExpiresAt?: string | null;
+  monthlyPlanName?: string | null;
   onClose: () => void;
   onOpenInvite: () => void;
   onOpenRecharge: () => void;
@@ -15,8 +17,10 @@ type CreditActionPopoverProps = {
 };
 
 export function CreditActionPopover({
-  betaVipActive = false,
-  betaVipExpiryLabel = "",
+  betaVipActive: _betaVipActive = false,
+  betaVipExpiryLabel: _betaVipExpiryLabel = "",
+  monthlyExpiresAt = null,
+  monthlyPlanName = null,
   onClose,
   onLogout,
   onOpenInvite,
@@ -29,7 +33,8 @@ export function CreditActionPopover({
     return null;
   }
 
-  const vipExpiryText = betaVipExpiryLabel ? `会员${betaVipExpiryLabel}到期` : "会员6月28日到期";
+  const monthlyDate = monthlyExpiresAt ? formatDateOnly(monthlyExpiresAt) : "";
+  const monthlyTone = monthlyPlanName === "月卡 Pro" ? "blue" : "green";
 
   return (
     <>
@@ -43,11 +48,10 @@ export function CreditActionPopover({
         className="absolute bottom-[calc(100%+12px)] left-0 z-40 w-full overflow-hidden rounded-xl border border-outline-variant bg-paper p-xs shadow-modal"
         role="menu"
       >
-        {betaVipActive ? (
-          <div className="lq-credit-vip-panel" role="status">
-            <p className="lq-credit-vip-title">内测VIP生效中</p>
-            <p>{vipExpiryText}</p>
-            <p>会员期内使用不消耗积分</p>
+        {monthlyPlanName && monthlyDate ? (
+          <div className={`mb-xs rounded-lg px-sm py-xs text-caption-md ${monthlyTone === "blue" ? "bg-[#eef5ff]" : "bg-[#ecfff7]"}`} role="status">
+            <p className={`m-0 font-bold ${monthlyTone === "blue" ? "text-[#0b63ff]" : "text-[#047857]"}`}>{monthlyPlanName}</p>
+            <p className="m-0 text-secondary">{monthlyDate}</p>
           </div>
         ) : null}
         {paymentFeatureEnabled ? (
@@ -92,4 +96,20 @@ export function CreditActionPopover({
       </div>
     </>
   );
+}
+
+function formatDateOnly(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  })
+    .format(date)
+    .replace(/\//g, "-");
 }

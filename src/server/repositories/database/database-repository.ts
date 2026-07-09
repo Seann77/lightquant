@@ -12,6 +12,7 @@ import type {
   AiModelSecret,
   ContactRequest,
   CreditAccount,
+  CreditGrant,
   CreditLedger,
   CreditReservation,
   PaymentTransaction,
@@ -63,6 +64,7 @@ import type {
   CreateUploadedFileInput,
   CreateUserLegalConsentInput,
   CreateUserInput,
+  CreditLedgerFilters,
   LedgerPage,
   LightQuantRepository,
   SetActiveAiModelProfileInput,
@@ -75,6 +77,42 @@ import type {
 } from "@/server/repositories/types";
 
 type PrismaDb = PrismaClient | Prisma.TransactionClient;
+
+function creditLedgerCategoryWhere(category: CreditLedgerFilters["category"]): Prisma.CreditLedgerWhereInput {
+  if (category === "income") {
+    return {
+      direction: "in",
+      type: {
+        not: "refund"
+      }
+    };
+  }
+
+  if (category === "consume") {
+    return {
+      direction: "out"
+    };
+  }
+
+  if (category === "refund") {
+    return {
+      type: "refund"
+    };
+  }
+
+  return {};
+}
+
+function creditLedgerCreatedAtWhere(filters: CreditLedgerFilters): Prisma.DateTimeFilter | undefined {
+  if (!filters.createdFrom && !filters.createdToExclusive) {
+    return undefined;
+  }
+
+  return {
+    gte: filters.createdFrom ? toDate(filters.createdFrom) : undefined,
+    lt: filters.createdToExclusive ? toDate(filters.createdToExclusive) : undefined
+  };
+}
 
 export class DatabaseLightQuantRepository implements LightQuantRepository {
   constructor(private readonly db: PrismaDb = getPrismaClient()) {}
@@ -691,6 +729,277 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
     return toCreditAccount(account);
   }
 
+  async getCreditGrantSummary(userId: string, now: string) {
+    const [monthly, permanent, nearestMonthly] = await Promise.all([
+      this.db.creditGrant.aggregate({
+        where: {
+          userId,
+          grantType: "monthly",
+          remainingAmount: {
+            gt: 0
+          },
+          expiresAt: {
+            gt: toDate(now)
+          }
+        },
+        _sum: {
+          remainingAmount: true
+        }
+      }),
+      this.db.creditGrant.aggregate({
+        where: {
+          userId,
+          grantType: "permanent",
+          remainingAmount: {
+            gt: 0
+          }
+        },
+        _sum: {
+          remainingAmount: true
+        }
+      }),
+      this.db.creditGrant.findFirst({
+        where: {
+          userId,
+          grantType: "monthly",
+          remainingAmount: {
+            gt: 0
+          },
+          expiresAt: {
+            gt: toDate(now)
+          }
+        },
+        orderBy: {
+          expiresAt: "asc"
+        }
+      })
+    ]);
+    const activeMonthlyCard = await this.getActiveMonthlyCardForUser(userId, now);
+
+    return {
+      monthlyBalance: monthly._sum.remainingAmount ?? 0,
+      permanentBalance: permanent._sum.remainingAmount ?? 0,
+      monthlyPlanId: activeMonthlyCard?.planId ?? null,
+      monthlyPlanName: activeMonthlyCard?.planName ?? null,
+      monthlyExpiresAt: activeMonthlyCard?.expiresAt ?? (nearestMonthly?.expiresAt ? toIso(nearestMonthly.expiresAt) : null)
+    };
+  }
+
+  async getActiveMonthlyCardForUser(userId: string, now: string, exceptOrderId?: string) {
+    const grant = await this.db.creditGrant.findFirst({
+      where: {
+        userId,
+        grantType: "monthly",
+        remainingAmount: {
+          gt: 0
+        },
+        sourceId: exceptOrderId
+          ? {
+              not: exceptOrderId
+            }
+          : undefined,
+        expiresAt: {
+          gt: toDate(now)
+        }
+      },
+      orderBy: {
+        expiresAt: "asc"
+      }
+    });
+
+    return this.getActiveMonthlyCardFromGrant(grant?.expiresAt ? {
+      userId,
+      sourceType: grant.sourceType,
+      sourceId: grant.sourceId,
+      expiresAt: toIso(grant.expiresAt),
+      createdAt: toIso(grant.createdAt)
+    } : null);
+  }
+
+  private async getActiveMonthlyCardFromGrant(grant: { userId: string; sourceType: string; sourceId: string; expiresAt: string; createdAt: string } | null) {
+    if (!grant?.expiresAt) {
+      return null;
+    }
+
+    const order = await this.findMonthlyRechargeOrderForGrant(grant);
+
+    if (!order || order.plan.planType !== "monthly") {
+      return null;
+    }
+
+    return {
+      planId: order.plan.id,
+      planName: order.plan.name,
+      expiresAt: grant.expiresAt
+    };
+  }
+
+  private async findMonthlyRechargeOrderForGrant(grant: { userId: string; sourceType: string; sourceId: string; expiresAt: string; createdAt: string }) {
+    const directOrder = await this.db.rechargeOrder.findUnique({
+      where: {
+        id: grant.sourceId
+      },
+      include: {
+        plan: true
+      }
+    }).catch(() => null);
+
+    if (directOrder?.userId === grant.userId && directOrder.plan.planType === "monthly") {
+      return directOrder;
+    }
+
+    const ledgerOrder = await this.db.creditLedger.findFirst({
+      where: {
+        userId: grant.userId,
+        type: "recharge",
+        direction: "in",
+        sourceType: "recharge",
+        sourceId: grant.sourceId
+      },
+      orderBy: {
+        createdAt: "desc"
+      }
+    }).then((ledger) =>
+      ledger
+        ? this.db.rechargeOrder.findUnique({
+            where: {
+              id: ledger.sourceId
+            },
+            include: {
+              plan: true
+            }
+          }).catch(() => null)
+        : null
+    );
+
+    if (ledgerOrder?.userId === grant.userId && ledgerOrder.plan.planType === "monthly") {
+      return ledgerOrder;
+    }
+
+    return this.db.rechargeOrder.findFirst({
+      where: {
+        userId: grant.userId,
+        status: "PAID",
+        planId: {
+          in: ["monthly_plus", "monthly_pro"]
+        },
+        paidAt: {
+          lte: toDate(grant.expiresAt),
+          gte: new Date(new Date(grant.expiresAt).getTime() - 31 * 24 * 60 * 60 * 1000)
+        }
+      },
+      include: {
+        plan: true
+      },
+      orderBy: [
+        {
+          paidAt: "desc"
+        },
+        {
+          createdAt: "desc"
+        }
+      ]
+    });
+  }
+
+  async expireCreditGrantsForUser(userId: string, now: string, requestId: string) {
+    await this.withTransaction(async (repository) => {
+      await lockCreditAccount(repository.db, userId, now);
+
+      const expiredGrants = await repository.db.creditGrant.findMany({
+        where: {
+          userId,
+          grantType: "monthly",
+          remainingAmount: {
+            gt: 0
+          },
+          expiresAt: {
+            lte: toDate(now)
+          }
+        },
+        orderBy: [
+          {
+            expiresAt: "asc"
+          },
+          {
+            createdAt: "asc"
+          }
+        ]
+      });
+
+      for (const grant of expiredGrants) {
+        const idempotencyKey = `credit_grant_expire:${grant.id}`;
+        const existing = await repository.db.creditLedger.findUnique({
+          where: {
+            idempotencyKey
+          }
+        });
+
+        if (existing) {
+          await repository.db.creditGrant.update({
+            where: {
+              id: grant.id
+            },
+            data: {
+              remainingAmount: 0,
+              updatedAt: toDate(now)
+            }
+          });
+          continue;
+        }
+
+        const account = await repository.db.creditAccount.findUniqueOrThrow({
+          where: {
+            userId
+          }
+        });
+        const amount = grant.remainingAmount;
+        const nextBalance = Math.max(0, account.balance - amount);
+        const updatedAccount = await repository.db.creditAccount.update({
+          where: {
+            userId
+          },
+          data: {
+            balance: nextBalance,
+            version: {
+              increment: 1
+            },
+            updatedAt: toDate(now)
+          }
+        });
+
+        await repository.db.creditGrant.update({
+          where: {
+            id: grant.id
+          },
+          data: {
+            remainingAmount: 0,
+            updatedAt: toDate(now)
+          }
+        });
+
+        await repository.db.creditLedger.create({
+          data: {
+            id: randomUUID(),
+            userId,
+            requestId,
+            scene: "monthly_expire",
+            type: "consume",
+            direction: "out",
+            amount,
+            balanceAfter: updatedAccount.balance,
+            status: "posted",
+            sourceType: "credit_grant",
+            sourceId: grant.id,
+            idempotencyKey,
+            remark: `月卡积分过期：${amount.toLocaleString("zh-CN")} 积分`,
+            createdAt: toDate(now)
+          }
+        });
+      }
+    });
+  }
+
   async applyCreditLedger(input: ApplyCreditLedgerInput): Promise<AppliedCreditLedger> {
     return this.withTransaction(async (repository) => repository.applyCreditLedgerInTransaction(input));
   }
@@ -743,6 +1052,10 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
       };
     }
 
+    if (input.direction === "out") {
+      return this.applyCreditConsumptionInTransaction(input);
+    }
+
     await this.ensureCreditAccount(input.userId, input.createdAt);
     await lockCreditAccount(this.db, input.userId);
 
@@ -778,8 +1091,9 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
       },
       data: {
         balance: nextBalance,
-        totalEarned: input.direction === "in" ? { increment: input.amount } : undefined,
-        totalSpent: input.direction === "out" ? { increment: input.amount } : undefined,
+        totalEarned: {
+          increment: input.amount
+        },
         version: {
           increment: 1
         },
@@ -804,6 +1118,24 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
         createdAt: toDate(input.createdAt)
       }
     });
+    await this.db.creditGrant.create({
+      data: {
+        id: randomUUID(),
+        userId: input.userId,
+        grantType: input.grantType ?? "permanent",
+        sourceType: input.sourceType,
+        sourceId: input.sourceId,
+        initialAmount: input.amount,
+        remainingAmount: input.amount,
+        expiresAt: input.grantExpiresAt ? toDate(input.grantExpiresAt) : null,
+        createdAt: toDate(input.createdAt),
+        updatedAt: toDate(input.createdAt)
+      }
+    }).catch((error) => {
+      if (!isUniqueConstraintError(error)) {
+        throw error;
+      }
+    });
 
     return {
       account: toCreditAccount(updatedAccount),
@@ -812,12 +1144,149 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
     };
   }
 
-  async listCreditLedger(userId: string, pagination: { page: number; pageSize: number }): Promise<LedgerPage> {
+  private async applyCreditConsumptionInTransaction(input: ApplyCreditLedgerInput): Promise<AppliedCreditLedger> {
+    await this.ensureCreditAccount(input.userId, input.createdAt);
+    await lockCreditAccount(this.db, input.userId);
+
+    const existingAfterLock = await this.db.creditLedger.findUnique({
+      where: {
+        idempotencyKey: input.idempotencyKey
+      }
+    });
+
+    if (existingAfterLock) {
+      return {
+        account: await this.ensureCreditAccount(input.userId, input.createdAt),
+        ledger: toCreditLedger(existingAfterLock),
+        duplicated: true
+      };
+    }
+
+    const previousAccount = await this.db.creditAccount.findUniqueOrThrow({
+      where: {
+        userId: input.userId
+      }
+    });
+    const grants = await this.db.creditGrant.findMany({
+      where: {
+        userId: input.userId,
+        remainingAmount: {
+          gt: 0
+        },
+        OR: [
+          {
+            grantType: "permanent"
+          },
+          {
+            grantType: "monthly",
+            expiresAt: {
+              gt: toDate(input.createdAt)
+            }
+          }
+        ]
+      },
+      orderBy: [
+        {
+          grantType: "asc"
+        },
+        {
+          expiresAt: {
+            sort: "asc",
+            nulls: "last"
+          }
+        },
+        {
+          createdAt: "asc"
+        }
+      ]
+    });
+    const available = grants.reduce((total, grant) => total + grant.remainingAmount, 0);
+
+    if (available < input.amount || previousAccount.balance < input.amount) {
+      throw new ApiError("INSUFFICIENT_CREDITS", "积分余额不足，请先充值", 402);
+    }
+
+    let remaining = input.amount;
+    let runningBalance = previousAccount.balance;
+    const ledgers: CreditLedger[] = [];
+
+    for (const grant of grants) {
+      if (remaining <= 0) {
+        break;
+      }
+
+      const amount = Math.min(remaining, grant.remainingAmount);
+      remaining -= amount;
+      runningBalance -= amount;
+
+      await this.db.creditGrant.update({
+        where: {
+          id: grant.id
+        },
+        data: {
+          remainingAmount: {
+            decrement: amount
+          },
+          updatedAt: toDate(input.createdAt)
+        }
+      });
+
+      const ledger = await this.db.creditLedger.create({
+        data: {
+          id: randomUUID(),
+          userId: input.userId,
+          requestId: input.requestId,
+          scene: `${input.scene}_${grant.grantType}`,
+          type: input.type,
+          direction: input.direction,
+          amount,
+          balanceAfter: runningBalance,
+          status: "posted",
+          sourceType: grant.grantType === "monthly" ? "monthly_credit" : "permanent_credit",
+          sourceId: input.sourceId,
+          idempotencyKey: ledgers.length === 0 ? input.idempotencyKey : `${input.idempotencyKey}:${grant.grantType}:${grant.id}`,
+          remark: `${input.remark}（${grant.grantType === "monthly" ? "月卡积分" : "基础积分"}）`,
+          createdAt: toDate(input.createdAt)
+        }
+      });
+
+      ledgers.push(toCreditLedger(ledger));
+    }
+
+    const updatedAccount = await this.db.creditAccount.update({
+      where: {
+        userId: input.userId
+      },
+      data: {
+        balance: runningBalance,
+        totalSpent: {
+          increment: input.amount
+        },
+        version: {
+          increment: 1
+        },
+        updatedAt: toDate(input.createdAt)
+      }
+    });
+
+    return {
+      account: toCreditAccount(updatedAccount),
+      ledger: ledgers[0],
+      ledgers,
+      duplicated: false
+    };
+  }
+
+  async listCreditLedger(userId: string, pagination: { page: number; pageSize: number }, filters: CreditLedgerFilters = {}): Promise<LedgerPage> {
+    const where: Prisma.CreditLedgerWhereInput = {
+      userId,
+      ...creditLedgerCategoryWhere(filters.category),
+      createdAt: creditLedgerCreatedAtWhere(filters)
+    };
+
     const [items, total] = await Promise.all([
       this.db.creditLedger.findMany({
-        where: {
-          userId
-        },
+        where,
         orderBy: {
           createdAt: "desc"
         },
@@ -825,9 +1294,7 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
         take: pagination.pageSize
       }),
       this.db.creditLedger.count({
-        where: {
-          userId
-        }
+        where
       })
     ]);
 
@@ -858,6 +1325,23 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
     });
 
     return plan ? toRechargePlan(plan) : null;
+  }
+
+  async hasPaidRechargeOrderForPlan(userId: string, planId: string, exceptOrderId?: string) {
+    const count = await this.db.rechargeOrder.count({
+      where: {
+        userId,
+        planId,
+        status: "PAID",
+        id: exceptOrderId
+          ? {
+              not: exceptOrderId
+            }
+          : undefined
+      }
+    });
+
+    return count > 0;
   }
 
   async findOrderById(id: string) {
@@ -2506,7 +2990,12 @@ function toCreditAccount(account: {
     totalEarned: account.totalEarned,
     totalSpent: account.totalSpent,
     version: account.version,
-    updatedAt: toIso(account.updatedAt)
+    updatedAt: toIso(account.updatedAt),
+    monthlyBalance: 0,
+    permanentBalance: account.balance,
+    monthlyPlanId: null,
+    monthlyPlanName: null,
+    monthlyExpiresAt: null
   };
 }
 
@@ -2548,6 +3037,9 @@ function toRechargePlan(plan: {
   id: string;
   name: string;
   description: string;
+  planType: string;
+  validityDays: number | null;
+  purchaseLimit: number | null;
   priceCents: number;
   points: number;
   bonusPoints: number;
@@ -2561,6 +3053,9 @@ function toRechargePlan(plan: {
     id: plan.id,
     name: plan.name,
     description: plan.description,
+    planType: normalizeCreditGrantType(plan.planType),
+    validityDays: plan.validityDays,
+    purchaseLimit: plan.purchaseLimit,
     priceCents: plan.priceCents,
     points: plan.points,
     bonusPoints: plan.bonusPoints,
@@ -3196,6 +3691,10 @@ function normalizeUploadedFileKind(kind: string | null, ext: string, mimeType: s
   }
 
   return inferUploadedFileKind(ext, mimeType);
+}
+
+function normalizeCreditGrantType(value: string): CreditGrant["grantType"] {
+  return value === "monthly" ? "monthly" : "permanent";
 }
 
 function toStringArray(value: Prisma.JsonValue) {

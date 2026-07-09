@@ -3,6 +3,7 @@ import type { RechargeOrder } from "@/server/domain";
 import { ApiError } from "@/server/http/api-response";
 import { getOrderExpiresAt, getWechatPayConfig, joinUrl } from "@/server/payments/payment-config";
 import { basePaymentAction, type PaymentAction } from "@/server/payments/payment-action";
+import { getPaymentProductCopy } from "@/server/payments/payment-product-copy";
 
 type WechatNotify = {
   appId: string;
@@ -25,10 +26,11 @@ const WECHAT_NOTIFY_MAX_SKEW_SECONDS = 5 * 60;
 
 export async function createWechatPaymentAction(order: RechargeOrder): Promise<PaymentAction> {
   const config = getWechatPayConfig();
+  const productCopy = getPaymentProductCopy(order);
   const body = JSON.stringify({
     appid: config.appId,
     mchid: config.mchId,
-    description: `LightQuant ${order.totalPoints} 积分充值`,
+    description: productCopy.subject,
     out_trade_no: order.orderNo,
     time_expire: getWechatExpireTime(order.createdAt),
     notify_url: config.notifyUrl,
