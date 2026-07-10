@@ -17,6 +17,7 @@ async function main() {
     await testLengthPartial();
     await testThinkingTruncationDoesNotMarkPartial();
     await testTimeoutPartial();
+    await testDeepSeekThinkingEnabledAndVisibility();
 
     console.log(JSON.stringify({
       ok: true,
@@ -26,8 +27,11 @@ async function main() {
         "thinking truncation does not mark final result partial",
         "stream timeout with content marks partial",
         "partial metadata includes continuation fields",
-        "strategy generation thinking enabled",
-        "code conversion thinking disabled"
+        "MiMo strategy generation thinking enabled",
+        "MiMo code conversion thinking disabled",
+        "DeepSeek strategy generation thinking enabled and visible",
+        "DeepSeek code conversion thinking enabled but hidden",
+        "DeepSeek code analysis thinking enabled but hidden"
       ]
     }, null, 2));
   } finally {
@@ -183,7 +187,73 @@ async function testTimeoutPartial() {
   }
 }
 
-function createProviderInput(type: "strategy_generation" | "code_conversion") {
+async function testDeepSeekThinkingEnabledAndVisibility() {
+  process.env.AI_TASK_TIMEOUT_MS = "1000";
+  const taskTypes: Array<"strategy_generation" | "code_conversion" | "code_analysis"> = [
+    "strategy_generation",
+    "code_conversion",
+    "code_analysis"
+  ];
+
+  for (const type of taskTypes) {
+    const server = createServer((request, response) => {
+      void handleSseRequest(request, response, "enabled", () => {
+        response.write(streamChunk({
+          model: "deepseek-reasoner",
+          choices: [
+            {
+              delta: {
+                reasoning_content: `deepseek thinking for ${type}`
+              }
+            }
+          ]
+        }));
+        response.write(streamChunk({
+          choices: [
+            {
+              delta: {
+                content: createFinalMarkdownForTask(type)
+              }
+            }
+          ]
+        }));
+        response.write(streamChunk({
+          choices: [
+            {
+              delta: {},
+              finish_reason: "stop"
+            }
+          ],
+          usage: {
+            prompt_tokens: 11,
+            completion_tokens: 22,
+            total_tokens: 33
+          }
+        }));
+        response.write("data: [DONE]\n\n");
+        response.end();
+      });
+    });
+
+    const baseUrl = await listen(server);
+
+    try {
+      const stream = await runOpenAiCompatibleProviderStream(createProviderInput(type), {
+        runtimeConfig: createRuntimeConfig(baseUrl, "deepseek-reasoner")
+      });
+
+      if (type === "strategy_generation") {
+        expect("DeepSeek strategy thinking visible", stream.visibleThinking.includes("deepseek thinking for strategy_generation"));
+      } else {
+        expect(`DeepSeek ${type} thinking hidden`, stream.visibleThinking === "");
+      }
+    } finally {
+      server.close();
+    }
+  }
+}
+
+function createProviderInput(type: "strategy_generation" | "code_conversion" | "code_analysis") {
   const now = "2026-06-26T00:00:00.000Z";
   const task: AiTask = {
     id: `task-${type}`,
@@ -193,8 +263,10 @@ function createProviderInput(type: "strategy_generation" | "code_conversion") {
     status: "RUNNING",
     scopeStatus: "in_scope",
     sourcePlatform: "JoinQuant",
-    targetPlatform: "PTrade",
-    prompt: type === "strategy_generation" ? "generate full strategy code" : "convert to PTrade",
+    targetPlatform: type === "code_analysis" ? null : "PTrade",
+    prompt: type === "strategy_generation"
+      ? "generate full strategy code"
+      : type === "code_conversion" ? "convert to PTrade" : "analyze this strategy",
     inputCode: "def initialize(context):\n    pass\n",
     inputFileId: null,
     costPoints: 0,
@@ -215,12 +287,12 @@ function createProviderInput(type: "strategy_generation" | "code_conversion") {
   };
 }
 
-function createRuntimeConfig(baseUrl: string) {
+function createRuntimeConfig(baseUrl: string, model = "mimo-v2.5-pro") {
   return {
     provider: "openai_compatible" as const,
     baseUrl,
     apiKey: "fake-key",
-    model: "mimo-v2.5-pro",
+    model,
     supportsVision: false,
     source: "env" as const,
     activeProfileId: null,
@@ -229,6 +301,34 @@ function createRuntimeConfig(baseUrl: string) {
     apiKeySecretId: null,
     apiKeySource: "env" as const
   };
+}
+
+function createFinalMarkdownForTask(type: "strategy_generation" | "code_conversion" | "code_analysis") {
+  if (type === "strategy_generation") {
+    return "## 完整策略代码\n```python\nprint('deepseek strategy')\n```";
+  }
+
+  if (type === "code_analysis") {
+    return [
+      "## 策略概览",
+      "- 策略名称：",
+      "  1. 代码中未明确给出",
+      "## 交易逻辑",
+      "- 初始化：",
+      "  1. 代码中未明确给出",
+      "## 关键参数",
+      "- 观察周期：",
+      "  1. 代码中未明确给出",
+      "## 风险提醒",
+      "- 交易可达性风险：",
+      "  1. 代码中未明确给出",
+      "## 优化建议",
+      "- 回测验证：",
+      "  1. 代码中未明确给出"
+    ].join("\n");
+  }
+
+  return "## 目标平台代码\n```python\nprint('deepseek conversion')\n```\n\n## 迁移说明\n已完成最小转换。";
 }
 
 async function listen(server: ReturnType<typeof createServer>) {
