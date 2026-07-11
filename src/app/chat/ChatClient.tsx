@@ -44,6 +44,8 @@ import {
   fetchAiTaskStatus,
   formatRestoredInputText,
   getConversationActiveTab,
+  getCachedClientRequestStartedAt,
+  getCachedTaskStartedAt,
   getFriendlyAiError as getFriendlyError,
   getAiTaskStreamingContent,
   formatAiTaskResultAsMarkdown,
@@ -1810,8 +1812,14 @@ function StrategyMessageBubble({ message }: { message: StrategyChatMessage }) {
   const displayFinalAnswerMarkdown = result?.generatedCode
     ? stripGeneratedCodeFromMarkdown(finalAnswerMarkdown, result.generatedCode)
     : finalAnswerMarkdown;
-  const billingTag = getBillingTag(getMessageBilling(message), task);
-  const completedElapsedSeconds = status === "succeeded" ? getCompletedTaskElapsedSeconds(task, message.createdAt) : null;
+  const billingTag = status === "succeeded" ? getBillingTag(getMessageBilling(message), task) : null;
+  const completedElapsedSeconds = status === "succeeded"
+    ? getDisplayedTaskElapsedSeconds({
+      task,
+      finishedAt: message.createdAt,
+      fallbackFinishedAt: message.createdAt
+    })
+    : null;
 
   return (
     <div className="lq-assistant-row">
@@ -1820,10 +1828,10 @@ function StrategyMessageBubble({ message }: { message: StrategyChatMessage }) {
           <StrategyFailureMessage message={failureMessage} title={task?.status === "CANCELLED" ? "任务已取消" : "生成失败"} />
         ) : finalAnswerMarkdown || streamContent.visibleThinking || result ? (
           <>
-          {completedElapsedSeconds !== null ? <TaskElapsedBadge elapsedSeconds={completedElapsedSeconds} tone="completed" /> : null}
+          {completedElapsedSeconds !== null ? (
+            <TaskMetaBar billingTag={billingTag} elapsedSeconds={completedElapsedSeconds} elapsedTone="completed" />
+          ) : null}
           <AssistantThinkingMessage
-            billingLabel={billingTag?.label}
-            billingWaived={billingTag?.waived}
             error={null}
             finalAnswerMarkdown={displayFinalAnswerMarkdown}
             status={thinkingStatus}
@@ -1874,7 +1882,7 @@ function StrategyJobBubble({
   const visibleThinking = job.visibleThinking?.trim() ?? "";
   const visibleError = failed || canceled ? job.error ?? null : null;
   const runningFallback = getDisplayJobActive(job) && !visibleThinking && !displayFinalAnswerMarkdown.trim() && !visibleError ? finalizingMessage ?? "正在处理任务..." : "";
-  const billingTag = getBillingTag(job.billing, job.task);
+  const billingTag = completed ? getBillingTag(job.billing, job.task) : null;
   const badgeTone = completed ? "completed" : getDisplayJobActive(job) ? "running" : null;
   const badgeElapsedSeconds = getStrategyJobElapsedSeconds(job, elapsedSeconds);
 
@@ -1897,10 +1905,10 @@ function StrategyJobBubble({
   return (
     <div className="lq-assistant-row">
       <div className="lq-assistant-message">
-        {badgeTone ? <TaskElapsedBadge elapsedSeconds={badgeElapsedSeconds} tone={badgeTone} /> : null}
+        {badgeTone ? (
+          <TaskMetaBar billingTag={billingTag} elapsedSeconds={badgeElapsedSeconds} elapsedTone={badgeTone} />
+        ) : null}
         <AssistantThinkingMessage
-          billingLabel={billingTag?.label}
-          billingWaived={billingTag?.waived}
           error={null}
           finalAnswerMarkdown={displayFinalAnswerMarkdown}
           status={thinkingStatus}
@@ -1912,10 +1920,35 @@ function StrategyJobBubble({
   );
 }
 
+function TaskMetaBar({
+  billingTag,
+  elapsedSeconds,
+  elapsedTone
+}: {
+  billingTag?: { label: string; waived: boolean } | null;
+  elapsedSeconds: number;
+  elapsedTone: "running" | "completed";
+}) {
+  return (
+    <div className="lq-task-meta-bar">
+      <TaskElapsedBadge elapsedSeconds={elapsedSeconds} tone={elapsedTone} />
+      {billingTag ? <TaskBillingBadge label={billingTag.label} waived={billingTag.waived} /> : null}
+    </div>
+  );
+}
+
 function TaskElapsedBadge({ elapsedSeconds, tone }: { elapsedSeconds: number; tone: "running" | "completed" }) {
   return (
     <div aria-live={tone === "running" ? "polite" : undefined} className={`lq-task-elapsed-badge is-${tone}`}>
       {tone === "running" ? "处理中" : "已处理"} {formatElapsedDuration(elapsedSeconds)}
+    </div>
+  );
+}
+
+function TaskBillingBadge({ label, waived }: { label: string; waived: boolean }) {
+  return (
+    <div className={`lq-task-billing-badge ${waived ? "is-waived" : ""}`.trim()}>
+      {label}
     </div>
   );
 }
@@ -1937,25 +1970,70 @@ function getStrategyJobElapsedSeconds(job: StrategyJob, activeElapsedSeconds: nu
     return activeElapsedSeconds;
   }
 
-  return getCompletedTaskElapsedSeconds(job.task ?? null, job.finishedAt) ?? activeElapsedSeconds;
+  return getDisplayedTaskElapsedSeconds({
+    task: job.task ?? null,
+    request: job.request,
+    startedAt: job.startedAt,
+    createdAt: job.createdAt,
+    finishedAt: job.finishedAt,
+    fallbackFinishedAt: job.finishedAt,
+    minElapsedSeconds: activeElapsedSeconds
+  }) ?? activeElapsedSeconds;
 }
 
-function getCompletedTaskElapsedSeconds(task: AiTaskData["task"] | null | undefined, fallbackFinishedAt?: string | null) {
-  if (!task) {
-    return null;
-  }
-
-  const startedAt = task.startedAt ?? task.progress?.startedAt ?? task.createdAt ?? null;
-  const finishedAt = task.finishedAt ?? fallbackFinishedAt ?? null;
+function getDisplayedTaskElapsedSeconds(input: {
+  task?: AiTaskData["task"] | null;
+  request?: StrategyJobRequest | null;
+  startedAt?: string | null;
+  createdAt?: string | null;
+  finishedAt?: string | null;
+  fallbackFinishedAt?: string | null;
+  minElapsedSeconds?: number | null;
+}) {
+  const task = input.task;
+  const clientRequestId = input.request?.clientRequestId ?? task?.clientRequestId ?? null;
+  const startedAt = pickFirstValidIso(
+    input.request?.submitStartedAt,
+    input.startedAt,
+    getCachedClientRequestStartedAt(clientRequestId),
+    getCachedTaskStartedAt(task?.id),
+    input.createdAt,
+    task?.createdAt,
+    task?.progress?.startedAt,
+    task?.startedAt
+  );
+  const finishedAt = pickFirstValidIso(
+    task?.finishedAt,
+    input.finishedAt,
+    input.fallbackFinishedAt
+  );
 
   if (!startedAt || !finishedAt) {
     return null;
   }
 
-  return getTaskElapsedSeconds({
+  const elapsedSeconds = getTaskElapsedSeconds({
     startedAt,
     finishedAt
   });
+
+  return Math.max(elapsedSeconds, input.minElapsedSeconds ?? 0);
+}
+
+function pickFirstValidIso(...values: Array<string | null | undefined>) {
+  for (const value of values) {
+    if (typeof value !== "string" || !value.trim()) {
+      continue;
+    }
+
+    const timestamp = Date.parse(value);
+
+    if (Number.isFinite(timestamp)) {
+      return value;
+    }
+  }
+
+  return null;
 }
 
 function StrategyFailureMessage({ message, onRetry, title = "生成失败" }: { message: string; onRetry?: () => void; title?: string }) {

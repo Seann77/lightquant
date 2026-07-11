@@ -14,8 +14,6 @@ type AssistantThinkingMessageProps = {
   className?: string;
   tone?: "light" | "dark";
   defaultThinkingExpanded?: boolean;
-  billingLabel?: string | null;
-  billingWaived?: boolean;
 };
 
 type ThinkingCollapseProps = {
@@ -28,8 +26,6 @@ type ThinkingCollapseProps = {
 type StreamProps = {
   text: string;
   streaming?: boolean;
-  billingLabel?: string | null;
-  billingWaived?: boolean;
 };
 
 export type StreamingMarkdownBlock =
@@ -46,9 +42,7 @@ export function AssistantThinkingMessage({
   error,
   className = "",
   tone = "light",
-  defaultThinkingExpanded,
-  billingLabel,
-  billingWaived = false
+  defaultThinkingExpanded
 }: AssistantThinkingMessageProps) {
   const displayThinking = thinking.trim();
   const hasFinal = Boolean(finalAnswerMarkdown.trim());
@@ -87,8 +81,6 @@ export function AssistantThinkingMessage({
       ) : null}
       {hasFinalStarted ? (
         <FinalAnswerStream
-          billingLabel={billingLabel}
-          billingWaived={billingWaived}
           streaming={status === "answering"}
           text={finalAnswerMarkdown}
         />
@@ -155,14 +147,11 @@ export function ThinkingStream({ text }: StreamProps) {
   return <pre className="lq-thinking-stream">{text}</pre>;
 }
 
-export function FinalAnswerStream({ text, streaming = false, billingLabel, billingWaived = false }: StreamProps) {
+export function FinalAnswerStream({ text, streaming = false }: StreamProps) {
   const placeholder = streaming ? "正在整理结果..." : "等待最终答案...";
 
   return (
     <section className="lq-final-section">
-      {billingLabel ? (
-        <span className={`lq-cost-tag lq-final-floating-cost ${billingWaived ? "is-waived" : ""}`.trim()}>{billingLabel}</span>
-      ) : null}
       {text.trim() ? <StreamingMarkdownResult markdown={text} streaming={streaming} /> : <div className="lq-final-placeholder">{placeholder}</div>}
     </section>
   );

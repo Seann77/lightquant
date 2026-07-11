@@ -1209,6 +1209,15 @@ textarea {
   gap: 10px;
 }
 
+.lq-task-meta-bar {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 .lq-task-elapsed-badge {
   display: inline-flex;
   width: fit-content;
@@ -1241,6 +1250,29 @@ textarea {
 
 .lq-task-elapsed-badge.is-completed::before {
   background: rgba(23, 195, 178, 0.7);
+}
+
+.lq-task-billing-badge {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border: 1px solid rgba(122, 178, 255, 0.62);
+  border-radius: 999px;
+  background: rgba(239, 247, 255, 0.9);
+  color: #1765c8;
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+.lq-task-billing-badge.is-waived {
+  border-color: rgba(42, 190, 174, 0.54);
+  background: rgba(235, 252, 250, 0.9);
+  color: #087f75;
 }
 
 .lq-thinking-message {
@@ -1303,12 +1335,6 @@ textarea {
   color: #0b1324;
   font-size: 14px;
   font-weight: 820;
-}
-
-.lq-final-floating-cost {
-  position: absolute;
-  top: 0;
-  right: 0;
 }
 
 .lq-thinking-message.is-dark .lq-thinking-title,

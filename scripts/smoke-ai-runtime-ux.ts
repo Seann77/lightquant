@@ -141,6 +141,11 @@ async function main() {
   const progressPanel = await readFile(path.join(root, "src", "components", "ai", "AiTaskProgressPanel.tsx"), "utf8");
   const globalsCss = await readFile(path.join(root, "src", "app", "globals.css"), "utf8");
   const aiService = await readFile(path.join(root, "src", "server", "ai", "ai-service.ts"), "utf8");
+  const openaiCompatibleProvider = await readFile(path.join(root, "src", "server", "ai", "providers", "openai-compatible-provider.ts"), "utf8");
+  const commonProviderPrompt = await readFile(path.join(root, "src", "server", "ai", "skills", "content", "common-provider.md"), "utf8");
+  const strategyPrompt = await readFile(path.join(root, "src", "server", "ai", "skills", "content", "strategy-generation.md"), "utf8");
+  const conversionPrompt = await readFile(path.join(root, "src", "server", "ai", "skills", "content", "code-conversion.md"), "utf8");
+  const analysisPrompt = await readFile(path.join(root, "src", "server", "ai", "skills", "content", "code-analysis.md"), "utf8");
   const noContinuationSmoke = await readFile(path.join(root, "scripts", "smoke-ai-no-continuation-ui.ts"), "utf8");
 
   expect("chat client uses stable elapsed hook", /useStableElapsedSeconds/.test(chatClient));
@@ -159,6 +164,13 @@ async function main() {
   expect("strategy active composer renders stop task button", /className="lq-stop-task-btn"/.test(chatClient) && /handleCancelJob\(activeJob\)/.test(chatClient));
   expect("strategy stop task button reuses cancel task flow", /async function handleCancelJob/.test(chatClient) && /cancelAiTask\(job\.id\)/.test(chatClient));
   expect("strategy task elapsed badge renders above assistant output", /function TaskElapsedBadge/.test(chatClient) && /<TaskElapsedBadge elapsedSeconds=/.test(chatClient));
+  expect("strategy completed elapsed uses displayed user-facing duration", /function getDisplayedTaskElapsedSeconds/.test(chatClient) && /getStrategyJobElapsedSeconds[\s\S]*minElapsedSeconds:\s*activeElapsedSeconds/.test(chatClient));
+  expect("strategy completed elapsed reads same request timer chain", /input\.request\?\.submitStartedAt/.test(chatClient) && /getCachedClientRequestStartedAt\(clientRequestId\)/.test(chatClient) && /getCachedTaskStartedAt\(task\?\.id\)/.test(chatClient));
+  expect("strategy completed elapsed cannot drop below running elapsed", /return Math\.max\(elapsedSeconds, input\.minElapsedSeconds \?\? 0\)/.test(chatClient));
+  expect("strategy task meta bar owns billing tag", /function TaskMetaBar/.test(chatClient) && /function TaskBillingBadge/.test(chatClient) && /billingTag=\{billingTag\}/.test(chatClient));
+  expect("strategy billing tag only appears after completion", /const billingTag = status === "succeeded" \? getBillingTag/.test(chatClient) && /const billingTag = completed \? getBillingTag/.test(chatClient));
+  expect("final answer stream no longer accepts billing props", !/billingLabel|billingWaived/.test(thinkingMessage));
+  expect("final floating cost style removed", !/lq-final-floating-cost/.test(thinkingMessage) && !/lq-final-floating-cost/.test(globalsCss));
   expect("strategy elapsed formatter supports minute display", /return `\$\{minutes\}m \$\{seconds\}s`;/.test(chatClient));
   expect("strategy stop task button uses restrained blue styling", /\.lq-stop-task-btn/.test(globalsCss) && /#0b4fc7/.test(globalsCss) && !/\.lq-stop-task-btn[\s\S]{0,900}(#b42318|217,\s*45,\s*32|248,\s*113,\s*113)/.test(globalsCss));
   expect("strategy job status has one-way merge", /function mergeJobStatus/.test(chatClient) && /getJobStatusRank\(nextStatus\) >= getJobStatusRank\(previousStatus\)/.test(chatClient));
@@ -167,6 +179,10 @@ async function main() {
   expect("strategy stream emits initial final deltas", /runningTask\.type === "strategy_generation" && delta\.type === "final_delta"/.test(aiService));
   expect("repair stream filters final deltas", /onDelta:\s*\(delta\) => delta\.type === "thinking_delta" \? input\.emit\(delta\) : undefined/.test(aiService));
   expect("repair emits neutral task snapshot", /perfLabel:\s*"stream_repairing"/.test(aiService));
+  expect("model identity questions do not inherit historical strategy context", /function isModelIdentityQuestion/.test(openaiCompatibleProvider) && /const context = isModelIdentityQuestion\(prompt\) \? "" : conversationContext/.test(openaiCompatibleProvider));
+  expect("model identity final guidance is present for streaming", /只回答 LightQuant 量化策略助手的产品能力/.test(openaiCompatibleProvider));
+  expect("common identity prompt uses LightQuant capability answer", /身份类提问以当前轮为准/.test(commonProviderPrompt) && /我是 LightQuant 量化策略助手/.test(commonProviderPrompt));
+  expect("three module prompts have identity answer rules", /策略生成页口径/.test(strategyPrompt) && /代码转换页口径/.test(conversionPrompt) && /代码解析页口径/.test(analysisPrompt));
   expect("strategy repair/finalizing suppresses draft answer", /suppressDraftFinalAnswer/.test(chatClient) && /shouldSuppressStrategyDraftFinalAnswer/.test(chatClient));
   expect("thinking collapse receives final-started state", /hasFinalStarted=\{hasFinalStarted\}/.test(thinkingMessage));
   expect("answering status shows final stream even before first text", /const hasFinalStarted = hasFinal \|\| status === "answering"/.test(thinkingMessage));
@@ -197,6 +213,9 @@ async function main() {
       "shared timer hook usage in strategy, conversion, and analysis surfaces",
       "strategy composer switches to restrained blue stop button while active",
       "strategy elapsed status renders above assistant output",
+      "completed elapsed uses the same user-facing timer chain as running elapsed",
+      "billing cost tag moves from final answer body to task meta bar",
+      "model identity questions use LightQuant product identity guidance",
       "strategy elapsed status supports seconds and minute-second labels",
       "source conversation mapping stays active during local-to-real task switch",
       "pending task payload cannot downgrade running/streaming display state",

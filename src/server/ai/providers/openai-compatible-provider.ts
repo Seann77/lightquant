@@ -305,6 +305,7 @@ function buildStreamingFinalAnswerGuidance(type: AiProviderInput["task"]["type"]
     return [
       "最终回答必须使用 Markdown，不要输出 JSON。",
       "当前是策略开发对话助手，最终回答使用自然 Markdown；可以只有文字，也可以包含必要的局部代码片段。",
+      "如果当前轮询问底层模型、模型供应商、模型名称、模型版本、API Provider、接口、baseUrl、model id、thinking 参数，或询问你与其他 AI 产品/模型的关系，只回答 LightQuant 量化策略助手的产品能力：主要帮助围绕 PTrade、聚宽 JoinQuant、QMT 做策略生成、修改、调试、代码转换和策略解释；不要确认、否认或提及底层模型与供应商名称，也不要使用拒绝式话术。",
       "每轮先判断用户意图，再选择输出形态：strategy_answer、strategy_modify、strategy_generate_full、strategy_debug、strategy_review、clarify 或 out_of_scope。",
       "当前轮用户意图优先于历史上下文。历史只用于保留平台、参数和策略背景；如果历史中要求不要完整代码，但当前轮明确要求完整策略或完整代码，本轮必须按 strategy_generate_full 输出完整可运行策略代码。",
       "",
@@ -334,6 +335,7 @@ function buildStreamingFinalAnswerGuidance(type: AiProviderInput["task"]["type"]
   if (type === "code_analysis") {
     return [
       "最终回答必须使用 Markdown，不要输出 JSON，不要输出聊天式结论块、论文式长文、投资研报或营销文案。最终回答必须包含且只使用这些二级标题：",
+      "如果当前轮询问底层模型、模型供应商、模型名称、模型版本、API Provider、接口、baseUrl、model id、thinking 参数，或询问你与其他 AI 产品/模型的关系，只回答 LightQuant 量化策略助手的产品能力：主要帮助围绕 PTrade、聚宽 JoinQuant、QMT 做策略逻辑解释、参数说明和风险点梳理；此时跳过下列固定标题模板；不要确认、否认或提及底层模型与供应商名称，也不要使用拒绝式话术。",
       "## 策略概览",
       "## 交易逻辑",
       "## 关键参数",
@@ -372,6 +374,7 @@ function buildStreamingFinalAnswerGuidance(type: AiProviderInput["task"]["type"]
 
   return [
     "最终回答必须使用 Markdown，不要输出 JSON。当前是代码转换模块，最终回答必须包含且只使用这些二级标题：",
+    "如果当前轮询问底层模型、模型供应商、模型名称、模型版本、API Provider、接口、baseUrl、model id、thinking 参数，或询问你与其他 AI 产品/模型的关系，只回答 LightQuant 量化策略助手的产品能力：主要帮助围绕 PTrade、聚宽 JoinQuant、QMT 做策略代码迁移、兼容说明和转换结果复核；此时跳过下列固定标题模板；不要确认、否认或提及底层模型与供应商名称，也不要使用拒绝式话术。",
     "## 目标平台代码",
     "## 迁移说明",
     "",
@@ -1703,7 +1706,9 @@ function isObject(value: unknown): value is Record<string, unknown> {
 }
 
 function hasTaskRelevantSignal({ task, conversationContext }: AiProviderInput) {
-  const input = `${task.prompt ?? ""}\n${task.inputCode ?? ""}\n${conversationContext ?? ""}`.toLowerCase();
+  const prompt = task.prompt ?? "";
+  const context = isModelIdentityQuestion(prompt) ? "" : conversationContext ?? "";
+  const input = `${prompt}\n${task.inputCode ?? ""}\n${context}`.toLowerCase();
   const quantSignals = [
     "策略",
     "量化",
@@ -1743,4 +1748,42 @@ function hasTaskRelevantSignal({ task, conversationContext }: AiProviderInput) {
   ];
 
   return quantSignals.some((keyword) => input.includes(keyword)) || codeSignals.some((keyword) => input.includes(keyword));
+}
+
+function isModelIdentityQuestion(prompt: string | null | undefined) {
+  const normalized = (prompt ?? "").toLowerCase().replace(/\s+/g, "");
+
+  if (!normalized) {
+    return false;
+  }
+
+  const directPatterns = [
+    "你是什么模型",
+    "你是什么大模型",
+    "你用的什么模型",
+    "你用的是deepseek",
+    "你是不是deepseek",
+    "你是不是gpt",
+    "你是不是chatgpt",
+    "你底层是什么模型",
+    "你由哪家公司模型驱动",
+    "你的provider是什么",
+    "你用的api是什么",
+    "你是不是deepseekthinking",
+    "你的模型版本是多少",
+    "你和chatgpt是什么关系",
+    "你和codex是什么关系",
+    "你和deepseek是什么关系",
+    "modelid",
+    "baseurl"
+  ];
+
+  if (directPatterns.some((pattern) => normalized.includes(pattern))) {
+    return true;
+  }
+
+  const identitySignals = ["模型", "大模型", "provider", "api", "版本", "底层", "供应商", "deepseek", "gpt", "chatgpt", "claude", "qwen", "mimo", "codex"];
+  const assistantSignals = ["你", "助手", "lightquant", "驱动", "使用", "用的", "是不是", "是什么", "关系"];
+
+  return identitySignals.some((signal) => normalized.includes(signal)) && assistantSignals.some((signal) => normalized.includes(signal));
 }
