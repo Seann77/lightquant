@@ -2,6 +2,7 @@ import type { AiModelProfile } from "@/server/domain";
 import {
   getAiApiKey,
   getAiBaseUrl,
+  getAiModelMaxOutputTokens,
   getAiModelName,
   getAiProviderMode,
   getAiSupportsVision,
@@ -20,6 +21,7 @@ export type AiRuntimeConfig = {
   baseUrl: string;
   apiKey: string;
   model: string;
+  modelMaxOutputTokens: number;
   supportsVision: boolean;
   source: "env" | "database profile";
   activeProfileId: string | null;
@@ -33,6 +35,7 @@ export type AiRuntimeConfigSummary = {
   provider: AiProviderMode | "invalid";
   baseUrlHost: string;
   model: string;
+  modelMaxOutputTokens: number;
   supportsVision: boolean;
   apiKeyConfigured: boolean;
   apiKeyEnvName: AllowedAiApiKeyEnvName | null;
@@ -135,6 +138,7 @@ async function resolveProfileRuntimeConfig(profile: AiModelProfile): Promise<AiR
       baseUrl,
       apiKey: "",
       model,
+      modelMaxOutputTokens: getAiModelMaxOutputTokens(profile.provider, model),
       supportsVision: profile.supportsVision,
       source: "database profile",
       activeProfileId: profile.id,
@@ -164,6 +168,7 @@ async function resolveProfileRuntimeConfig(profile: AiModelProfile): Promise<AiR
         baseUrl,
         apiKey,
         model,
+        modelMaxOutputTokens: getAiModelMaxOutputTokens(profile.provider, model),
         supportsVision: profile.supportsVision,
         source: "database profile",
         activeProfileId: profile.id,
@@ -196,6 +201,7 @@ async function resolveProfileRuntimeConfig(profile: AiModelProfile): Promise<AiR
     baseUrl,
     apiKey,
     model,
+    modelMaxOutputTokens: getAiModelMaxOutputTokens(profile.provider, model),
     supportsVision: profile.supportsVision,
     source: "database profile",
     activeProfileId: profile.id,
@@ -215,6 +221,7 @@ function resolveEnvRuntimeConfig(): AiRuntimeConfig {
     baseUrl: getAiBaseUrl(provider),
     apiKey: provider === "mock" ? "" : getAiApiKey(provider),
     model: getAiModelName(provider),
+    modelMaxOutputTokens: getAiModelMaxOutputTokens(provider),
     supportsVision: getAiSupportsVision(provider),
     source: "env",
     activeProfileId: null,
@@ -233,6 +240,7 @@ async function summarizeProfileRuntimeConfig(profile: AiModelProfile): Promise<A
       provider: config.provider,
       baseUrlHost: sanitizeBaseUrlForAdmin(config.baseUrl),
       model: config.model,
+      modelMaxOutputTokens: config.modelMaxOutputTokens,
       supportsVision: config.supportsVision,
       apiKeyConfigured: Boolean(config.apiKey),
       apiKeyEnvName: config.apiKeyEnvName,
@@ -249,6 +257,7 @@ async function summarizeProfileRuntimeConfig(profile: AiModelProfile): Promise<A
       provider: isAiProviderMode(profile.provider) ? profile.provider : "invalid",
       baseUrlHost: sanitizeBaseUrlForAdmin(profile.baseUrl),
       model: profile.model || "-",
+      modelMaxOutputTokens: getAiModelMaxOutputTokens(isAiProviderMode(profile.provider) ? profile.provider : "openai_compatible", profile.model || ""),
       supportsVision: profile.supportsVision,
       apiKeyConfigured: Boolean(
         profile.apiKeySecretId ||
@@ -274,6 +283,7 @@ function summarizeEnvRuntimeConfig(): AiRuntimeConfigSummary {
       provider: config.provider,
       baseUrlHost: sanitizeBaseUrlForAdmin(config.baseUrl),
       model: config.model,
+      modelMaxOutputTokens: config.modelMaxOutputTokens,
       supportsVision: config.supportsVision,
       apiKeyConfigured: Boolean(config.apiKey),
       apiKeyEnvName: config.apiKeyEnvName,
@@ -292,6 +302,7 @@ function summarizeEnvRuntimeConfig(): AiRuntimeConfigSummary {
       provider,
       baseUrlHost: safeReadEnvBaseUrlHost(provider),
       model: safeReadEnvModel(provider),
+      modelMaxOutputTokens: provider === "invalid" ? 0 : getAiModelMaxOutputTokens(provider, safeReadEnvModel(provider)),
       supportsVision: safeReadEnvSupportsVision(provider),
       apiKeyConfigured: hasEnvApiKey(provider),
       apiKeyEnvName: provider === "mock" || provider === "invalid" ? null : getEnvApiKeyName(provider),

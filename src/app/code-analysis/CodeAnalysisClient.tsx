@@ -25,11 +25,11 @@ import {
   persistConversationActiveTab,
   replaceWorkbenchConversationUrl,
   streamWorkbenchAiTask,
+  useStableElapsedSeconds,
   waitForAiTaskResult
 } from "@/lib/ai/workbench-client";
 import {
   buildAiTaskFingerprint,
-  canContinueAiTaskData,
   isAiTaskDataCompleteSuccess,
   isAiTaskDataPartial
 } from "@/lib/ai/task-fingerprint";
@@ -60,8 +60,6 @@ export function CodeAnalysisClient() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [lastSuccessfulFingerprint, setLastSuccessfulFingerprint] = useState<string | null>(null);
-  const [lastPartialFingerprint, setLastPartialFingerprint] = useState<string | null>(null);
-  const [lastPartialCanContinue, setLastPartialCanContinue] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollingAnalysisTaskIdRef = useRef<string | null>(null);
   const streamingAnalysisTaskIdRef = useRef<string | null>(null);
@@ -69,8 +67,12 @@ export function CodeAnalysisClient() {
   const activeAnalysisTaskStatus = data?.task.status ?? null;
   const activeAnalysisTaskRunning = activeAnalysisTaskStatus === "PENDING" || activeAnalysisTaskStatus === "RUNNING";
   const analysisBusy = loading || activeAnalysisTaskRunning;
-  const analysisStartedAt = data?.task.startedAt ?? data?.task.progress?.startedAt ?? data?.task.createdAt ?? undefined;
-  const elapsedSeconds = useElapsedSeconds(analysisBusy, analysisStartedAt);
+  const elapsedSeconds = useStableElapsedSeconds(analysisBusy, {
+    task: data?.task ?? null,
+    taskId: data?.task.id ?? null,
+    localCreatedAt: data?.task.createdAt ?? null,
+    finishedAt: data?.task.finishedAt ?? null
+  });
 
   const activeAnalysisConversationId = data?.conversation?.id ?? data?.task.conversationId ?? conversationIdFromUrl;
   const finalInputText = getFinalInputText(inputCode, inputSource);
@@ -81,9 +83,6 @@ export function CodeAnalysisClient() {
     inputFile: uploadedFile
   }), [platform, finalInputText, uploadedFile]);
   const analysisDuplicateCompleted = Boolean(lastSuccessfulFingerprint && lastSuccessfulFingerprint === analysisCurrentFingerprint);
-  const analysisContinuationAvailable = lastPartialCanContinue &&
-    Boolean(lastPartialFingerprint) &&
-    (finalInputText ? lastPartialFingerprint === analysisCurrentFingerprint : inputSource === "restored");
 
   const resetAnalysisLocalState = useCallback(() => {
     setInputCode("");
@@ -147,16 +146,10 @@ export function CodeAnalysisClient() {
 
       if (isAiTaskDataCompleteSuccess(restored.taskData)) {
         setLastSuccessfulFingerprint(restoredFingerprint);
-        setLastPartialFingerprint(null);
-        setLastPartialCanContinue(false);
       } else if (isAiTaskDataPartial(restored.taskData)) {
         setLastSuccessfulFingerprint(null);
-        setLastPartialFingerprint(restoredFingerprint);
-        setLastPartialCanContinue(canContinueAiTaskData(restored.taskData));
       } else {
         setLastSuccessfulFingerprint(null);
-        setLastPartialFingerprint(null);
-        setLastPartialCanContinue(false);
       }
     },
     onError: (historyError) => {
@@ -301,9 +294,8 @@ export function CodeAnalysisClient() {
     }
   }
 
-  async function handleSubmit(options: { continuation?: boolean } = {}) {
-    const continueOutput = options.continuation === true;
-    const submittedFingerprint = continueOutput ? lastPartialFingerprint : analysisCurrentFingerprint;
+  async function handleSubmit() {
+    const submittedFingerprint = analysisCurrentFingerprint;
 
     if (analysisBusy || uploading) {
       return;
@@ -313,31 +305,22 @@ export function CodeAnalysisClient() {
       return;
     }
 
-    if (continueOutput && !analysisContinuationAvailable) {
+    if (analysisDuplicateCompleted) {
       return;
     }
 
-    if (!continueOutput && analysisDuplicateCompleted) {
-      return;
-    }
-
-    if (!continueOutput && !finalInputText) {
+    if (!finalInputText) {
       setError(inputSource === "restored"
         ? "历史输入仅为摘要，请粘贴完整代码或重新上传附件后再解析。"
         : "请粘贴需要解析的策略代码，或上传可解析的文本文件。");
       return;
     }
 
-    if (!continueOutput && uploadedFile?.scanStatus === "BLOCKED") {
+    if (uploadedFile?.scanStatus === "BLOCKED") {
       return;
     }
 
     const currentConversationId = data?.conversation?.id ?? conversationIdFromUrl ?? undefined;
-
-    if (continueOutput && !currentConversationId) {
-      setError("当前输出已截断，请在当前会话中继续输出补全结果。");
-      return;
-    }
 
     setLoading(true);
     setError("");
@@ -352,10 +335,10 @@ export function CodeAnalysisClient() {
         type: "code_analysis",
         conversationId: currentConversationId,
         sourcePlatform: platform,
-        messageContent: continueOutput ? "继续输出" : undefined,
-        prompt: continueOutput ? "继续输出" : undefined,
-        inputCode: continueOutput ? undefined : finalInputText,
-        inputFileId: continueOutput ? undefined : uploadedFile?.contentText ? uploadedFile.fileId : undefined,
+        messageContent: undefined,
+        prompt: undefined,
+        inputCode: finalInputText,
+        inputFileId: uploadedFile?.contentText ? uploadedFile.fileId : undefined,
         clientRequestId: createWorkbenchClientRequestId("analysis")
       }, {
         onTask: (payload) => {
@@ -392,9 +375,7 @@ export function CodeAnalysisClient() {
       setStreamState((current) => createThinkingStateFromTaskData(completed, current));
       replaceWorkbenchConversationUrl(router, { type: "analysis" }, conversationIdFromUrl, completed.conversation?.id ?? completed.task.conversationId ?? null);
       rememberAnalysisTaskFingerprintOutcome(completed, submittedFingerprint, {
-        setLastSuccessfulFingerprint,
-        setLastPartialFingerprint,
-        setLastPartialCanContinue
+        setLastSuccessfulFingerprint
       });
       window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
       window.dispatchEvent(new Event("lightquant:credits-updated"));
@@ -420,7 +401,9 @@ export function CodeAnalysisClient() {
   const analysisInputChars = finalInputText.length;
   const canSubmit = !analysisBusy &&
     !uploading &&
-    (analysisContinuationAvailable || (Boolean(finalInputText) && !analysisDuplicateCompleted && uploadedFile?.scanStatus !== "BLOCKED"));
+    Boolean(finalInputText) &&
+    !analysisDuplicateCompleted &&
+    uploadedFile?.scanStatus !== "BLOCKED";
 
   return (
     <WorkbenchShell className="lq-analysis-page min-h-full">
@@ -471,15 +454,13 @@ export function CodeAnalysisClient() {
             <button
               className="lq-primary-btn"
               disabled={!canSubmit}
-              onClick={() => void handleSubmit({ continuation: analysisContinuationAvailable })}
+              onClick={() => void handleSubmit()}
               type="button"
             >
               {analysisBusy ? <LoaderCircle aria-hidden="true" className="animate-spin" size={18} /> : <Sparkles aria-hidden="true" size={18} />}
               {analysisBusy
                 ? `解析中 ${elapsedSeconds}s`
-                : analysisContinuationAvailable
-                  ? "继续输出"
-                  : analysisDuplicateCompleted
+                : analysisDuplicateCompleted
                     ? "已完成解析"
                     : "开始解析"}
             </button>
@@ -509,7 +490,7 @@ export function CodeAnalysisClient() {
             <div className="lq-empty-icon">
               <BarChart3 aria-hidden="true" size={25} />
             </div>
-            <h2>{loading ? "解析中..." : "正在同步任务状态..."}</h2>
+            <h2>{loading ? "解析中..." : "正在处理任务..."}</h2>
           </div>
         ) : parseFailed ? (
           <div className="lq-empty-result">
@@ -579,21 +560,15 @@ function rememberAnalysisTaskFingerprintOutcome(
   fingerprint: string,
   setters: {
     setLastSuccessfulFingerprint: (value: string | null) => void;
-    setLastPartialFingerprint: (value: string | null) => void;
-    setLastPartialCanContinue: (value: boolean) => void;
   }
 ) {
   if (isAiTaskDataPartial(data)) {
     setters.setLastSuccessfulFingerprint(null);
-    setters.setLastPartialFingerprint(fingerprint);
-    setters.setLastPartialCanContinue(canContinueAiTaskData(data));
     return;
   }
 
   if (isAiTaskDataCompleteSuccess(data)) {
     setters.setLastSuccessfulFingerprint(fingerprint);
-    setters.setLastPartialFingerprint(null);
-    setters.setLastPartialCanContinue(false);
   }
 }
 
@@ -607,26 +582,4 @@ function getFinalInputText(inputCode: string, inputSource: AnalysisInputSource) 
 
 function isAbortError(error: unknown) {
   return error instanceof Error && error.name === "AbortError";
-}
-
-function useElapsedSeconds(active: boolean, startedAt?: string) {
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-
-  useEffect(() => {
-    if (!active) {
-      setElapsedSeconds(0);
-      return;
-    }
-
-    const startedAtMs = startedAt ? new Date(startedAt).getTime() : Date.now();
-    const safeStartedAt = Number.isFinite(startedAtMs) ? startedAtMs : Date.now();
-    setElapsedSeconds(Math.max(0, Math.floor((Date.now() - safeStartedAt) / 1000)));
-    const timer = window.setInterval(() => {
-      setElapsedSeconds(Math.max(0, Math.floor((Date.now() - safeStartedAt) / 1000)));
-    }, 1000);
-
-    return () => window.clearInterval(timer);
-  }, [active, startedAt]);
-
-  return elapsedSeconds;
 }

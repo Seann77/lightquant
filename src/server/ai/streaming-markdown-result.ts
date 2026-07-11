@@ -7,6 +7,10 @@ import {
   normalizeStrategyFinalAnswerMarkdown,
   type StrategyCodeLevel
 } from "@/lib/ai/strategy-result-format";
+import {
+  applyGeneratedCodeArtifact,
+  extractGeneratedCodeFromMarkdown
+} from "@/server/ai/code-artifact";
 
 type MarkdownSectionKey = "summary" | "code" | "notes" | "risks" | "overview" | "tradingLogic" | "parameters" | "suggestions";
 
@@ -109,12 +113,18 @@ export function parseStreamingMarkdownResult(input: AiProviderInput, markdown: s
     const explanation = truncateResultText(buildStrategyExplanation(finalAnswerMarkdown, sections), input.config.maxResultChars);
     const strategyMeta = buildStrategyStreamingMeta(input, scopeStatus, finalAnswerMarkdown, codeExtraction.codeLevel, codeExtraction.generatedCodeSource);
 
-    return buildProviderResult(input, scopeStatus, finalAnswerMarkdown, sections, {
+    const result = buildProviderResult(input, scopeStatus, finalAnswerMarkdown, sections, {
       explanation: scopeStatus === "out_of_scope" ? input.skill.outOfScopeResponse : explanation,
       generatedCode,
       migrationNotes: null,
       riskWarnings: [],
       strategyMeta
+    });
+
+    return applyGeneratedCodeArtifact(result, {
+      task: input.task,
+      finalAnswerMarkdown,
+      conversationContext: input.conversationContext
     });
   }
 
@@ -134,15 +144,22 @@ export function parseStreamingMarkdownResult(input: AiProviderInput, markdown: s
 
   const codeSection = getSectionContent(sections, "code");
   const notes = getSectionContent(sections, "notes");
-  const generatedCode = extractGeneratedCode(codeSection || finalAnswerMarkdown);
+  const extractedCode = extractGeneratedCodeFromMarkdown(codeSection || finalAnswerMarkdown, input.task.type, input.task.targetPlatform);
+  const generatedCode = extractedCode.code ?? extractGeneratedCode(codeSection || finalAnswerMarkdown);
   const migrationNotes = truncateResultText(notes || null, input.config.maxResultChars);
   const explanation = truncateResultText(stripMarkdownNoise(removeCodeFences(codeSection || summary)), input.config.maxResultChars);
 
-  return buildProviderResult(input, scopeStatus, finalAnswerMarkdown, sections, {
+  const result = buildProviderResult(input, scopeStatus, finalAnswerMarkdown, sections, {
     explanation: scopeStatus === "out_of_scope" ? input.skill.outOfScopeResponse : explanation,
     generatedCode: scopeStatus === "out_of_scope" ? null : generatedCode,
     migrationNotes: scopeStatus === "out_of_scope" ? null : migrationNotes,
     riskWarnings: []
+  });
+
+  return applyGeneratedCodeArtifact(result, {
+    task: input.task,
+    finalAnswerMarkdown,
+    conversationContext: input.conversationContext
   });
 }
 

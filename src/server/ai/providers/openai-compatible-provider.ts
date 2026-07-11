@@ -2,6 +2,7 @@ import {
   getAiApiKey,
   getAiBaseUrl,
   getAiMaxRetries,
+  getAiModelMaxOutputTokens,
   getAiModelName,
   getAiSupportsVision,
   getAiTaskTimeoutMs,
@@ -15,6 +16,7 @@ import { loadTextContent } from "@/server/ai/skills/skill-content";
 import { normalizeMarkdown, parseStreamingMarkdownResult } from "@/server/ai/streaming-markdown-result";
 import type { AiProviderInput, AiProviderResult, AiProviderStreamCallbacks, AiProviderStreamResult } from "@/server/ai/providers/types";
 import { normalizeCompleteStrategyCode } from "@/lib/ai/strategy-result-format";
+import { buildLongCodeModeGuidance } from "@/server/ai/output-integrity";
 
 type ProviderOptions = {
   provider: Exclude<AiProviderMode, "mock">;
@@ -26,6 +28,7 @@ type ProviderConfig = {
   baseUrl: string;
   apiKey: string;
   model: string;
+  modelMaxOutputTokens: number;
   timeoutMs: number;
   maxRetries: number;
   supportsVision: boolean;
@@ -138,7 +141,7 @@ export async function runOpenAiCompatibleProviderStream(
     ...parsed,
     model: stream.model || providerConfig.model,
     tokenUsage: stream.tokenUsage
-  }, input, providerConfig.supportsVision), input, stream, finalAnswerMarkdown);
+  }, input, providerConfig.supportsVision), input, providerConfig, stream, finalAnswerMarkdown);
 
   return {
     result: providerResult,
@@ -158,6 +161,7 @@ function readProviderConfig(options: ProviderOptions): ProviderConfig {
         baseUrl: options.runtimeConfig.baseUrl,
         apiKey: options.runtimeConfig.apiKey,
         model: options.runtimeConfig.model,
+        modelMaxOutputTokens: options.runtimeConfig.modelMaxOutputTokens,
         timeoutMs: getAiTaskTimeoutMs(),
         maxRetries: getAiMaxRetries(),
         supportsVision: options.runtimeConfig.supportsVision
@@ -170,6 +174,7 @@ function readProviderConfig(options: ProviderOptions): ProviderConfig {
       baseUrl: getAiBaseUrl(provider),
       apiKey: getAiApiKey(provider),
       model: getAiModelName(provider),
+      modelMaxOutputTokens: getAiModelMaxOutputTokens(provider),
       timeoutMs: getAiTaskTimeoutMs(),
       maxRetries: getAiMaxRetries(),
       supportsVision: getAiSupportsVision(provider)
@@ -203,7 +208,7 @@ function buildChatCompletionPayload(input: AiProviderInput, providerConfig: Prov
     response_format: {
       type: "json_object"
     },
-    [outputTokenField]: input.config.maxOutputTokens,
+    [outputTokenField]: getOutputTokenLimit(input, providerConfig),
     temperature: 0.2,
     stream: false,
     ...thinkingOptions
@@ -227,7 +232,7 @@ function buildStreamingChatCompletionPayload(input: AiProviderInput, providerCon
         content: buildUserContent(input, providerConfig)
       }
     ],
-    [outputTokenField]: getStreamingOutputTokenLimit(input),
+    [outputTokenField]: getOutputTokenLimit(input, providerConfig),
     temperature: 0.2,
     stream: true,
     ...thinkingOptions
@@ -281,6 +286,7 @@ function buildStreamingSystemMessage(input: AiProviderInput) {
     COMMON_SAFETY_PROMPT,
     "",
     taskSpecificGuidance(task.type),
+    buildLongCodeModeGuidance(input),
     buildContinuationSystemGuidance(task.prompt),
     "",
     `任务名称：${config.displayName}`,
@@ -403,6 +409,7 @@ function buildSystemMessage(input: AiProviderInput, forceInScope: boolean) {
     COMMON_SAFETY_PROMPT,
     "",
     taskSpecificGuidance(task.type),
+    buildLongCodeModeGuidance(input),
     buildContinuationSystemGuidance(task.prompt),
     "",
     `任务名称：${config.displayName}`,
@@ -947,8 +954,10 @@ function getMaxFinalAnswerChars(input: AiProviderInput) {
   return Math.max(12000, input.config.maxResultChars);
 }
 
-function getStreamingOutputTokenLimit(input: AiProviderInput) {
-  return input.config.maxOutputTokens;
+function getOutputTokenLimit(input: AiProviderInput, config: Pick<ProviderConfig, "modelMaxOutputTokens">) {
+  const modelSafeLimit = Math.max(1, Math.floor(config.modelMaxOutputTokens * 0.75));
+
+  return Math.min(input.config.maxOutputTokens, modelSafeLimit);
 }
 
 function parseModelJson(content: string) {
@@ -1173,6 +1182,7 @@ function applyVisionFallback(result: AiProviderResult, input: AiProviderInput, s
 function applyStreamPartialMetadata(
   result: AiProviderResult,
   input: AiProviderInput,
+  providerConfig: Pick<ProviderConfig, "modelMaxOutputTokens">,
   stream: StreamAccumulator,
   finalAnswerMarkdown: string
 ): AiProviderResult {
@@ -1191,7 +1201,7 @@ function applyStreamPartialMetadata(
       truncated: true,
       truncateReason: stream.truncateReason,
       canContinue: true,
-      outputTokenLimit: getStreamingOutputTokenLimit(input),
+      outputTokenLimit: getOutputTokenLimit(input, providerConfig),
       finishReason: stream.finishReason,
       streamCompleted: stream.sawDoneSignal
     }

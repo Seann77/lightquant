@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import type { UploadedCodeFile } from "@/lib/file-upload";
 import { formatStrategyResultAsMarkdown } from "@/lib/ai/strategy-result-format";
 import type {
@@ -19,6 +20,9 @@ import type {
 export const AI_TASK_POLL_INTERVAL_MS = 3000;
 export const AI_TASK_POLL_TIMEOUT_MS = 5 * 60 * 1000;
 export const WORKBENCH_SWITCH_COMPLETE_EVENT = "lightquant:workbench-switch-complete";
+export const AI_TASK_STARTED_AT_STORAGE_PREFIX = "lightquant:ai-task-started-at:";
+export const AI_TASK_STARTED_AT_TASK_STORAGE_PREFIX = `${AI_TASK_STARTED_AT_STORAGE_PREFIX}task:`;
+export const AI_TASK_STARTED_AT_CLIENT_STORAGE_PREFIX = `${AI_TASK_STARTED_AT_STORAGE_PREFIX}client:`;
 
 export type WorkbenchSwitchCompleteDetail = {
   conversationId: string;
@@ -33,6 +37,17 @@ type WorkbenchSwitchPerfState = {
 
 type RouterLike = {
   replace(href: string, options?: { scroll?: boolean }): void;
+};
+
+type TaskTimerSource = {
+  id?: string | null;
+  clientRequestId?: string | null;
+  startedAt?: string | null;
+  createdAt?: string | null;
+  finishedAt?: string | null;
+  progress?: {
+    startedAt?: string | null;
+  } | null;
 };
 
 declare global {
@@ -86,6 +101,256 @@ export function notifyWorkbenchSwitchComplete(detail: WorkbenchSwitchCompleteDet
   window.dispatchEvent(new CustomEvent(WORKBENCH_SWITCH_COMPLETE_EVENT, {
     detail
   }));
+}
+
+export function getCachedTaskStartedAt(taskId?: string | null) {
+  if (!taskId || typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    return readValidIsoString(window.sessionStorage.getItem(`${AI_TASK_STARTED_AT_TASK_STORAGE_PREFIX}${taskId}`))
+      ?? readValidIsoString(window.sessionStorage.getItem(`${AI_TASK_STARTED_AT_STORAGE_PREFIX}${taskId}`));
+  } catch {
+    return null;
+  }
+}
+
+export function getCachedClientRequestStartedAt(clientRequestId?: string | null) {
+  if (!clientRequestId || typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    return readValidIsoString(window.sessionStorage.getItem(`${AI_TASK_STARTED_AT_CLIENT_STORAGE_PREFIX}${clientRequestId}`));
+  } catch {
+    return null;
+  }
+}
+
+export function pickEarliestValidIso(...values: Array<string | null | undefined>) {
+  let earliest: string | null = null;
+  let earliestMs = Number.POSITIVE_INFINITY;
+
+  for (const value of values) {
+    const safeValue = readValidIsoString(value);
+
+    if (!safeValue) {
+      continue;
+    }
+
+    const valueMs = Date.parse(safeValue);
+
+    if (valueMs < earliestMs) {
+      earliest = safeValue;
+      earliestMs = valueMs;
+    }
+  }
+
+  return earliest;
+}
+
+export function rememberTaskStartedAt(taskId: string | null | undefined, startedAt: string | null | undefined, options: { overwrite?: boolean } = {}) {
+  const safeStartedAt = readValidIsoString(startedAt);
+
+  if (!taskId || !safeStartedAt || typeof window === "undefined") {
+    return safeStartedAt;
+  }
+
+  try {
+    const key = `${AI_TASK_STARTED_AT_TASK_STORAGE_PREFIX}${taskId}`;
+    const legacyKey = `${AI_TASK_STARTED_AT_STORAGE_PREFIX}${taskId}`;
+    const existingStartedAt = getCachedTaskStartedAt(taskId);
+    const nextStartedAt = options.overwrite ? safeStartedAt : existingStartedAt ?? safeStartedAt;
+
+    if (!options.overwrite && existingStartedAt) {
+      return existingStartedAt;
+    }
+
+    window.sessionStorage.setItem(key, nextStartedAt);
+    window.sessionStorage.setItem(legacyKey, nextStartedAt);
+  } catch {
+    // sessionStorage can be unavailable in private or restricted contexts.
+  }
+
+  return options.overwrite ? safeStartedAt : getCachedTaskStartedAt(taskId) ?? safeStartedAt;
+}
+
+export function rememberClientRequestStartedAt(
+  clientRequestId: string | null | undefined,
+  startedAt: string | null | undefined,
+  options: { overwrite?: boolean } = {}
+) {
+  const safeStartedAt = readValidIsoString(startedAt);
+
+  if (!clientRequestId || !safeStartedAt || typeof window === "undefined") {
+    return safeStartedAt;
+  }
+
+  try {
+    const key = `${AI_TASK_STARTED_AT_CLIENT_STORAGE_PREFIX}${clientRequestId}`;
+    const existingStartedAt = getCachedClientRequestStartedAt(clientRequestId);
+    const nextStartedAt = options.overwrite ? safeStartedAt : existingStartedAt ?? safeStartedAt;
+
+    if (!options.overwrite && existingStartedAt) {
+      return existingStartedAt;
+    }
+
+    window.sessionStorage.setItem(key, nextStartedAt);
+    return nextStartedAt;
+  } catch {
+    // sessionStorage can be unavailable in private or restricted contexts.
+  }
+
+  return safeStartedAt;
+}
+
+export function migrateTaskStartedAt(
+  localTaskId: string | null | undefined,
+  taskId: string | null | undefined,
+  localCreatedAt?: string | null,
+  options: {
+    clientRequestId?: string | null;
+    localClientRequestId?: string | null;
+    taskClientRequestId?: string | null;
+    submitStartedAt?: string | null;
+  } = {}
+) {
+  if (!localTaskId || !taskId || localTaskId === taskId) {
+    return;
+  }
+
+  const clientRequestId = options.clientRequestId ?? null;
+
+  // A running timer belongs to exactly one submit chain. Only migrate the
+  // optimistic local job when all known ids still point at that same request.
+  if (
+    !clientRequestId ||
+    localTaskId !== clientRequestId ||
+    (options.localClientRequestId && options.localClientRequestId !== clientRequestId) ||
+    (options.taskClientRequestId && options.taskClientRequestId !== clientRequestId)
+  ) {
+    return;
+  }
+
+  const inheritedStartedAt = readValidIsoString(options.submitStartedAt)
+    ?? getCachedClientRequestStartedAt(clientRequestId)
+    ?? getCachedTaskStartedAt(localTaskId)
+    ?? readValidIsoString(localCreatedAt);
+  rememberTaskStartedAt(taskId, inheritedStartedAt, { overwrite: true });
+}
+
+export function resolveTaskStartedAt(input: {
+  task?: TaskTimerSource | null;
+  clientRequestId?: string | null;
+  requestStartedAt?: string | null;
+  cachedStartedAt?: string | null;
+  localCreatedAt?: string | null;
+  fallback?: string | null;
+  now?: string;
+}) {
+  const clientRequestId = input.clientRequestId ?? input.task?.clientRequestId ?? null;
+
+  return readValidIsoString(input.requestStartedAt)
+    ?? getCachedClientRequestStartedAt(clientRequestId)
+    ?? readValidIsoString(input.cachedStartedAt)
+    ?? readValidIsoString(input.task?.startedAt)
+    ?? readValidIsoString(input.task?.progress?.startedAt)
+    ?? getCachedTaskStartedAt(input.task?.id)
+    ?? readValidIsoString(input.task?.createdAt)
+    ?? readValidIsoString(input.localCreatedAt)
+    ?? readValidIsoString(input.fallback)
+    ?? input.now
+    ?? new Date().toISOString();
+}
+
+export function getTaskElapsedSeconds(input: {
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  nowMs?: number;
+}) {
+  const startedAtMs = parseTimeMs(input.startedAt);
+
+  if (!Number.isFinite(startedAtMs)) {
+    return 0;
+  }
+
+  const finishedAtMs = parseTimeMs(input.finishedAt);
+  const endAtMs = Number.isFinite(finishedAtMs) ? finishedAtMs : input.nowMs ?? Date.now();
+  return Math.max(0, Math.floor((endAtMs - startedAtMs) / 1000));
+}
+
+export function useStableElapsedSeconds(active: boolean, input: {
+  task?: TaskTimerSource | null;
+  taskId?: string | null;
+  clientRequestId?: string | null;
+  localCreatedAt?: string | null;
+  fallbackStartedAt?: string | null;
+  finishedAt?: string | null;
+}) {
+  const taskId = input.task?.id ?? input.taskId ?? null;
+  const clientRequestId = input.clientRequestId ?? input.task?.clientRequestId ?? null;
+  const timerIdentity = clientRequestId ?? taskId;
+  const stableStartedAt = resolveTaskStartedAt({
+    task: input.task ?? (taskId ? { id: taskId, clientRequestId } : null),
+    clientRequestId,
+    cachedStartedAt: input.fallbackStartedAt,
+    localCreatedAt: input.localCreatedAt,
+    fallback: input.fallbackStartedAt
+  });
+  const startedAtRef = useRef<string | null>(stableStartedAt);
+  const timerIdentityRef = useRef<string | null>(timerIdentity);
+  const lastValueRef = useRef(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(() => getTaskElapsedSeconds({
+    startedAt: stableStartedAt,
+    finishedAt: input.finishedAt
+  }));
+
+  useEffect(() => {
+    const identityChanged = timerIdentityRef.current !== timerIdentity;
+    timerIdentityRef.current = timerIdentity;
+
+    const nextStartedAt = identityChanged || !startedAtRef.current
+      ? stableStartedAt
+      : startedAtRef.current;
+    startedAtRef.current = nextStartedAt;
+    rememberTaskStartedAt(taskId, nextStartedAt, { overwrite: true });
+    rememberClientRequestStartedAt(clientRequestId, nextStartedAt, { overwrite: true });
+
+    const nextElapsedSeconds = getTaskElapsedSeconds({
+      startedAt: nextStartedAt,
+      finishedAt: input.finishedAt
+    });
+    lastValueRef.current = nextElapsedSeconds;
+    setElapsedSeconds(nextElapsedSeconds);
+  }, [clientRequestId, input.finishedAt, stableStartedAt, taskId, timerIdentity]);
+
+  useEffect(() => {
+    if (!active) {
+      lastValueRef.current = getTaskElapsedSeconds({
+        startedAt: startedAtRef.current,
+        finishedAt: input.finishedAt
+      });
+      setElapsedSeconds(lastValueRef.current);
+      return;
+    }
+
+    const tick = () => {
+      const nextElapsedSeconds = getTaskElapsedSeconds({
+        startedAt: startedAtRef.current,
+        finishedAt: input.finishedAt
+      });
+      lastValueRef.current = nextElapsedSeconds;
+      setElapsedSeconds(nextElapsedSeconds);
+    };
+
+    tick();
+    const timer = window.setInterval(tick, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [active, input.finishedAt]);
+
+  return active ? elapsedSeconds : lastValueRef.current;
 }
 
 export async function fetchAiConversationSummary(conversationId: string, options: { signal?: AbortSignal } = {}) {
@@ -829,6 +1094,7 @@ export function readTaskSnapshot(value: unknown): AiTaskData["task"] | null {
 
   return {
     id: task.id,
+    clientRequestId: readNullableString(task.clientRequestId),
     type: readNullableString(task.type) ?? "",
     status: readNullableString(task.status) ?? "SUCCEEDED",
     conversationId: readNullableString(task.conversationId),
@@ -1249,6 +1515,23 @@ function createAbortError() {
 
 function getPerfNow() {
   return typeof performance !== "undefined" ? performance.now() : Date.now();
+}
+
+function parseTimeMs(value?: string | null) {
+  if (!value) {
+    return Number.NaN;
+  }
+
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : Number.NaN;
+}
+
+function readValidIsoString(value?: string | null) {
+  if (!value || !Number.isFinite(Date.parse(value))) {
+    return null;
+  }
+
+  return value;
 }
 
 function delay(ms: number, signal?: AbortSignal) {

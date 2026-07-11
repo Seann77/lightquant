@@ -520,9 +520,9 @@ function createSeedRunEvents({
     progressPercent: hasAttachment ? 6 : 3,
     seq: events.length + 1,
     status: "running",
-    summary: "等待后台处理进程接手本次任务。",
+    summary: "正在处理任务...",
     taskId: localTaskId,
-    title: "正在准备任务",
+    title: "正在处理任务",
     type: "prepare_task"
   }));
 
@@ -1170,12 +1170,12 @@ function getFallbackPhaseLabel(taskType: WorkbenchTaskType, phase: RunStage) {
     return "处理未完成";
   }
 
-  return "正在准备任务";
+  return "正在处理任务";
 }
 
 function getFallbackStatusMessage(taskType: WorkbenchTaskType, phase: RunStage) {
   if (phase === "queued") {
-    return "任务已提交，正在等待后台处理。";
+    return "正在处理任务...";
   }
 
   if (phase === "input") {

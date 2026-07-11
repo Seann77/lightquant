@@ -43,6 +43,7 @@ export type WorkbenchAttachmentKind = "code" | "text" | "log" | "markdown" | "im
 export type AiTaskData = {
   task: {
     id: string;
+    clientRequestId?: string | null;
     type?: string;
     status: string;
     conversationId?: string | null;

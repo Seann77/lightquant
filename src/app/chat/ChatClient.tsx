@@ -14,13 +14,13 @@ import {
   Paperclip,
   Send,
   Sparkles,
+  Square,
   Trash2
 } from "lucide-react";
 import { getFileUploadFriendlyError, getUploadAccept, getUploadButtonLabel, uploadCodeFile, type UploadedCodeFile } from "@/lib/file-upload";
 import { normalizeStrategyFinalAnswerMarkdown } from "@/lib/ai/strategy-result-format";
 import {
   buildAiTaskFingerprint,
-  canContinueAiTaskData,
   isAiTaskDataCompleteSuccess,
   isAiTaskDataPartial
 } from "@/lib/ai/task-fingerprint";
@@ -31,10 +31,11 @@ import { MessageAttachmentList, WorkbenchFileUploadStatus } from "@/components/a
 import { WorkbenchShell } from "@/components/ai/WorkbenchShell";
 import {
   CopyCodeButton,
+  FullCodeResultPanel,
   getCodeConversionTabContent,
   isCodeConversionCodeTab,
-  getStrategyResponseTitle,
-  parseCodeConversionMarkdown
+  parseCodeConversionMarkdown,
+  stripGeneratedCodeFromMarkdown
 } from "@/components/ai/WorkbenchResultViews";
 import {
   createRestoredUploadedFile,
@@ -47,14 +48,20 @@ import {
   getAiTaskStreamingContent,
   formatAiTaskResultAsMarkdown,
   getMessageAttachments,
+  getTaskElapsedSeconds,
   logWorkbenchPerf,
+  migrateTaskStartedAt,
   persistConversationActiveTab,
   readRecord,
   readNullableString,
   readStringArray,
+  rememberClientRequestStartedAt,
+  rememberTaskStartedAt,
+  resolveTaskStartedAt,
   replaceWorkbenchConversationUrl,
   streamWorkbenchAiTask,
   uploadedFileToMessageAttachment,
+  useStableElapsedSeconds,
   waitForAiTaskResult
 } from "@/lib/ai/workbench-client";
 import { useWorkbenchConversationRestore } from "@/lib/ai/use-workbench-conversation";
@@ -80,6 +87,8 @@ type JobStatus =
 
 type StrategyJobRequest = {
   conversationKey: string;
+  clientRequestId?: string;
+  submitStartedAt?: string;
   prompt: string;
   messageContent: string;
   targetPlatform: string;
@@ -99,6 +108,7 @@ type StrategyJob = {
   createdAt: string;
   startedAt?: string;
   finishedAt?: string;
+  clientRequestId?: string;
   task?: AiTaskData["task"];
   result?: AiTaskData["result"];
   billing?: AiTaskData["billing"];
@@ -144,8 +154,7 @@ function StrategyModeContent() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [lastSuccessfulFingerprint, setLastSuccessfulFingerprint] = useState<string | null>(null);
-  const [lastPartialFingerprint, setLastPartialFingerprint] = useState<string | null>(null);
-  const [lastPartialCanContinue, setLastPartialCanContinue] = useState(false);
+  const [cancelingStrategyJobId, setCancelingStrategyJobId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const compositionRef = useRef(false);
   const strategyThreadRef = useRef<HTMLDivElement>(null);
@@ -160,8 +169,15 @@ function StrategyModeContent() {
   const streamAbortControllersRef = useRef(new Map<string, AbortController>());
   const activeJobId = activeJobByConversationId[currentConversationKey];
   const activeJob = activeJobId ? jobsById[activeJobId] ?? null : null;
-  const activeJobRunning = Boolean(activeJob && isJobActive(activeJob));
-  const elapsedSeconds = useElapsedSeconds(activeJobRunning, activeJob?.startedAt ?? activeJob?.createdAt);
+  const activeJobRunning = getDisplayJobActive(activeJob);
+  const elapsedSeconds = useStableElapsedSeconds(activeJobRunning, {
+    task: activeJob?.task ?? null,
+    taskId: activeJob?.id ?? null,
+    clientRequestId: activeJob?.clientRequestId ?? activeJob?.request?.clientRequestId ?? activeJob?.task?.clientRequestId ?? null,
+    localCreatedAt: activeJob?.createdAt ?? null,
+    fallbackStartedAt: activeJob?.startedAt ?? null,
+    finishedAt: activeJob?.finishedAt ?? activeJob?.task?.finishedAt ?? null
+  });
   const strategyCurrentFingerprint = useMemo(() => buildAiTaskFingerprint({
     type: "strategy_generation",
     targetPlatform,
@@ -171,11 +187,11 @@ function StrategyModeContent() {
   }), [targetPlatform, prompt, uploadedFile]);
   const strategyHasInput = Boolean(prompt.trim() || uploadedFile);
   const strategyDuplicateCompleted = strategyHasInput && lastSuccessfulFingerprint === strategyCurrentFingerprint;
-  const strategyContinuationAvailable = !strategyHasInput && lastPartialCanContinue && Boolean(lastPartialFingerprint);
-  const strategySubmitDisabled = activeJobRunning ||
-    uploading ||
+  const strategySendDisabled = uploading ||
     uploadedFile?.scanStatus === "BLOCKED" ||
-    (!strategyContinuationAvailable && (!strategyHasInput || strategyDuplicateCompleted));
+    !strategyHasInput ||
+    strategyDuplicateCompleted;
+  const strategyCanceling = Boolean(activeJob && cancelingStrategyJobId === activeJob.id);
 
   useEffect(() => {
     activeConversationKeyRef.current = currentConversationKey;
@@ -218,16 +234,10 @@ function StrategyModeContent() {
 
       if (restoredFingerprint && isAiTaskDataCompleteSuccess(restored.taskData)) {
         setLastSuccessfulFingerprint(restoredFingerprint);
-        setLastPartialFingerprint(null);
-        setLastPartialCanContinue(false);
       } else if (restoredFingerprint && isAiTaskDataPartial(restored.taskData)) {
         setLastSuccessfulFingerprint(null);
-        setLastPartialFingerprint(restoredFingerprint);
-        setLastPartialCanContinue(canContinueAiTaskData(restored.taskData));
       } else {
         setLastSuccessfulFingerprint(null);
-        setLastPartialFingerprint(null);
-        setLastPartialCanContinue(false);
       }
     },
     onError: (historyError) => {
@@ -406,53 +416,52 @@ function StrategyModeContent() {
     }
   }
 
-  async function handleSubmit(options: { continuation?: boolean } = {}) {
-    const continueOutput = options.continuation === true;
-
+  async function handleSubmit() {
     if (activeJobRunning || uploading) {
       return;
     }
 
-    if (continueOutput && !strategyContinuationAvailable) {
+    if (strategyDuplicateCompleted) {
       return;
     }
 
-    if (!continueOutput && strategyDuplicateCompleted) {
-      return;
-    }
-
-    const messageContent = continueOutput ? "继续输出" : prompt.trim();
-    const submittedFingerprint = continueOutput ? lastPartialFingerprint : strategyCurrentFingerprint;
+    const messageContent = prompt.trim();
+    const submittedFingerprint = strategyCurrentFingerprint;
 
     if (!submittedFingerprint) {
       return;
     }
 
-    if (!continueOutput && !messageContent && !uploadedFile) {
+    if (!messageContent && !uploadedFile) {
       return;
     }
 
-    if (!continueOutput && uploadedFile?.scanStatus === "BLOCKED") {
+    if (uploadedFile?.scanStatus === "BLOCKED") {
       return;
     }
 
     const clientRequestId = createWorkbenchClientRequestId("strategy");
+    const submitStartedAt = new Date().toISOString();
+    rememberClientRequestStartedAt(clientRequestId, submitStartedAt, { overwrite: true });
     const optimisticUserContent = messageContent || (uploadedFile ? `已上传文件：${uploadedFile.originalName}` : "已上传文件输入");
     const currentConversationId = conversation?.id ?? conversationIdFromUrl ?? undefined;
     const conversationKeyAtSubmit = currentConversationId ?? DRAFT_CONVERSATION_KEY;
     const request: StrategyJobRequest = {
       conversationKey: conversationKeyAtSubmit,
+      clientRequestId,
+      submitStartedAt,
       prompt: optimisticUserContent,
       messageContent: optimisticUserContent,
       targetPlatform,
-      inputFileId: continueOutput ? undefined : uploadedFile?.fileId,
-      inputFileName: continueOutput ? undefined : uploadedFile?.originalName
+      inputFileId: uploadedFile?.fileId,
+      inputFileName: uploadedFile?.originalName
     };
     const localJob = createLocalStrategyJob({
       id: clientRequestId,
       conversationId: conversationKeyAtSubmit,
       request,
-      createdAt: new Date().toISOString()
+      createdAt: submitStartedAt,
+      startedAt: submitStartedAt
     });
 
     setError("");
@@ -474,12 +483,12 @@ function StrategyModeContent() {
         content: optimisticUserContent,
         contentJson: {
           targetPlatform,
-          inputFileId: continueOutput ? null : uploadedFile?.fileId ?? null,
-          inputFileName: continueOutput ? null : uploadedFile?.originalName ?? null,
-          continuation: continueOutput
+          inputFileId: uploadedFile?.fileId ?? null,
+          inputFileName: uploadedFile?.originalName ?? null,
+          continuation: null
         },
-        attachments: !continueOutput && uploadedFile ? [uploadedFileToMessageAttachment(uploadedFile, `local-attachment-${clientRequestId}`)] : [],
-        createdAt: new Date().toISOString()
+        attachments: uploadedFile ? [uploadedFileToMessageAttachment(uploadedFile, `local-attachment-${clientRequestId}`)] : [],
+        createdAt: submitStartedAt
       }
     ]);
     setPrompt("");
@@ -497,7 +506,7 @@ function StrategyModeContent() {
         messageContent: optimisticUserContent,
         targetPlatform,
         prompt: optimisticUserContent,
-        inputFileId: continueOutput ? undefined : uploadedFile?.fileId,
+        inputFileId: uploadedFile?.fileId,
         clientRequestId
       }, {
         signal: streamController.signal,
@@ -540,9 +549,7 @@ function StrategyModeContent() {
         request
       });
       rememberTaskFingerprintOutcome(completed, submittedFingerprint, {
-        setLastSuccessfulFingerprint,
-        setLastPartialFingerprint,
-        setLastPartialCanContinue
+        setLastSuccessfulFingerprint
       });
       window.dispatchEvent(new Event("lightquant:credits-updated"));
       window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
@@ -557,10 +564,11 @@ function StrategyModeContent() {
       setError(friendly);
       setJobsById((current) => ({
         ...current,
-        [localJob.id]: {
-          ...localJob,
+        [streamJobId]: {
+          ...(current[streamJobId] ?? current[localJob.id] ?? localJob),
           status: "failed",
           error: friendly,
+          finalAnswerMarkdown: "",
           finishedAt: new Date().toISOString()
         }
       }));
@@ -580,17 +588,56 @@ function StrategyModeContent() {
     }
   ) {
     const responseConversationId = data.conversation?.id ?? data.task.conversationId ?? options.sourceConversationKey;
-    const previousJob = jobsById[data.task.id] ?? (options.localJobId ? jobsById[options.localJobId] : undefined);
+    const localJob = options.localJobId ? jobsById[options.localJobId] : undefined;
+    const previousJob = jobsById[data.task.id] ?? localJob;
+    const request = options.request ?? previousJob?.request;
+    const requestClientRequestId = request?.clientRequestId ?? null;
+    const taskClientRequestId = data.task.clientRequestId ?? null;
+    const previousClientRequestId = getStrategyJobClientRequestId(previousJob);
+    const requestMatchesTask = !requestClientRequestId || !taskClientRequestId || requestClientRequestId === taskClientRequestId;
+    const clientRequestId = requestMatchesTask
+      ? requestClientRequestId ?? taskClientRequestId ?? (previousJob?.id === data.task.id ? previousClientRequestId : null)
+      : taskClientRequestId ?? requestClientRequestId;
+    const previousBelongsToCurrentRequest = Boolean(clientRequestId && previousClientRequestId === clientRequestId);
+    const localBelongsToCurrentRequest = Boolean(
+      requestClientRequestId &&
+      options.localJobId === requestClientRequestId &&
+      previousClientRequestId === requestClientRequestId &&
+      taskClientRequestId === requestClientRequestId
+    );
+
+    if (options.localJobId && options.localJobId !== data.task.id) {
+      migrateTaskStartedAt(options.localJobId, data.task.id, previousJob?.startedAt ?? previousJob?.createdAt, {
+        clientRequestId,
+        localClientRequestId: previousClientRequestId,
+        taskClientRequestId,
+        submitStartedAt: request?.submitStartedAt
+      });
+    }
+
+    const stableStartedAt = resolveTaskStartedAt({
+      task: data.task,
+      clientRequestId,
+      requestStartedAt: requestMatchesTask && requestClientRequestId === clientRequestId ? request?.submitStartedAt : undefined,
+      cachedStartedAt: previousBelongsToCurrentRequest ? previousJob?.startedAt : undefined,
+      localCreatedAt: localBelongsToCurrentRequest ? previousJob?.createdAt : undefined,
+      fallback: data.task.createdAt
+    });
+    rememberTaskStartedAt(data.task.id, stableStartedAt, { overwrite: true });
+    rememberClientRequestStartedAt(clientRequestId, stableStartedAt, { overwrite: true });
+
     const streamContent = getAiTaskStreamingContent(data, data.task.id);
+    const suppressDraftFinalAnswer = shouldSuppressStrategyDraftFinalAnswer(data);
     const nextJob = createStrategyJobFromTask(data.task, {
       conversationId: responseConversationId,
       result: data.result,
       billing: data.billing,
       events: data.events,
       previous: previousJob,
-      request: options.request ?? previousJob?.request,
+      request,
       visibleThinking: streamContent.visibleThinking,
-      finalAnswerMarkdown: streamContent.finalAnswerMarkdown
+      finalAnswerMarkdown: streamContent.finalAnswerMarkdown,
+      suppressDraftFinalAnswer
     });
     const shouldUpdateVisibleConversation = isSameConversationKey(activeConversationKeyRef.current, options.sourceConversationKey, responseConversationId);
 
@@ -606,8 +653,10 @@ function StrategyModeContent() {
         ...existing,
         ...nextJob,
         visibleThinking: preserveStreamBuffer(nextJob.visibleThinking, existing?.visibleThinking),
-        finalAnswerMarkdown: preserveStreamBuffer(nextJob.finalAnswerMarkdown, existing?.finalAnswerMarkdown),
-        request: options.request ?? existing?.request
+        finalAnswerMarkdown: suppressDraftFinalAnswer ? "" : preserveStreamBuffer(nextJob.finalAnswerMarkdown, existing?.finalAnswerMarkdown),
+        startedAt: nextJob.startedAt,
+        clientRequestId: nextJob.clientRequestId ?? existing?.clientRequestId ?? request?.clientRequestId,
+        request: request ?? existing?.request
       };
 
       return next;
@@ -616,14 +665,15 @@ function StrategyModeContent() {
     setActiveJobByConversationId((current) => {
       const next = { ...current };
 
-      if (options.localJobId && options.localJobId !== data.task.id && next[options.sourceConversationKey] === options.localJobId) {
-        delete next[options.sourceConversationKey];
-      }
-
       if (nextJob.status === "completed" && data.messages?.some((message) => message.taskId === data.task.id && message.role === "assistant")) {
         delete next[responseConversationId];
+        delete next[options.sourceConversationKey];
       } else {
         next[responseConversationId] = data.task.id;
+
+        if (options.localJobId && options.localJobId !== data.task.id && next[options.sourceConversationKey] === options.localJobId) {
+          next[options.sourceConversationKey] = data.task.id;
+        }
       }
 
       return next;
@@ -797,10 +847,11 @@ function StrategyModeContent() {
   }
 
   async function handleCancelJob(job: StrategyJob) {
-    if (!isJobActive(job)) {
+    if (!isJobActive(job) || cancelingStrategyJobId === job.id) {
       return;
     }
 
+    setCancelingStrategyJobId(job.id);
     streamAbortControllersRef.current.get(job.id)?.abort();
     pollingJobsRef.current.get(job.id)?.abort();
     pollingJobsRef.current.delete(job.id);
@@ -816,6 +867,7 @@ function StrategyModeContent() {
           finishedAt: new Date().toISOString()
         }
       }));
+      setCancelingStrategyJobId(null);
       return;
     }
 
@@ -827,6 +879,8 @@ function StrategyModeContent() {
       window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
     } catch (cancelError) {
       setError(getFriendlyError(cancelError));
+    } finally {
+      setCancelingStrategyJobId(null);
     }
   }
 
@@ -836,19 +890,27 @@ function StrategyModeContent() {
     }
 
     const clientRequestId = createWorkbenchClientRequestId("strategy-retry");
+    const submitStartedAt = new Date().toISOString();
+    rememberClientRequestStartedAt(clientRequestId, submitStartedAt, { overwrite: true });
     const sourceConversationKey = job.conversationId || currentConversationKey;
-    const retryRequest = job.request ?? {
+    const retryRequest: StrategyJobRequest = {
+      ...(job.request ?? {
       conversationKey: sourceConversationKey,
       prompt: job.task?.promptPreview ?? "重试策略生成任务",
       messageContent: job.task?.promptPreview ?? "重试策略生成任务",
       targetPlatform: job.task?.targetPlatform ?? targetPlatform,
       inputFileId: job.task?.inputFileId ?? undefined
+      }),
+      conversationKey: sourceConversationKey,
+      clientRequestId,
+      submitStartedAt
     };
     const localJob = createLocalStrategyJob({
       id: clientRequestId,
       conversationId: sourceConversationKey,
       request: retryRequest,
-      createdAt: new Date().toISOString()
+      createdAt: submitStartedAt,
+      startedAt: submitStartedAt
     });
 
     setError("");
@@ -926,10 +988,11 @@ function StrategyModeContent() {
       setError(friendly);
       setJobsById((current) => ({
         ...current,
-        [localJob.id]: {
-          ...localJob,
+        [streamJobId]: {
+          ...(current[streamJobId] ?? current[localJob.id] ?? localJob),
           status: "failed",
           error: friendly,
+          finalAnswerMarkdown: "",
           finishedAt: new Date().toISOString()
         }
       }));
@@ -988,13 +1051,12 @@ function StrategyModeContent() {
               <ChatBubble role="assistant" text={historyLoading ? "正在载入会话..." : "请输入策略需求，我会保留上下文，后续可继续追问或修改上一轮策略。"} />
             ) : null}
             {messages.map((message) => (
-              <StrategyMessageBubble elapsedSeconds={message.localStatus === "pending" ? elapsedSeconds : undefined} key={message.id} message={message} />
+              <StrategyMessageBubble key={message.id} message={message} />
             ))}
             {activeJob && shouldShowActiveJobPanel ? (
               <StrategyJobBubble
                 elapsedSeconds={elapsedSeconds}
                 job={activeJob}
-                onCancel={() => void handleCancelJob(activeJob)}
                 onRetry={() => void handleRetryJob(activeJob)}
               />
             ) : null}
@@ -1033,21 +1095,28 @@ function StrategyModeContent() {
                   <DollarSign aria-hidden="true" />
                   <span>每次策略生成消耗 50 积分</span>
                 </div>
-                <button
-                  className="lq-primary-btn"
-                  disabled={strategySubmitDisabled}
-                  onClick={() => void handleSubmit({ continuation: strategyContinuationAvailable })}
-                  type="button"
-                >
-                  {activeJobRunning ? <LoaderCircle aria-hidden="true" className="animate-spin" size={18} /> : <Send aria-hidden="true" size={18} />}
-                  {activeJobRunning
-                    ? `${activeJob?.status === "queued" ? "排队中" : "处理中"} ${elapsedSeconds}s`
-                    : strategyContinuationAvailable
-                      ? "继续输出"
-                      : strategyDuplicateCompleted
-                        ? "已完成生成"
-                        : "发送"}
-                </button>
+                {activeJobRunning && activeJob ? (
+                  <button
+                    aria-label="停止当前任务"
+                    className="lq-stop-task-btn"
+                    disabled={strategyCanceling}
+                    onClick={() => void handleCancelJob(activeJob)}
+                    type="button"
+                  >
+                    {strategyCanceling ? <LoaderCircle aria-hidden="true" className="animate-spin" size={17} /> : <Square aria-hidden="true" size={15} />}
+                    停止
+                  </button>
+                ) : (
+                  <button
+                    className="lq-primary-btn"
+                    disabled={strategySendDisabled}
+                    onClick={() => void handleSubmit()}
+                    type="button"
+                  >
+                    <Send aria-hidden="true" size={18} />
+                    发送
+                  </button>
+                )}
               </div>
             </div>
             <WorkbenchFileUploadStatus file={uploadedFile} message={uploadError} />
@@ -1077,8 +1146,6 @@ function ConvertModeContent() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [lastSuccessfulFingerprint, setLastSuccessfulFingerprint] = useState<string | null>(null);
-  const [lastPartialFingerprint, setLastPartialFingerprint] = useState<string | null>(null);
-  const [lastPartialCanContinue, setLastPartialCanContinue] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const conversionPreviewRef = useRef<HTMLDivElement>(null);
   const conversionAutoFollowRef = useRef(true);
@@ -1091,7 +1158,12 @@ function ConvertModeContent() {
   const activeConversionTaskStatus = taskData?.task.status ?? null;
   const activeConversionTaskRunning = activeConversionTaskStatus === "PENDING" || activeConversionTaskStatus === "RUNNING";
   const conversionLoading = loading || activeConversionTaskRunning;
-  const elapsedSeconds = useElapsedSeconds(conversionLoading, taskData?.task.startedAt ?? taskData?.task.createdAt ?? undefined);
+  const elapsedSeconds = useStableElapsedSeconds(conversionLoading, {
+    task: taskData?.task ?? null,
+    taskId: taskData?.task.id ?? null,
+    localCreatedAt: taskData?.task.createdAt ?? null,
+    finishedAt: taskData?.task.finishedAt ?? null
+  });
 
   const activeConversionConversationId = taskData?.conversation?.id ?? taskData?.task.conversationId ?? conversationIdFromUrl;
   const finalInputText = getFinalConversionInputText(inputCode);
@@ -1106,9 +1178,6 @@ function ConvertModeContent() {
     inputFile: uploadedFile
   }), [sourcePlatform, targetPlatform, finalPrompt, finalInputText, uploadedFile]);
   const conversionDuplicateCompleted = Boolean(finalInputText) && lastSuccessfulFingerprint === conversionCurrentFingerprint;
-  const conversionContinuationAvailable = Boolean(finalInputText) &&
-    lastPartialCanContinue &&
-    lastPartialFingerprint === conversionCurrentFingerprint;
 
   useWorkbenchConversationRestore({
     conversationId: conversationIdFromUrl,
@@ -1174,16 +1243,10 @@ function ConvertModeContent() {
 
       if (isAiTaskDataCompleteSuccess(restored.taskData)) {
         setLastSuccessfulFingerprint(restoredFingerprint);
-        setLastPartialFingerprint(null);
-        setLastPartialCanContinue(false);
       } else if (isAiTaskDataPartial(restored.taskData)) {
         setLastSuccessfulFingerprint(null);
-        setLastPartialFingerprint(restoredFingerprint);
-        setLastPartialCanContinue(canContinueAiTaskData(restored.taskData));
       } else {
         setLastSuccessfulFingerprint(null);
-        setLastPartialFingerprint(null);
-        setLastPartialCanContinue(false);
       }
     },
     onError: (historyError) => {
@@ -1332,9 +1395,8 @@ function ConvertModeContent() {
     }
   }
 
-  async function handleSubmit(options: { continuation?: boolean } = {}) {
-    const continueOutput = options.continuation === true;
-    const submittedFingerprint = continueOutput ? lastPartialFingerprint : conversionCurrentFingerprint;
+  async function handleSubmit() {
+    const submittedFingerprint = conversionCurrentFingerprint;
 
     if (conversionLoading || uploading) {
       return;
@@ -1344,23 +1406,19 @@ function ConvertModeContent() {
       return;
     }
 
-    if (continueOutput && !conversionContinuationAvailable) {
+    if (conversionDuplicateCompleted) {
       return;
     }
 
-    if (!continueOutput && conversionDuplicateCompleted) {
+    if (!finalInputText) {
       return;
     }
 
-    if (!continueOutput && !finalInputText) {
+    if (uploadedFile?.scanStatus === "BLOCKED") {
       return;
     }
 
-    if (!continueOutput && uploadedFile?.scanStatus === "BLOCKED") {
-      return;
-    }
-
-    if (!continueOutput && finalTotalInputChars > CODE_CONVERSION_MAX_TOTAL_INPUT_CHARS) {
+    if (finalTotalInputChars > CODE_CONVERSION_MAX_TOTAL_INPUT_CHARS) {
       setError(getConversionInputTooLargeMessage(finalTotalInputChars, inputSource === "attachment" && Boolean(uploadedFile)));
       return;
     }
@@ -1385,9 +1443,9 @@ function ConvertModeContent() {
         conversationId: currentConversationId,
         sourcePlatform,
         targetPlatform,
-        inputCode: continueOutput ? undefined : finalInputText,
-        prompt: continueOutput ? "继续输出" : finalPrompt,
-        inputFileId: continueOutput ? undefined : uploadedFile?.fileId,
+        inputCode: finalInputText,
+        prompt: finalPrompt,
+        inputFileId: uploadedFile?.fileId,
         clientRequestId: createWorkbenchClientRequestId("convert")
       }, {
         onTask: (data) => {
@@ -1425,9 +1483,7 @@ function ConvertModeContent() {
       setActiveTab(conversionTabs[0]);
       replaceWorkbenchConversationUrl(router, { type: "chat", mode: "convert" }, conversationIdFromUrl, completed.conversation?.id ?? completed.task.conversationId ?? null);
       rememberTaskFingerprintOutcome(completed, submittedFingerprint, {
-        setLastSuccessfulFingerprint,
-        setLastPartialFingerprint,
-        setLastPartialCanContinue
+        setLastSuccessfulFingerprint
       });
       window.dispatchEvent(new Event("lightquant:credits-updated"));
       window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
@@ -1502,13 +1558,16 @@ function ConvertModeContent() {
   const inputTooLargeMessage = finalTotalInputChars > CODE_CONVERSION_MAX_TOTAL_INPUT_CHARS
     ? getConversionInputTooLargeMessage(finalTotalInputChars, inputSource === "attachment" && Boolean(uploadedFile))
     : "";
-  const shownError = error || (conversionContinuationAvailable ? "" : inputTooLargeMessage);
+  const shownError = error || inputTooLargeMessage;
   const hasConversionOutput = Boolean(targetCode.trim() || migrationNotes.trim());
   const taskStatus = taskData?.task.status ?? (conversionLoading ? "RUNNING" : null);
   const canCancelTask = Boolean(taskData?.task.id && (taskStatus === "PENDING" || taskStatus === "RUNNING"));
   const conversionSubmitDisabled = conversionLoading ||
     uploading ||
-    (!conversionContinuationAvailable && (Boolean(inputTooLargeMessage) || !finalInputText || uploadedFile?.scanStatus === "BLOCKED" || conversionDuplicateCompleted));
+    Boolean(inputTooLargeMessage) ||
+    !finalInputText ||
+    uploadedFile?.scanStatus === "BLOCKED" ||
+    conversionDuplicateCompleted;
 
   useEffect(() => {
     conversionTabChangedRef.current = conversionMountedRef.current;
@@ -1629,7 +1688,9 @@ function ConvertModeContent() {
               <div className="lq-code-preview app-scrollbar" onScroll={handleConversionPreviewScroll} ref={conversionPreviewRef}>
                 <div className="lq-code-lines">{Array.from({ length: conversionLineCount }, (_, index) => <div key={index}>{index + 1}</div>)}</div>
                 {hasConversionOutput ? (
-                  <CodeConversionToolOutput activeTab={activeTab} content={conversionPanelContent} loading={conversionLoading} />
+                  isCodeConversionCodeTab(activeTab) && result?.generatedCode
+                    ? <FullCodeResultPanel result={result} title="转换后代码" />
+                    : <CodeConversionToolOutput activeTab={activeTab} content={conversionPanelContent} loading={conversionLoading} />
                 ) : streamState.error ? (
                   <div className="lq-result-placeholder is-error">
                     <BotIcon />
@@ -1652,15 +1713,13 @@ function ConvertModeContent() {
             <button
               className="lq-primary-btn"
               disabled={conversionSubmitDisabled}
-              onClick={() => void handleSubmit({ continuation: conversionContinuationAvailable })}
+              onClick={() => void handleSubmit()}
               type="button"
             >
               {conversionLoading ? <LoaderCircle aria-hidden="true" className="animate-spin" size={18} /> : <Sparkles aria-hidden="true" size={18} />}
               {conversionLoading
                 ? `转换中 ${elapsedSeconds}s`
-                : conversionContinuationAvailable
-                  ? "继续输出"
-                  : conversionDuplicateCompleted
+                : conversionDuplicateCompleted
                     ? "已完成转换"
                     : "开始转换"}
             </button>
@@ -1722,7 +1781,7 @@ function ChatBubble({ loading = false, role, text }: { loading?: boolean; role: 
   );
 }
 
-function StrategyMessageBubble({ elapsedSeconds, message }: { elapsedSeconds?: number; message: StrategyChatMessage }) {
+function StrategyMessageBubble({ message }: { message: StrategyChatMessage }) {
   if (message.role === "user") {
     return (
       <div className="lq-user-row">
@@ -1748,7 +1807,11 @@ function StrategyMessageBubble({ elapsedSeconds, message }: { elapsedSeconds?: n
     finalAnswerMarkdown: streamContent.finalAnswerMarkdown,
     result
   }) || streamContent.finalAnswerMarkdown;
+  const displayFinalAnswerMarkdown = result?.generatedCode
+    ? stripGeneratedCodeFromMarkdown(finalAnswerMarkdown, result.generatedCode)
+    : finalAnswerMarkdown;
   const billingTag = getBillingTag(getMessageBilling(message), task);
+  const completedElapsedSeconds = status === "succeeded" ? getCompletedTaskElapsedSeconds(task, message.createdAt) : null;
 
   return (
     <div className="lq-assistant-row">
@@ -1756,15 +1819,18 @@ function StrategyMessageBubble({ elapsedSeconds, message }: { elapsedSeconds?: n
         {status === "failed" ? (
           <StrategyFailureMessage message={failureMessage} title={task?.status === "CANCELLED" ? "任务已取消" : "生成失败"} />
         ) : finalAnswerMarkdown || streamContent.visibleThinking || result ? (
+          <>
+          {completedElapsedSeconds !== null ? <TaskElapsedBadge elapsedSeconds={completedElapsedSeconds} tone="completed" /> : null}
           <AssistantThinkingMessage
             billingLabel={billingTag?.label}
             billingWaived={billingTag?.waived}
             error={null}
-            finalTitle={getStrategyResponseTitle(result)}
-            finalAnswerMarkdown={finalAnswerMarkdown}
+            finalAnswerMarkdown={displayFinalAnswerMarkdown}
             status={thinkingStatus}
             thinking={streamContent.visibleThinking}
           />
+          {result?.generatedCode ? <FullCodeResultPanel result={result} title="完整策略代码" /> : null}
+          </>
         ) : null}
         {!result && status === "idle" ? (
           <div className="lq-chat-bubble is-plain">
@@ -1782,17 +1848,16 @@ function StrategyMessageBubble({ elapsedSeconds, message }: { elapsedSeconds?: n
 function StrategyJobBubble({
   elapsedSeconds,
   job,
-  onCancel,
   onRetry
 }: {
   elapsedSeconds: number;
   job: StrategyJob;
-  onCancel: () => void;
   onRetry: () => void;
 }) {
   const failed = job.status === "failed";
   const canceled = job.status === "canceled";
   const completed = job.status === "completed";
+  const finalizingMessage = getStrategyFinalizingMessage(job);
   const rawFinalAnswerMarkdown = job.finalAnswerMarkdown || (job.result ? formatAiTaskResultAsMarkdown(job.result, "strategy_generation") : "");
   const finalAnswerMarkdown = job.status === "streaming"
     ? rawFinalAnswerMarkdown
@@ -1800,11 +1865,18 @@ function StrategyJobBubble({
       finalAnswerMarkdown: rawFinalAnswerMarkdown,
       result: job.result
     }) || rawFinalAnswerMarkdown;
-  const thinkingStatus: AssistantThinkingStatus = failed || canceled ? "failed" : completed ? "completed" : job.status === "streaming" ? "answering" : "thinking";
+  const displayFinalAnswerMarkdown = job.result?.generatedCode
+    ? stripGeneratedCodeFromMarkdown(finalAnswerMarkdown, job.result.generatedCode)
+    : finalizingMessage
+      ? ""
+      : finalAnswerMarkdown;
+  const thinkingStatus: AssistantThinkingStatus = failed || canceled ? "failed" : completed ? "completed" : job.status === "streaming" || finalizingMessage ? "answering" : "thinking";
   const visibleThinking = job.visibleThinking?.trim() ?? "";
   const visibleError = failed || canceled ? job.error ?? null : null;
-  const runningFallback = isJobActive(job) && !visibleThinking && !finalAnswerMarkdown.trim() && !visibleError ? "正在同步任务状态..." : "";
+  const runningFallback = getDisplayJobActive(job) && !visibleThinking && !displayFinalAnswerMarkdown.trim() && !visibleError ? finalizingMessage ?? "正在处理任务..." : "";
   const billingTag = getBillingTag(job.billing, job.task);
+  const badgeTone = completed ? "completed" : getDisplayJobActive(job) ? "running" : null;
+  const badgeElapsedSeconds = getStrategyJobElapsedSeconds(job, elapsedSeconds);
 
   if (failed || canceled) {
     return (
@@ -1825,18 +1897,65 @@ function StrategyJobBubble({
   return (
     <div className="lq-assistant-row">
       <div className="lq-assistant-message">
+        {badgeTone ? <TaskElapsedBadge elapsedSeconds={badgeElapsedSeconds} tone={badgeTone} /> : null}
         <AssistantThinkingMessage
           billingLabel={billingTag?.label}
           billingWaived={billingTag?.waived}
           error={null}
-          finalTitle={getStrategyResponseTitle(job.result ?? null)}
-          finalAnswerMarkdown={finalAnswerMarkdown}
+          finalAnswerMarkdown={displayFinalAnswerMarkdown}
           status={thinkingStatus}
           thinking={visibleThinking || runningFallback}
         />
+        {job.result?.generatedCode ? <FullCodeResultPanel result={job.result} title="完整策略代码" /> : null}
       </div>
     </div>
   );
+}
+
+function TaskElapsedBadge({ elapsedSeconds, tone }: { elapsedSeconds: number; tone: "running" | "completed" }) {
+  return (
+    <div aria-live={tone === "running" ? "polite" : undefined} className={`lq-task-elapsed-badge is-${tone}`}>
+      {tone === "running" ? "处理中" : "已处理"} {formatElapsedDuration(elapsedSeconds)}
+    </div>
+  );
+}
+
+function formatElapsedDuration(elapsedSeconds: number) {
+  const safeSeconds = Math.max(0, Math.floor(elapsedSeconds));
+
+  if (safeSeconds < 60) {
+    return `${safeSeconds}s`;
+  }
+
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+  return `${minutes}m ${seconds}s`;
+}
+
+function getStrategyJobElapsedSeconds(job: StrategyJob, activeElapsedSeconds: number) {
+  if (getDisplayJobActive(job)) {
+    return activeElapsedSeconds;
+  }
+
+  return getCompletedTaskElapsedSeconds(job.task ?? null, job.finishedAt) ?? activeElapsedSeconds;
+}
+
+function getCompletedTaskElapsedSeconds(task: AiTaskData["task"] | null | undefined, fallbackFinishedAt?: string | null) {
+  if (!task) {
+    return null;
+  }
+
+  const startedAt = task.startedAt ?? task.progress?.startedAt ?? task.createdAt ?? null;
+  const finishedAt = task.finishedAt ?? fallbackFinishedAt ?? null;
+
+  if (!startedAt || !finishedAt) {
+    return null;
+  }
+
+  return getTaskElapsedSeconds({
+    startedAt,
+    finishedAt
+  });
 }
 
 function StrategyFailureMessage({ message, onRetry, title = "生成失败" }: { message: string; onRetry?: () => void; title?: string }) {
@@ -1893,48 +2012,20 @@ function BotIcon() {
   );
 }
 
-function useElapsedSeconds(active: boolean, startedAt?: string) {
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-
-  useEffect(() => {
-    if (!active) {
-      setElapsedSeconds(0);
-      return;
-    }
-
-    const startedAtMs = startedAt ? new Date(startedAt).getTime() : Date.now();
-    const safeStartedAt = Number.isFinite(startedAtMs) ? startedAtMs : Date.now();
-    setElapsedSeconds(Math.max(0, Math.floor((Date.now() - safeStartedAt) / 1000)));
-    const timer = window.setInterval(() => {
-      setElapsedSeconds(Math.max(0, Math.floor((Date.now() - safeStartedAt) / 1000)));
-    }, 1000);
-
-    return () => window.clearInterval(timer);
-  }, [active, startedAt]);
-
-  return elapsedSeconds;
-}
-
 function rememberTaskFingerprintOutcome(
   data: AiTaskData,
   fingerprint: string,
   setters: {
     setLastSuccessfulFingerprint: (value: string | null) => void;
-    setLastPartialFingerprint: (value: string | null) => void;
-    setLastPartialCanContinue: (value: boolean) => void;
   }
 ) {
   if (isAiTaskDataPartial(data)) {
     setters.setLastSuccessfulFingerprint(null);
-    setters.setLastPartialFingerprint(fingerprint);
-    setters.setLastPartialCanContinue(canContinueAiTaskData(data));
     return;
   }
 
   if (isAiTaskDataCompleteSuccess(data)) {
     setters.setLastSuccessfulFingerprint(fingerprint);
-    setters.setLastPartialFingerprint(null);
-    setters.setLastPartialCanContinue(false);
   }
 }
 
@@ -1999,12 +2090,19 @@ function createLocalStrategyJob(input: {
   conversationId: string;
   request: StrategyJobRequest;
   createdAt: string;
+  startedAt?: string;
 }): StrategyJob {
+  const startedAt = input.request.submitStartedAt ?? input.startedAt ?? input.createdAt;
+  rememberTaskStartedAt(input.id, startedAt, { overwrite: true });
+  rememberClientRequestStartedAt(input.request.clientRequestId ?? input.id, startedAt, { overwrite: true });
+
   return {
     id: input.id,
     conversationId: input.conversationId,
     status: "pending",
     createdAt: input.createdAt,
+    startedAt,
+    clientRequestId: input.request.clientRequestId ?? input.id,
     request: input.request
   };
 }
@@ -2020,19 +2118,44 @@ function createStrategyJobFromTask(
     request?: StrategyJobRequest;
     visibleThinking?: string;
     finalAnswerMarkdown?: string;
+    suppressDraftFinalAnswer?: boolean;
   }
 ): StrategyJob {
-  const status = mapTaskStatusToJobStatus(task.status, input.result);
+  const status = mergeJobStatus(input.previous?.status, mapTaskStatusToJobStatus(task.status, input.result));
   const createdAt = task.createdAt ?? input.previous?.createdAt ?? new Date().toISOString();
+  const requestClientRequestId = input.request?.clientRequestId ?? null;
+  const taskClientRequestId = task.clientRequestId ?? null;
+  const previousClientRequestId = getStrategyJobClientRequestId(input.previous);
+  const requestMatchesTask = !requestClientRequestId || !taskClientRequestId || requestClientRequestId === taskClientRequestId;
+  const clientRequestId = requestMatchesTask
+    ? requestClientRequestId ?? taskClientRequestId ?? (input.previous?.id === task.id ? previousClientRequestId : null)
+    : taskClientRequestId ?? requestClientRequestId;
+  const previousBelongsToCurrentRequest = Boolean(clientRequestId && previousClientRequestId === clientRequestId);
+  const localBelongsToCurrentRequest = Boolean(input.previous && input.previous.id === clientRequestId && previousBelongsToCurrentRequest);
+  const startedAt = resolveTaskStartedAt({
+    task: {
+      ...task,
+      clientRequestId
+    },
+    clientRequestId,
+    requestStartedAt: requestMatchesTask && requestClientRequestId === clientRequestId ? input.request?.submitStartedAt : undefined,
+    cachedStartedAt: previousBelongsToCurrentRequest ? input.previous?.startedAt : undefined,
+    localCreatedAt: localBelongsToCurrentRequest ? input.previous?.createdAt : undefined,
+    fallback: createdAt
+  });
   const resultText = input.result ? [input.result.explanation, input.result.generatedCode, input.result.migrationNotes].filter(Boolean).join("\n\n") : undefined;
   const visibleThinking = preserveStreamBuffer(input.visibleThinking, input.previous?.visibleThinking);
-  const preservedFinalAnswerMarkdown = preserveStreamBuffer(input.finalAnswerMarkdown, input.previous?.finalAnswerMarkdown);
+  const preservedFinalAnswerMarkdown = input.suppressDraftFinalAnswer ? "" : preserveStreamBuffer(input.finalAnswerMarkdown, input.previous?.finalAnswerMarkdown);
   const finalAnswerMarkdown = status === "completed"
     ? normalizeStrategyFinalAnswerMarkdown({
       finalAnswerMarkdown: preservedFinalAnswerMarkdown,
       result: input.result ?? input.previous?.result
     }) || preservedFinalAnswerMarkdown
     : preservedFinalAnswerMarkdown;
+  rememberTaskStartedAt(task.id, startedAt, {
+    overwrite: true
+  });
+  rememberClientRequestStartedAt(clientRequestId, startedAt, { overwrite: true });
 
   return {
     id: task.id,
@@ -2044,8 +2167,9 @@ function createStrategyJobFromTask(
     finalAnswerMarkdown,
     error: status === "failed" || status === "canceled" ? task.errorMessage ?? input.previous?.error ?? "任务处理失败" : undefined,
     createdAt,
-    startedAt: task.startedAt ?? input.previous?.startedAt ?? undefined,
+    startedAt,
     finishedAt: task.finishedAt ?? input.previous?.finishedAt ?? undefined,
+    clientRequestId: clientRequestId ?? undefined,
     task,
     result: input.result ?? input.previous?.result,
     billing: input.billing ?? input.previous?.billing,
@@ -2076,6 +2200,90 @@ function mapTaskStatusToJobStatus(status: string, result?: AiTaskData["result"])
   }
 
   return "queued";
+}
+
+function shouldSuppressStrategyDraftFinalAnswer(data: AiTaskData) {
+  if (data.result) {
+    return false;
+  }
+
+  const phase = data.task.progress?.phase;
+  return phase === "merging" || phase === "validating";
+}
+
+function getStrategyFinalizingMessage(job: StrategyJob) {
+  if (job.result || isTerminalJobStatus(job.status)) {
+    return null;
+  }
+
+  const phase = job.task?.progress?.phase;
+
+  if (phase === "validating") {
+    return "正在检查代码完整性";
+  }
+
+  if (phase === "merging") {
+    return "正在整理最终结果";
+  }
+
+  return null;
+}
+
+function mergeJobStatus(previousStatus: JobStatus | undefined, nextStatus: JobStatus): JobStatus {
+  if (isTerminalJobStatus(nextStatus)) {
+    return nextStatus;
+  }
+
+  if (previousStatus && isTerminalJobStatus(previousStatus)) {
+    return previousStatus;
+  }
+
+  if (!previousStatus) {
+    return nextStatus;
+  }
+
+  return getJobStatusRank(nextStatus) >= getJobStatusRank(previousStatus) ? nextStatus : previousStatus;
+}
+
+function getJobStatusRank(status: JobStatus) {
+  switch (status) {
+    case "streaming":
+      return 3;
+    case "running":
+      return 2;
+    case "pending":
+    case "queued":
+      return 1;
+    case "completed":
+    case "failed":
+    case "canceled":
+      return 100;
+    default:
+      return 0;
+  }
+}
+
+function isTerminalJobStatus(status: JobStatus) {
+  return status === "completed" || status === "failed" || status === "canceled";
+}
+
+function getStrategyJobClientRequestId(job: StrategyJob | null | undefined) {
+  return job?.request?.clientRequestId ?? job?.clientRequestId ?? job?.task?.clientRequestId ?? null;
+}
+
+function getDisplayJobActive(job: StrategyJob | null | undefined) {
+  if (!job || isTerminalJobStatus(job.status)) {
+    return false;
+  }
+
+  return Boolean(job && (
+    job.status === "pending" ||
+    job.status === "queued" ||
+    job.status === "running" ||
+    job.status === "streaming" ||
+    job.task?.status === "PENDING" ||
+    job.task?.status === "RUNNING"
+  ));
 }
 
 function createEmptyThinkingState(): ThinkingMessageState {
@@ -2142,11 +2350,11 @@ function getConversionInputTooLargeMessage(totalInputChars: number, fromAttachme
 }
 
 function isJobActive(job: StrategyJob) {
-  return job.status === "pending" || job.status === "queued" || job.status === "running" || job.status === "streaming";
+  return getDisplayJobActive(job);
 }
 
 function isJobTerminal(job: StrategyJob) {
-  return job.status === "completed" || job.status === "failed" || job.status === "canceled";
+  return isTerminalJobStatus(job.status);
 }
 
 function shouldRenderStrategyJobPanel(job: StrategyJob, messages: StrategyChatMessage[]) {
@@ -2203,6 +2411,7 @@ function getMessageTask(message: StrategyChatMessage): AiTaskData["task"] | null
 
   return {
     id: task.id,
+    clientRequestId: typeof task.clientRequestId === "string" ? task.clientRequestId : null,
     type: String(task.type ?? "strategy_generation"),
     status: String(task.status ?? "SUCCEEDED"),
     conversationId: typeof task.conversationId === "string" ? task.conversationId : null,

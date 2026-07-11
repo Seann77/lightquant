@@ -18,6 +18,7 @@ async function main() {
     await testThinkingTruncationDoesNotMarkPartial();
     await testTimeoutPartial();
     await testDeepSeekThinkingEnabledAndVisibility();
+    await testOutputTokenLimitUsesModelMaxBudget();
 
     console.log(JSON.stringify({
       ok: true,
@@ -31,7 +32,9 @@ async function main() {
         "MiMo code conversion thinking disabled",
         "DeepSeek strategy generation thinking enabled and visible",
         "DeepSeek code conversion thinking enabled but hidden",
-        "DeepSeek code analysis thinking enabled but hidden"
+        "DeepSeek code analysis thinking enabled but hidden",
+        "MiMo max_completion_tokens respects 75 percent model output budget",
+        "DeepSeek max_tokens respects 75 percent model output budget"
       ]
     }, null, 2));
   } finally {
@@ -253,6 +256,57 @@ async function testDeepSeekThinkingEnabledAndVisibility() {
   }
 }
 
+async function testOutputTokenLimitUsesModelMaxBudget() {
+  await testOutputTokenPayloadField("mimo-v2.5-pro", "max_completion_tokens");
+  await testOutputTokenPayloadField("deepseek-reasoner", "max_tokens");
+}
+
+async function testOutputTokenPayloadField(model: string, field: "max_tokens" | "max_completion_tokens") {
+  process.env.AI_TASK_TIMEOUT_MS = "1000";
+  const server = createServer((request, response) => {
+    void handleSseRequest(request, response, model.startsWith("deepseek-") ? "enabled" : "disabled", () => {
+      response.write(streamChunk({
+        model,
+        choices: [
+          {
+            delta: {
+              content: createFinalMarkdownForTask("code_conversion")
+            }
+          }
+        ]
+      }));
+      response.write(streamChunk({
+        choices: [
+          {
+            delta: {},
+            finish_reason: "stop"
+          }
+        ],
+        usage: {
+          prompt_tokens: 1,
+          completion_tokens: 2,
+          total_tokens: 3
+        }
+      }));
+      response.write("data: [DONE]\n\n");
+      response.end();
+    }, {
+      tokenField: field,
+      tokenLimit: 6000
+    });
+  });
+
+  const baseUrl = await listen(server);
+
+  try {
+    await runOpenAiCompatibleProviderStream(createProviderInput("code_conversion"), {
+      runtimeConfig: createRuntimeConfig(baseUrl, model, 8000)
+    });
+  } finally {
+    server.close();
+  }
+}
+
 function createProviderInput(type: "strategy_generation" | "code_conversion" | "code_analysis") {
   const now = "2026-06-26T00:00:00.000Z";
   const task: AiTask = {
@@ -287,12 +341,13 @@ function createProviderInput(type: "strategy_generation" | "code_conversion" | "
   };
 }
 
-function createRuntimeConfig(baseUrl: string, model = "mimo-v2.5-pro") {
+function createRuntimeConfig(baseUrl: string, model = "mimo-v2.5-pro", modelMaxOutputTokens = 100000) {
   return {
     provider: "openai_compatible" as const,
     baseUrl,
     apiKey: "fake-key",
     model,
+    modelMaxOutputTokens,
     supportsVision: false,
     source: "env" as const,
     activeProfileId: null,
@@ -347,13 +402,20 @@ async function handleSseRequest(
   request: IncomingMessage,
   response: ServerResponse,
   expectedThinkingType: "enabled" | "disabled",
-  writeBody: () => void
+  writeBody: () => void,
+  options: {
+    tokenField?: "max_tokens" | "max_completion_tokens";
+    tokenLimit?: number;
+  } = {}
 ) {
   try {
     const payload = readRecord(JSON.parse(await readRequestBody(request)));
     const thinking = readRecord(payload?.thinking);
 
     expect(`thinking ${expectedThinkingType}`, thinking?.type === expectedThinkingType);
+    if (options.tokenField) {
+      expect(`${options.tokenField} field`, payload?.[options.tokenField] === options.tokenLimit);
+    }
     writeSseHeaders(response);
     writeBody();
   } catch (error) {

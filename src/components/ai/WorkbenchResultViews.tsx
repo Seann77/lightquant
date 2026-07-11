@@ -41,6 +41,7 @@ export function StrategyResultView({
 }) {
   const outOfScope = result.scopeStatus === "out_of_scope";
   const markdown = formatStrategyResultAsMarkdown(result);
+  const displayMarkdown = result.generatedCode ? stripGeneratedCodeFromMarkdown(markdown, result.generatedCode) : markdown;
 
   return (
     <div className="lq-assistant-answer">
@@ -48,7 +49,8 @@ export function StrategyResultView({
         <h2>{getStrategyResponseTitle(result)}</h2>
         {task ? <BillingCostTag billing={billing} task={task} /> : null}
       </div>
-      {markdown ? <StrategyMarkdownResult markdown={markdown} textClassName="lq-answer-text" /> : null}
+      {displayMarkdown ? <StrategyMarkdownResult markdown={displayMarkdown} textClassName="lq-answer-text" /> : null}
+      {result.generatedCode ? <FullCodeResultPanel result={result} title="完整策略代码" /> : null}
       {!outOfScope ? <p className="lq-answer-footnote">结果仅供研究和回测参考，实盘前请自行验证。</p> : null}
     </div>
   );
@@ -63,6 +65,7 @@ export function StrategyResultCard({ data }: { data: AiTaskData }) {
 
   const outOfScope = result.scopeStatus === "out_of_scope";
   const markdown = formatStrategyResultAsMarkdown(result);
+  const displayMarkdown = result.generatedCode ? stripGeneratedCodeFromMarkdown(markdown, result.generatedCode) : markdown;
 
   return (
     <div className="lq-result-card">
@@ -70,7 +73,8 @@ export function StrategyResultCard({ data }: { data: AiTaskData }) {
         <h2>{getStrategyResponseTitle(result)}</h2>
         <BillingCostTag billing={data.billing} task={data.task} />
       </div>
-      {markdown ? <StrategyMarkdownResult markdown={markdown} textClassName="m-0 text-sm leading-7 text-[#5b6472]" /> : null}
+      {displayMarkdown ? <StrategyMarkdownResult markdown={displayMarkdown} textClassName="m-0 text-sm leading-7 text-[#5b6472]" /> : null}
+      {result.generatedCode ? <FullCodeResultPanel result={result} title="完整策略代码" /> : null}
       {!outOfScope ? <p className="lq-answer-footnote">结果仅供研究和回测参考，实盘前请自行验证。</p> : null}
     </div>
   );
@@ -126,6 +130,10 @@ export function CodeConversionResultView({
   const content = getCodeConversionTabContent(activeTab, result);
   const isCodeTab = isCodeConversionCodeTab(activeTab);
 
+  if (isCodeTab && result?.generatedCode) {
+    return <FullCodeResultPanel result={result} title="转换后代码" />;
+  }
+
   if (!content) {
     return (
       <div className="lq-conversion-empty">
@@ -139,6 +147,60 @@ export function CodeConversionResultView({
       <code>{content}</code>
     </pre>
   );
+}
+
+export function FullCodeResultPanel({
+  result,
+  title
+}: {
+  result: NonNullable<AiTaskData["result"]>;
+  title: string;
+}) {
+  const code = result.generatedCode?.trim() ?? "";
+
+  if (!code) {
+    return null;
+  }
+
+  const artifact = readRecord(result.reportJson?.artifact);
+  const platform = typeof artifact?.platform === "string" ? artifact.platform : "";
+  const lineCount = typeof artifact?.codeLineCount === "number"
+    ? artifact.codeLineCount
+    : code.split(/\r?\n/).filter((line) => line.trim()).length;
+
+  return (
+    <section aria-label={title} className="lq-code-block-shell lq-full-code-result">
+      <div className="lq-code-block-toolbar">
+        <span className="lq-code-language">
+          {title}{platform ? ` · ${platform}` : ""} · {lineCount} 行
+        </span>
+        <CopyCodeButton code={code} />
+      </div>
+      <pre className="lq-code-block app-scrollbar">
+        <code>{code}</code>
+      </pre>
+    </section>
+  );
+}
+
+export function stripGeneratedCodeFromMarkdown(markdown: string, generatedCode: string | null | undefined) {
+  const code = normalizeCodeForCompare(generatedCode ?? "");
+
+  if (!markdown.trim() || !code) {
+    return markdown.trim();
+  }
+
+  return markdown
+    .replace(/```([\w+-]+)?\s*\r?\n([\s\S]*?)```/g, (block, _language, blockCode) => {
+      const normalizedBlock = normalizeCodeForCompare(blockCode);
+      const isSameCode = normalizedBlock === code ||
+        (normalizedBlock.length > 400 && (normalizedBlock.includes(code.slice(0, 300)) || code.includes(normalizedBlock.slice(0, 300))));
+
+      return isSameCode ? "" : block;
+    })
+    .replace(/^##\s*(?:完整策略代码|完整策略.*代码|策略代码|目标平台代码|转换后代码)\s*$/gim, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 export function getCodeConversionTabContent(tab: string, result: AiTaskData["result"] | undefined) {
@@ -249,6 +311,14 @@ function normalizeConversionCodeText(value: string) {
     .replace(/^##\s+.+$/gm, "")
     .replace(/^`{3,}[\w+-]*\s*$/gm, "")
     .replace(/^`{3,}\s*$/gm, "")
+    .trim();
+}
+
+function normalizeCodeForCompare(value: string) {
+  return value
+    .replace(/^```[\w+-]*\s*/gm, "")
+    .replace(/^```\s*$/gm, "")
+    .replace(/\r\n/g, "\n")
     .trim();
 }
 
@@ -766,11 +836,21 @@ export function InlineMarkdownText({ text }: { text: string }) {
   return <>{parseInlineMarkdown(text)}</>;
 }
 
-export function CopyableCodeBlock({ code, language }: { code: string; language?: string }) {
+export function CopyableCodeBlock({
+  code,
+  label,
+  language
+}: {
+  code: string;
+  label?: string;
+  language?: string;
+}) {
+  const displayLabel = label ?? language;
+
   return (
     <div className="lq-code-block-shell">
       <div className="lq-code-block-toolbar">
-        {language ? <span className="lq-code-language">{language}</span> : null}
+        {displayLabel ? <span className="lq-code-language">{displayLabel}</span> : null}
         <CopyCodeButton code={code} />
       </div>
       <pre className="lq-code-block app-scrollbar">

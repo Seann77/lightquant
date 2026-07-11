@@ -11,9 +11,20 @@ import { getAiPerfNow, logAiPerf, measureAiPerf } from "@/server/ai/ai-perf";
 import { getAiModelName, getAiProviderMode, getAiTaskTimeoutMs, getBetaVipConfig } from "@/server/env";
 import { getUploadedImageDataUrl, inferUploadedFileKind } from "@/server/files/file-service";
 import { getAiTaskBillingForUserAt, type AiTaskBilling } from "@/server/memberships/beta-membership-service";
-import type { AiProviderAttachment, AiProviderStreamDelta } from "@/server/ai/providers/types";
-import { buildContinuationDraft } from "@/server/ai/continuation";
+import type { AiProviderAttachment, AiProviderResult, AiProviderStreamDelta } from "@/server/ai/providers/types";
 import { normalizeStrategyFinalAnswerMarkdown } from "@/lib/ai/strategy-result-format";
+import { formatProviderResultAsMarkdown } from "@/server/ai/streaming-markdown-result";
+import {
+  applyGeneratedCodeArtifact,
+  shouldUseStreamingMarkdownForTask
+} from "@/server/ai/code-artifact";
+import {
+  buildAutoRepairPrompt,
+  canAutoRepairAiOutput,
+  inspectAiOutputIntegrity,
+  withRepairReportMetadata,
+  type AiOutputIntegrityDecision
+} from "@/server/ai/output-integrity";
 
 type CreateAiTaskRequest = {
   type: string;
@@ -119,28 +130,15 @@ export async function createAiTask(userId: string, input: CreateAiTaskRequest, r
     return response;
   }
 
-  const rawUserPrompt = normalizeOptionalText(input.messageContent) ?? normalizeOptionalText(input.prompt);
   const conversationDraft = await measureAiPerf("create_task.prepare_conversation", {
     requestId,
     taskType: type,
     hasConversation: Boolean(input.conversationId)
   }, () => prepareConversationForTask(userId, type, normalizeOptionalText(input.conversationId)));
-  const continuationDraft = buildContinuationDraft({
-    messages: conversationDraft.messages,
-    taskType: type,
-    userPrompt: rawUserPrompt
-  });
   const normalized = normalizeTaskInput(type, input, {
-    allowContinuationWithoutCode: Boolean(continuationDraft)
+    allowContinuationWithoutCode: false
   });
-  const providerInput = continuationDraft
-    ? {
-        ...normalized,
-        prompt: continuationDraft.prompt,
-        sourcePlatform: normalized.sourcePlatform ?? conversationDraft.conversation?.sourcePlatform ?? null,
-        targetPlatform: normalized.targetPlatform ?? conversationDraft.conversation?.targetPlatform ?? null
-      }
-    : normalized;
+  const providerInput = normalized;
 
   logAiPerf("create_task.start", {
     requestId,
@@ -148,7 +146,7 @@ export async function createAiTask(userId: string, input: CreateAiTaskRequest, r
     hasConversation: Boolean(input.conversationId),
     hasInputFile: Boolean(input.inputFileId),
     inputChars: getTotalInputChars(providerInput),
-    continuation: Boolean(continuationDraft)
+    continuation: false
   });
 
   const resolvedInput = await measureAiPerf("create_task.resolve_input_file", {
@@ -251,21 +249,16 @@ export async function createAiTask(userId: string, input: CreateAiTaskRequest, r
           userId,
           role: "user",
           taskId: null,
-          content: getUserMessageContent(type, continuationDraft ? { ...resolvedInput, prompt: normalized.prompt } : resolvedInput),
+          content: getUserMessageContent(type, resolvedInput),
           contentJson: {
             taskType: type,
             targetPlatform: resolvedInput.targetPlatform,
             sourcePlatform: resolvedInput.sourcePlatform,
-            prompt: continuationDraft ? normalized.prompt : resolvedInput.prompt,
+            prompt: resolvedInput.prompt,
             inputCodePreview: normalizePreview(resolvedInput.inputCode, 500),
             inputFileId: resolvedInput.inputFileId,
             inputFileName: resolvedInput.inputFileName,
-            continuation: continuationDraft
-              ? {
-                  previousMessageId: continuationDraft.previousMessageId,
-                  previousTailChars: continuationDraft.previousTail.length
-                }
-              : null,
+            continuation: null,
             clientRequestId
           },
           createdAt: now
@@ -458,19 +451,37 @@ export async function runAiTask(taskId: string, requestId: string) {
         visionAttachments: providerAttachments.length
       }
     });
-    let completedProviderResult: Awaited<ReturnType<typeof runAiProvider>> | null = null;
+    let completedProviderResult: AiProviderResult | null = null;
+    let providerFinalAnswerMarkdown: string | null = null;
     let providerRunError: unknown = null;
 
     try {
-      const providerResult = await runAiProvider(
-        runningProviderTask,
-        conversationContext,
-        async (progress) => {
-          await recordAiTaskProgress(runningProviderTask, progress);
-        },
-        providerAttachments
-      );
-      completedProviderResult = providerResult;
+      if (shouldUseStreamingMarkdownForTask({
+        task: runningProviderTask,
+        conversationContext
+      })) {
+        const providerStream = await runAiProviderStream(
+          runningProviderTask,
+          conversationContext,
+          undefined,
+          providerAttachments
+        );
+        completedProviderResult = providerStream.result;
+        providerFinalAnswerMarkdown = providerStream.finalAnswerMarkdown;
+      } else {
+        const providerResult = await runAiProvider(
+          runningProviderTask,
+          conversationContext,
+          async (progress) => {
+            await recordAiTaskProgress(runningProviderTask, progress);
+          },
+          providerAttachments
+        );
+        completedProviderResult = applyGeneratedCodeArtifact(providerResult, {
+          task: runningProviderTask,
+          conversationContext
+        });
+      }
     } catch (error) {
       providerRunError = error;
       throw error;
@@ -489,7 +500,7 @@ export async function runAiTask(taskId: string, requestId: string) {
       });
     }
 
-    const providerResult = completedProviderResult as Awaited<ReturnType<typeof runAiProvider>>;
+    let providerResult = completedProviderResult as AiProviderResult;
     const latestAfterProvider = await repository.findAiTaskById(runningProviderTask.id);
 
     if (!latestAfterProvider) {
@@ -501,6 +512,15 @@ export async function runAiTask(taskId: string, requestId: string) {
         duplicated: true
       });
     }
+
+    providerResult = await repairProviderResultIfNeeded({
+      task: runningProviderTask,
+      conversationContext,
+      attachments: providerAttachments,
+      result: providerResult
+    });
+    const repairedFinalMarkdown = readRecord(providerResult.reportJson)?.finalAnswerMarkdown;
+    providerFinalAnswerMarkdown = typeof repairedFinalMarkdown === "string" ? repairedFinalMarkdown : providerFinalAnswerMarkdown;
 
     await appendRunEvent(runningProviderTask, {
       type: "stream_output",
@@ -568,7 +588,12 @@ export async function runAiTask(taskId: string, requestId: string) {
         updatedAt: finishedAt
       });
 
-      await createAssistantMessageForTask(updatedTask, result, finishedAt);
+      await createAssistantMessageForTask(updatedTask, result, finishedAt, providerFinalAnswerMarkdown
+        ? {
+            finalAnswerMarkdown: providerFinalAnswerMarkdown,
+            parsedResult: toResultResponse(result)
+          }
+        : undefined);
       await appendRunEvent(updatedTask, {
         type: "create_artifact",
         status: "completed",
@@ -890,7 +915,17 @@ async function runAiTaskStreaming(
         runningTask,
         conversationContext,
         {
-          onDelta: emit
+          onDelta: (delta) => {
+            if (delta.type === "thinking_delta") {
+              return emit(delta);
+            }
+
+            if (runningTask.type === "strategy_generation" && delta.type === "final_delta") {
+              return emit(delta);
+            }
+
+            return undefined;
+          }
         },
         providerAttachments
       ));
@@ -913,7 +948,7 @@ async function runAiTaskStreaming(
       });
     }
 
-    const providerStream = completedProviderStream as Awaited<ReturnType<typeof runAiProviderStream>>;
+    let providerStream = completedProviderStream as Awaited<ReturnType<typeof runAiProviderStream>>;
     const latestAfterProvider = await repository.findAiTaskById(runningTask.id);
 
     if (!latestAfterProvider) {
@@ -930,6 +965,14 @@ async function runAiTaskStreaming(
       });
       return response;
     }
+
+    providerStream = await repairProviderStreamIfNeeded({
+      task: runningTask,
+      conversationContext,
+      attachments: providerAttachments,
+      stream: providerStream,
+      emit
+    });
 
     await appendRunEvent(runningTask, {
       type: "stream_output",
@@ -1104,6 +1147,210 @@ async function runAiTaskStreaming(
     await refundConfirmedAiTaskCost(latestTask, requestId);
     throw apiError;
   }
+}
+
+async function repairProviderResultIfNeeded(input: {
+  task: AiTask;
+  conversationContext?: string;
+  attachments: AiProviderAttachment[];
+  result: Awaited<ReturnType<typeof runAiProvider>>;
+}) {
+  const decision = inspectAiOutputIntegrity({
+    task: input.task,
+    result: input.result,
+    conversationContext: input.conversationContext
+  });
+
+  if (!decision.partial) {
+    return input.result;
+  }
+
+  if (!canAutoRepairAiOutput(input.task.type)) {
+    throw createIncompleteOutputError();
+  }
+
+  await appendAutoRepairStartedEvent(input.task, decision);
+
+  const partialDraft = formatProviderResultAsMarkdown(input.result, input.task);
+  const repairTask = buildAutoRepairTask(input.task, partialDraft, decision.reason ?? "unknown");
+  const repairResult = shouldUseStreamingMarkdownForTask({
+    task: repairTask,
+    conversationContext: input.conversationContext
+  })
+    ? (await runAiProviderStream(
+        repairTask,
+        input.conversationContext,
+        undefined,
+        input.attachments
+      )).result
+    : applyGeneratedCodeArtifact(await runAiProvider(
+        repairTask,
+        input.conversationContext,
+        async (progress) => {
+          await recordAiTaskProgress(input.task, {
+            ...progress,
+            statusMessage: progress.statusMessage || "正在整理最终结果。"
+          });
+        },
+        input.attachments
+      ), {
+        task: repairTask,
+        conversationContext: input.conversationContext
+      });
+  const repairDecision = inspectAiOutputIntegrity({
+    task: input.task,
+    result: repairResult,
+    conversationContext: input.conversationContext
+  });
+
+  if (repairDecision.partial) {
+    await appendAutoRepairFailedEvent(input.task, repairDecision);
+    throw createIncompleteOutputError();
+  }
+
+  await appendAutoRepairCompletedEvent(input.task, decision);
+
+  return withRepairReportMetadata(repairResult, {
+    repairAttempt: 1,
+    repairedFromReason: decision.reason ?? "unknown"
+  });
+}
+
+async function repairProviderStreamIfNeeded(input: {
+  task: AiTask;
+  conversationContext?: string;
+  attachments: AiProviderAttachment[];
+  stream: Awaited<ReturnType<typeof runAiProviderStream>>;
+  emit: (event: AiTaskStreamEvent) => void | Promise<void>;
+}) {
+  const decision = inspectAiOutputIntegrity({
+    task: input.task,
+    result: input.stream.result,
+    finalAnswerMarkdown: input.stream.finalAnswerMarkdown,
+    conversationContext: input.conversationContext
+  });
+
+  if (!decision.partial) {
+    return input.stream;
+  }
+
+  if (!canAutoRepairAiOutput(input.task.type)) {
+    throw createIncompleteOutputError();
+  }
+
+  await appendAutoRepairStartedEvent(input.task, decision);
+  await recordAiTaskProgress(input.task, {
+    phase: "merging",
+    progressPercent: 90,
+    statusMessage: "正在检查代码完整性。"
+  });
+
+  await input.emit({
+    type: "task",
+    data: await buildAiTaskResponse(input.task, {
+      result: null,
+      includeConversation: false,
+      includeMessages: false,
+      includeEvents: true,
+      includeCreditAccount: false,
+      perfLabel: "stream_repairing"
+    })
+  });
+
+  const repairTask = buildAutoRepairTask(input.task, input.stream.finalAnswerMarkdown, decision.reason ?? "unknown");
+  const repairStream = await runAiProviderStream(
+    repairTask,
+    input.conversationContext,
+    {
+      onDelta: (delta) => delta.type === "thinking_delta" ? input.emit(delta) : undefined
+    },
+    input.attachments
+  );
+  const repairDecision = inspectAiOutputIntegrity({
+    task: input.task,
+    result: repairStream.result,
+    finalAnswerMarkdown: repairStream.finalAnswerMarkdown,
+    conversationContext: input.conversationContext
+  });
+
+  if (repairDecision.partial) {
+    await appendAutoRepairFailedEvent(input.task, repairDecision);
+    throw createIncompleteOutputError();
+  }
+
+  await appendAutoRepairCompletedEvent(input.task, decision);
+
+  return {
+    ...repairStream,
+    result: withRepairReportMetadata(repairStream.result, {
+      repairAttempt: 1,
+      repairedFromReason: decision.reason ?? "unknown"
+    })
+  };
+}
+
+function buildAutoRepairTask(task: AiTask, partialDraft: string, reason: string): AiTask {
+  return {
+    ...task,
+    prompt: buildAutoRepairPrompt({
+      task,
+      partialDraft,
+      reason
+    })
+  };
+}
+
+async function appendAutoRepairStartedEvent(task: AiTask, decision: AiOutputIntegrityDecision) {
+  await appendRunEvent(task, {
+    type: "validate_result",
+    status: "running",
+    title: "正在检查代码完整性",
+    summary: "正在整理最终结果。",
+    progressPercent: 90,
+    detailJson: {
+      partial: true,
+      truncated: true,
+      truncateReason: decision.reason,
+      repairAttempt: 1,
+      longCodeMode: decision.longCodeMode,
+      requiresCompleteCode: decision.requiresCompleteCode
+    }
+  });
+}
+
+async function appendAutoRepairCompletedEvent(task: AiTask, decision: AiOutputIntegrityDecision) {
+  await appendRunEvent(task, {
+    type: "validate_result",
+    status: "completed",
+    title: "代码完整性检查完成",
+    summary: "最终结果已整理完成。",
+    progressPercent: 94,
+    detailJson: {
+      repairAttempt: 1,
+      repairedFromReason: decision.reason
+    }
+  });
+}
+
+async function appendAutoRepairFailedEvent(task: AiTask, decision: AiOutputIntegrityDecision) {
+  await appendRunEvent(task, {
+    type: "validate_result",
+    status: "failed",
+    title: "代码完整性检查未通过",
+    summary: "本次生成没有完成。",
+    progressPercent: 96,
+    detailJson: {
+      partial: true,
+      truncated: true,
+      truncateReason: decision.reason,
+      repairAttempt: 1,
+      repairFailedReason: decision.reason
+    }
+  });
+}
+
+function createIncompleteOutputError() {
+  return new ApiError("AI_TASK_FAILED", "本次生成没有完成，积分已退回。你可以稍后重新提交。", 502);
 }
 
 export async function getAiTaskForUser(userId: string, taskId: string) {
@@ -2477,13 +2724,20 @@ function buildConversationContextText(messages: AiMessage[]) {
       const error = readRecord(message.contentJson?.error);
       const generatedCode = typeof result?.generatedCode === "string" ? result.generatedCode : "";
       const explanation = typeof result?.explanation === "string" ? result.explanation : "";
+      const report = readRecord(result?.reportJson);
+      const artifact = readRecord(report?.artifact);
+      const artifactSha = typeof artifact?.contentSha256 === "string" ? artifact.contentSha256 : "";
+      const artifactLines = typeof artifact?.codeLineCount === "number" ? artifact.codeLineCount : null;
 
       if (explanation) {
         parts.push(`说明摘要：${truncateForContext(explanation, 1200)}`);
       }
 
       if (generatedCode) {
-        parts.push(`生成/修改代码：\n${truncateForContext(generatedCode, 8000)}`);
+        const artifactLabel = artifactSha
+          ? `代码 artifact：sha256=${artifactSha}${artifactLines ? `，行数=${artifactLines}` : ""}`
+          : "生成/修改代码摘要";
+        parts.push(`${artifactLabel}\n${truncateForContext(generatedCode, 1600)}`);
       }
 
       if (error?.message) {

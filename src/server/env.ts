@@ -286,10 +286,40 @@ export function getAiModelName(provider: AiProviderMode = getAiProviderMode()) {
   throw new ServerConfigError("LIGHTQUANT_AI_MODEL must be set for the selected AI provider");
 }
 
+export function getAiModelMaxOutputTokens(provider: AiProviderMode = getAiProviderMode(), model = getAiModelName(provider)) {
+  const explicit = Number(process.env.LIGHTQUANT_AI_MODEL_MAX_OUTPUT_TOKENS);
+
+  if (Number.isFinite(explicit) && explicit > 0) {
+    return Math.floor(explicit);
+  }
+
+  return inferAiModelMaxOutputTokens(provider, model);
+}
+
 export function getAiTaskTimeoutMs() {
   const value = Number(process.env.AI_TASK_TIMEOUT_MS ?? "300000");
 
   return Number.isFinite(value) && value > 0 ? value : 300000;
+}
+
+function inferAiModelMaxOutputTokens(provider: AiProviderMode, model: string) {
+  const normalized = model.toLowerCase();
+
+  if (provider === "mock") {
+    return 64000;
+  }
+
+  if (normalized.startsWith("mimo-") || normalized.includes("mimo")) {
+    return 64000;
+  }
+
+  if (normalized.startsWith("deepseek-")) {
+    return 64000;
+  }
+
+  // Safe default for OpenAI-compatible model profiles without an explicit max.
+  // Operators can override it with LIGHTQUANT_AI_MODEL_MAX_OUTPUT_TOKENS.
+  return 64000;
 }
 
 export function getAiMaxRetries() {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Bot, ChevronDown, ChevronRight, LoaderCircle } from "lucide-react";
 import { CopyableCodeBlock, InlineMarkdownText, isStrategyAnswerShortHeading } from "@/components/ai/WorkbenchResultViews";
 
@@ -16,13 +16,13 @@ type AssistantThinkingMessageProps = {
   defaultThinkingExpanded?: boolean;
   billingLabel?: string | null;
   billingWaived?: boolean;
-  finalTitle?: string;
 };
 
 type ThinkingCollapseProps = {
   thinking: string;
   status: AssistantThinkingStatus;
   defaultExpanded?: boolean;
+  hasFinalStarted?: boolean;
 };
 
 type StreamProps = {
@@ -30,15 +30,14 @@ type StreamProps = {
   streaming?: boolean;
   billingLabel?: string | null;
   billingWaived?: boolean;
-  title?: string;
 };
 
-type MarkdownBlock =
+export type StreamingMarkdownBlock =
   | { type: "heading"; text: string; level: 2 | 3 }
   | { type: "shortHeading"; text: string }
   | { type: "paragraph"; text: string }
   | { type: "list"; items: string[] }
-  | { type: "code"; code: string; language?: string };
+  | { type: "code"; code: string; language?: string; open?: boolean };
 
 export function AssistantThinkingMessage({
   thinking,
@@ -49,14 +48,14 @@ export function AssistantThinkingMessage({
   tone = "light",
   defaultThinkingExpanded,
   billingLabel,
-  billingWaived = false,
-  finalTitle = "最终结果"
+  billingWaived = false
 }: AssistantThinkingMessageProps) {
   const displayThinking = thinking.trim();
   const hasFinal = Boolean(finalAnswerMarkdown.trim());
+  const hasFinalStarted = hasFinal || status === "answering";
   const hasError = Boolean(error);
 
-  if (!displayThinking && !hasFinal && !hasError) {
+  if (!displayThinking && !hasFinalStarted && !hasError) {
     return null;
   }
 
@@ -77,50 +76,70 @@ export function AssistantThinkingMessage({
             {status === "thinking" || status === "answering" ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Bot aria-hidden="true" />}
           </div>
           <div className="lq-thinking-message-body">
-            <ThinkingCollapse defaultExpanded={defaultThinkingExpanded} status={status} thinking={displayThinking} />
+            <ThinkingCollapse
+              defaultExpanded={defaultThinkingExpanded}
+              hasFinalStarted={hasFinalStarted}
+              status={status}
+              thinking={displayThinking}
+            />
           </div>
         </>
       ) : null}
-      {hasFinal ? (
-        <FinalAnswerStream billingLabel={billingLabel} billingWaived={billingWaived} streaming={status === "answering"} text={finalAnswerMarkdown} title={finalTitle} />
+      {hasFinalStarted ? (
+        <FinalAnswerStream
+          billingLabel={billingLabel}
+          billingWaived={billingWaived}
+          streaming={status === "answering"}
+          text={finalAnswerMarkdown}
+        />
       ) : null}
       {error ? <div className="lq-thinking-error">{error}</div> : null}
     </div>
   );
 }
 
-export function ThinkingCollapse({ thinking, status, defaultExpanded }: ThinkingCollapseProps) {
+export function ThinkingCollapse({ thinking, status, defaultExpanded, hasFinalStarted = false }: ThinkingCollapseProps) {
   const completed = status === "completed" || status === "failed";
-  const [expanded, setExpanded] = useState(defaultExpanded ?? !completed);
+  const userTouchedRef = useRef(false);
+  const autoCollapsedRef = useRef(false);
+  const [expanded, setExpanded] = useState(defaultExpanded ?? !(completed || hasFinalStarted || status === "answering"));
   const displayThinking = thinking.trim();
   const preview = getThinkingPreview(displayThinking);
 
   useEffect(() => {
-    if (defaultExpanded !== undefined) {
+    if (defaultExpanded !== undefined && !userTouchedRef.current) {
       setExpanded(defaultExpanded);
       return;
     }
 
-    setExpanded(!completed);
-  }, [completed, defaultExpanded]);
+    if (!userTouchedRef.current && status === "thinking" && !hasFinalStarted) {
+      setExpanded(true);
+    }
+  }, [defaultExpanded, hasFinalStarted, status]);
+
+  useEffect(() => {
+    if (hasFinalStarted && !autoCollapsedRef.current && !userTouchedRef.current) {
+      setExpanded(false);
+      autoCollapsedRef.current = true;
+    }
+  }, [hasFinalStarted]);
 
   if (!displayThinking) {
     return null;
   }
 
-  if (!completed) {
-    return (
-      <section className="lq-thinking-section">
-        <ThinkingStream text={displayThinking} />
-      </section>
-    );
-  }
-
   return (
     <section className="lq-thinking-section">
-      <button className="lq-thinking-collapse-toggle" onClick={() => setExpanded((value) => !value)} type="button">
+      <button
+        className="lq-thinking-collapse-toggle"
+        onClick={() => {
+          userTouchedRef.current = true;
+          setExpanded((value) => !value);
+        }}
+        type="button"
+      >
         {expanded ? <ChevronDown aria-hidden="true" size={16} /> : <ChevronRight aria-hidden="true" size={16} />}
-        <span>思考过程</span>
+        <span>处理过程</span>
         <em>{expanded ? "收起" : "展开"}</em>
       </button>
       {expanded ? <ThinkingStream text={displayThinking} /> : <p className="lq-thinking-preview">{preview}</p>}
@@ -136,23 +155,21 @@ export function ThinkingStream({ text }: StreamProps) {
   return <pre className="lq-thinking-stream">{text}</pre>;
 }
 
-export function FinalAnswerStream({ text, streaming = false, billingLabel, billingWaived = false, title = "最终结果" }: StreamProps) {
+export function FinalAnswerStream({ text, streaming = false, billingLabel, billingWaived = false }: StreamProps) {
+  const placeholder = streaming ? "正在整理结果..." : "等待最终答案...";
+
   return (
     <section className="lq-final-section">
-      <div className="lq-final-title">
-        <span>{title}：</span>
-        {streaming ? <em>正在输出</em> : null}
-        {billingLabel ? (
-          <span className={`lq-cost-tag ${billingWaived ? "is-waived" : ""}`.trim()}>{billingLabel}</span>
-        ) : null}
-      </div>
-      {text.trim() ? <StreamingMarkdownResult markdown={text} /> : <div className="lq-final-placeholder">等待最终答案...</div>}
+      {billingLabel ? (
+        <span className={`lq-cost-tag lq-final-floating-cost ${billingWaived ? "is-waived" : ""}`.trim()}>{billingLabel}</span>
+      ) : null}
+      {text.trim() ? <StreamingMarkdownResult markdown={text} streaming={streaming} /> : <div className="lq-final-placeholder">{placeholder}</div>}
     </section>
   );
 }
 
-export function StreamingMarkdownResult({ markdown }: { markdown: string }) {
-  const blocks = useMemo(() => parseMarkdownBlocks(markdown), [markdown]);
+export function StreamingMarkdownResult({ markdown, streaming = false }: { markdown: string; streaming?: boolean }) {
+  const blocks = useMemo(() => parseStreamingMarkdownBlocks(markdown), [markdown]);
 
   return (
     <div className="lq-streaming-markdown">
@@ -167,7 +184,14 @@ export function StreamingMarkdownResult({ markdown }: { markdown: string }) {
         }
 
         if (block.type === "code") {
-          return <CopyableCodeBlock code={block.code} key={`code-${index}`} language={block.language} />;
+          return (
+            <CopyableCodeBlock
+              code={block.code}
+              key={`code-${index}`}
+              label={streaming ? "正在生成代码" : undefined}
+              language={block.language}
+            />
+          );
         }
 
         if (block.type === "list") {
@@ -192,9 +216,9 @@ function getThinkingPreview(value: string) {
     ?.slice(0, 160) ?? "";
 }
 
-function parseMarkdownBlocks(markdown: string): MarkdownBlock[] {
+export function parseStreamingMarkdownBlocks(markdown: string): StreamingMarkdownBlock[] {
   const lines = markdown.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
-  const blocks: MarkdownBlock[] = [];
+  const blocks: StreamingMarkdownBlock[] = [];
   let paragraph: string[] = [];
   let list: string[] = [];
   let code: { language?: string; lines: string[] } | null = null;
@@ -231,7 +255,8 @@ function parseMarkdownBlocks(markdown: string): MarkdownBlock[] {
         blocks.push({
           type: "code",
           code: code.lines.join("\n").trim(),
-          language: code.language
+          language: code.language,
+          open: false
         });
         code = null;
       } else {
@@ -295,7 +320,8 @@ function parseMarkdownBlocks(markdown: string): MarkdownBlock[] {
     blocks.push({
       type: "code",
       code: code.lines.join("\n").trim(),
-      language: code.language
+      language: code.language,
+      open: true
     });
   }
 

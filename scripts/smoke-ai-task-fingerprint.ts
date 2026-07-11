@@ -90,7 +90,7 @@ expect("partial result detected", isAiTaskResultPartial({
     canContinue: true
   }
 }));
-expect("continuable result detected", canContinueAiTaskResult({
+expect("partial result is not user-continuable", !canContinueAiTaskResult({
   scopeStatus: "in_scope",
   explanation: null,
   riskWarnings: [],
@@ -108,7 +108,7 @@ console.log(JSON.stringify({
     "platform and prompt sensitivity",
     "stable file id preference",
     "fallback file content hash",
-    "partial continuation metadata"
+    "partial detection without user continuation"
   ]
 }, null, 2));
 

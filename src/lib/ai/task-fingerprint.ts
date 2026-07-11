@@ -38,9 +38,8 @@ export function isAiTaskResultPartial(result: AiTaskData["result"] | null | unde
 }
 
 export function canContinueAiTaskResult(result: AiTaskData["result"] | null | undefined) {
-  const report = readRecord(result?.reportJson);
-
-  return isAiTaskResultPartial(result) && report?.canContinue === true;
+  void result;
+  return false;
 }
 
 export function isAiTaskDataPartial(data: AiTaskData | null | undefined) {
