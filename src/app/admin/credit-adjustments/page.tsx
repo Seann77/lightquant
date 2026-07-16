@@ -21,7 +21,7 @@ export default async function AdminCreditAdjustmentsPage() {
           后台写操作未开启。需要显式配置 ADMIN_WRITE_ENABLED=true 后，补积分 API 才会接受写入。
         </div>
       ) : null}
-      <CreditAdjustmentForm disabled={!writeEnabled} />
+      <CreditAdjustmentForm adminPhone={context.user.phone} disabled={!writeEnabled} />
     </AdminShell>
   );
 }

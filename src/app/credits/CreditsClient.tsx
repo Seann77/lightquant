@@ -51,17 +51,6 @@ type LedgerData = {
   totalPages: number;
 };
 
-type CurrentUserProfile = {
-  membership?: {
-    betaVip?: {
-      active: boolean;
-      startsAt: string | null;
-      endsAt: string | null;
-      label: string;
-    };
-  } | null;
-};
-
 type ReturnedPaymentStatus = {
   order: {
     id: string;
@@ -90,6 +79,8 @@ type PaymentReturnNotice = {
 
 type CreditFilter = (typeof creditFilters)[number];
 type TimeRangePreset = "all" | "today" | "7d" | "30d" | "custom";
+
+const LEDGER_PAGE_SIZE = 10;
 
 type AppliedTimeRange = {
   preset: TimeRangePreset;
@@ -137,7 +128,7 @@ export function CreditsClient() {
   const [dateError, setDateError] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [betaVipActive, setBetaVipActive] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   const [refreshKey, setRefreshKey] = useState(0);
   const [paymentReturnNotice, setPaymentReturnNotice] = useState<PaymentReturnNotice | null>(null);
   const loadCreditsRequestIdRef = useRef(0);
@@ -152,15 +143,13 @@ export function CreditsClient() {
       setError("");
 
       try {
-        const ledgerQuery = buildLedgerQuery(activeFilter, timeRange);
+        const ledgerQuery = buildLedgerQuery(activeFilter, timeRange, currentPage);
         const [accountResponse, ledgerResponse] = await Promise.all([
           fetch("/api/v1/credits/account", { cache: "no-store" }),
           fetch(`/api/v1/credits/ledger?${ledgerQuery}`, { cache: "no-store" })
         ]);
-        const profileResponse = await fetch("/api/v1/me", { cache: "no-store" }).catch(() => null);
         const accountPayload = (await accountResponse.json()) as ApiResponse<{ account: CreditAccount }>;
         const ledgerPayload = (await ledgerResponse.json()) as ApiResponse<LedgerData>;
-        const profilePayload = profileResponse ? ((await profileResponse.json().catch(() => null)) as ApiResponse<CurrentUserProfile> | null) : null;
 
         if (!accountPayload.success) {
           if (accountPayload.error.code === "UNAUTHORIZED" && getPaymentReturnOrderId()) {
@@ -175,15 +164,18 @@ export function CreditsClient() {
         }
 
         if (!cancelled && currentRequestId === loadCreditsRequestIdRef.current) {
+          if (currentPage > ledgerPayload.data.totalPages) {
+            setCurrentPage(ledgerPayload.data.totalPages);
+            return;
+          }
+
           setAccount(accountPayload.data.account);
           setLedger(ledgerPayload.data);
-          setBetaVipActive(profilePayload?.success === true && profilePayload.data.membership?.betaVip?.active === true);
         }
       } catch (loadError) {
         if (!cancelled && currentRequestId === loadCreditsRequestIdRef.current) {
           setAccount(null);
           setLedger(null);
-          setBetaVipActive(false);
           setError(loadError instanceof Error ? loadError.message : "积分数据加载失败");
         }
       } finally {
@@ -198,7 +190,7 @@ export function CreditsClient() {
     return () => {
       cancelled = true;
     };
-  }, [refreshKey, activeFilter, timeRange]);
+  }, [refreshKey, activeFilter, timeRange, currentPage]);
 
   useEffect(() => {
     function handleCreditsUpdated() {
@@ -336,8 +328,19 @@ export function CreditsClient() {
   const hasTransactions = records.length > 0;
   const hasActiveLedgerFilter = activeFilter !== "全部" || timeRange.preset !== "all";
   const timeRangeLabel = getTimeRangeLabel(timeRange);
+  const totalPages = ledger?.totalPages ?? 1;
+  const totalRecords = ledger?.total ?? records.length;
+  const displayedPage = ledger?.page ?? currentPage;
+  const previousPageDisabled = loading || currentPage <= 1;
+  const nextPageDisabled = loading || currentPage >= totalPages;
+
+  function changeFilter(filter: CreditFilter) {
+    setCurrentPage(1);
+    setActiveFilter(filter);
+  }
 
   function applyPreset(preset: Exclude<TimeRangePreset, "custom">) {
+    setCurrentPage(1);
     setTimeRange({ preset, startDate: "", endDate: "" });
     setTimeRangeOpen(false);
     setCustomDateOpen(false);
@@ -357,6 +360,7 @@ export function CreditsClient() {
       return;
     }
 
+    setCurrentPage(1);
     setTimeRange({
       preset: "custom",
       startDate: draftStartDate,
@@ -368,6 +372,7 @@ export function CreditsClient() {
   }
 
   function resetTimeRange() {
+    setCurrentPage(1);
     setTimeRange({ preset: "all", startDate: "", endDate: "" });
     setDraftStartDate("");
     setDraftEndDate("");
@@ -450,18 +455,11 @@ export function CreditsClient() {
         })}
       </section>
 
-      {betaVipActive ? (
-        <div className="lq-vip-inline-notice" role="status">
-          <BadgeCheck aria-hidden="true" size={16} />
-          内测VIP期内使用不消耗积分
-        </div>
-      ) : null}
-
       <section className="lq-ledger-panel">
         <div className="lq-ledger-tools">
           <div className="lq-filter-tabs">
             {creditFilters.map((filter) => (
-              <button className={`lq-filter-tab ${filter === activeFilter ? "is-active" : ""}`} key={filter} onClick={() => setActiveFilter(filter)} type="button">
+              <button className={`lq-filter-tab ${filter === activeFilter ? "is-active" : ""}`} key={filter} onClick={() => changeFilter(filter)} type="button">
                 {filter}
               </button>
             ))}
@@ -534,53 +532,60 @@ export function CreditsClient() {
         </div>
 
         {hasTransactions ? (
-          <div className="lq-ledger-scroll app-scrollbar">
+          <div className="lq-ledger-records">
             <div className="lq-ledger-table-body">
               <table className="lq-ledger-table">
-                <colgroup>
-                  <col className="lq-ledger-col-time" />
-                  <col className="lq-ledger-col-category" />
-                  <col className="lq-ledger-col-detail" />
-                  <col className="lq-ledger-col-amount" />
-                  <col className="lq-ledger-col-balance" />
-                  <col className="lq-ledger-col-status" />
-                </colgroup>
-                <thead>
-                  <tr>
-                    <th className="lq-ledger-cell-time">时间</th>
-                    <th className="lq-ledger-cell-category">类型</th>
-                    <th className="lq-ledger-cell-detail">事项 / 描述</th>
-                    <th className="lq-ledger-cell-amount">积分变化</th>
-                    <th className="lq-ledger-cell-balance">余额</th>
-                    <th className="lq-ledger-cell-status">状态</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {records.map((record) => (
-                    <tr key={record.id}>
-                      <td className="lq-ledger-cell-time">{record.time}</td>
-                      <td className="lq-ledger-cell-category">
-                        <span className="lq-ledger-category-badge">{record.category}</span>
-                      </td>
-                      <td className="lq-ledger-cell-detail">
-                        <p className="m-0 font-extrabold text-[#111827]">{record.title}</p>
-                        <p className="m-0 text-xs text-[#5b6472]">{record.description}</p>
-                      </td>
-                      <td className={`lq-ledger-cell-amount font-extrabold ${amountClass(record.amount)}`}>{formatAmount(record.amount)}</td>
-                      <td className="lq-ledger-cell-balance">{record.balanceAfter.toLocaleString("zh-CN")}</td>
-                      <td className="lq-ledger-cell-status">
-                        <span className={`lq-ledger-status-badge ${statusClass(record.status)}`}>{record.status}</span>
-                      </td>
+                  <colgroup>
+                    <col className="lq-ledger-col-time" />
+                    <col className="lq-ledger-col-category" />
+                    <col className="lq-ledger-col-detail" />
+                    <col className="lq-ledger-col-amount" />
+                    <col className="lq-ledger-col-balance" />
+                    <col className="lq-ledger-col-status" />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th className="lq-ledger-cell-time">时间</th>
+                      <th className="lq-ledger-cell-category">类型</th>
+                      <th className="lq-ledger-cell-detail">事项 / 描述</th>
+                      <th className="lq-ledger-cell-amount">积分变化</th>
+                      <th className="lq-ledger-cell-balance">余额</th>
+                      <th className="lq-ledger-cell-status">状态</th>
                     </tr>
-                  ))}
-                </tbody>
+                  </thead>
+                  <tbody>
+                    {records.map((record) => (
+                      <tr key={record.id}>
+                        <td className="lq-ledger-cell-time" data-label="时间">{record.time}</td>
+                        <td className="lq-ledger-cell-category" data-label="类型">
+                          <span className="lq-ledger-category-badge">{record.category}</span>
+                        </td>
+                        <td className="lq-ledger-cell-detail" data-label="事项 / 描述">
+                          <p className="m-0 font-extrabold text-[#111827]">{record.title}</p>
+                          <p className="m-0 text-xs text-[#5b6472]">{record.description}</p>
+                        </td>
+                        <td className={`lq-ledger-cell-amount font-extrabold ${amountClass(record.amount)}`} data-label="积分变化">{formatAmount(record.amount)}</td>
+                        <td className="lq-ledger-cell-balance" data-label="余额">{record.balanceAfter.toLocaleString("zh-CN")}</td>
+                        <td className="lq-ledger-cell-status" data-label="状态">
+                          <span className={`lq-ledger-status-badge ${statusClass(record.status)}`}>{record.status}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
               </table>
             </div>
             <div className="lq-ledger-footer">
-              <span>
-                第 {ledger?.page ?? 1} 页 / 共 {ledger?.totalPages ?? 1} 页
-              </span>
-              <span>共 {ledger?.total ?? records.length} 条</span>
+              <p className="lq-ledger-pagination-summary">
+                第 {displayedPage} 页 / 共 {totalPages} 页 <span aria-hidden="true">·</span> 共 {totalRecords} 条
+              </p>
+              <div className="lq-ledger-pagination-actions">
+                <button disabled={previousPageDisabled} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} type="button">
+                  上一页
+                </button>
+                <button disabled={nextPageDisabled} onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} type="button">
+                  下一页
+                </button>
+              </div>
             </div>
           </div>
         ) : (
@@ -614,10 +619,10 @@ function formatDateOnly(value: string) {
     .replace(/\//g, "-");
 }
 
-function buildLedgerQuery(activeFilter: CreditFilter, timeRange: AppliedTimeRange) {
+function buildLedgerQuery(activeFilter: CreditFilter, timeRange: AppliedTimeRange, page: number) {
   const params = new URLSearchParams({
-    page: "1",
-    pageSize: "20",
+    page: String(page),
+    pageSize: String(LEDGER_PAGE_SIZE),
     category: categoryParamForFilter(activeFilter)
   });
   const range = getDateRangeParams(timeRange);

@@ -109,14 +109,10 @@ export function getStrategyResponseTitle(result: AiTaskData["result"] | null | u
 }
 
 function BillingCostTag({ billing, task }: { billing?: AiTaskData["billing"] | null; task: AiTaskData["task"] }) {
-  const nominalCostPoints = billing?.nominalCostPoints ?? task.costPoints;
   const chargedPoints = billing?.chargedPoints ?? task.costPoints;
-  const waivedByMembership = billing?.waivedByMembership === true;
 
   return (
-    <span className={`lq-cost-tag ${waivedByMembership ? "is-waived" : ""}`.trim()}>
-      {waivedByMembership ? `内测VIP免扣 ${nominalCostPoints} 积分` : `已扣除 ${chargedPoints} 积分`}
-    </span>
+    <span className={`lq-cost-tag ${chargedPoints === 0 ? "is-waived" : ""}`.trim()}>已扣除 {chargedPoints} 积分</span>
   );
 }
 
@@ -129,10 +125,6 @@ export function CodeConversionResultView({
 }) {
   const content = getCodeConversionTabContent(activeTab, result);
   const isCodeTab = isCodeConversionCodeTab(activeTab);
-
-  if (isCodeTab && result?.generatedCode) {
-    return <FullCodeResultPanel result={result} title="转换后代码" />;
-  }
 
   if (!content) {
     return (

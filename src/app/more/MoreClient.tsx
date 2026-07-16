@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, ArrowRight, BarChart3, ChevronDown, CircleDollarSign, HelpCircle, MessageCircle } from "lucide-react";
+import { AlertTriangle, ArrowRight, BarChart3, ChevronDown, CircleDollarSign, HelpCircle, MessageCircle, Minus, Plus } from "lucide-react";
 import { ContactModal } from "@/components/shell/ContactModal";
 import { moreItems } from "@/lib/mock-data";
 
@@ -11,19 +11,17 @@ function openRecharge() {
   window.dispatchEvent(new Event("lightquant:open-recharge"));
 }
 
-function openWechat() {
-  window.dispatchEvent(new Event("lightquant:open-wechat"));
-}
-
 function MoreItemContent({ item, paymentFeatureEnabled = false }: { item: MoreItem; paymentFeatureEnabled?: boolean }) {
   if (item.variant === "points") {
     return (
       <div>
-        <ul className="m-0 grid gap-3 p-0">
+        <ul className="lq-points-rule-list">
           {item.rules.map((rule) => (
-            <li className="flex items-start gap-2" key={rule.label}>
-              <span className="mt-[2px] text-[#0b63ff]">{rule.icon === "add_circle" ? "+" : "-"}</span>
-              <span>
+            <li className={`lq-points-rule ${rule.icon === "add_circle" ? "is-gain" : "is-cost"}`} key={rule.label}>
+              <span aria-hidden="true" className="lq-points-rule-icon">
+                {rule.icon === "add_circle" ? <Plus size={14} strokeWidth={2.4} /> : <Minus size={14} strokeWidth={2.4} />}
+              </span>
+              <span className="lq-points-rule-copy">
                 <strong>{rule.label}</strong>
                 {rule.text}
               </span>
@@ -125,10 +123,6 @@ export function MoreClient({ paymentFeatureEnabled = false }: { paymentFeatureEn
             <button className="lq-cta-btn is-secondary" data-testid="contact-open" onClick={() => setContactOpen(true)} type="button">
               <MessageCircle aria-hidden="true" size={17} />
               联系我们
-            </button>
-            <button className="lq-cta-btn is-primary" onClick={openWechat} type="button">
-              <MessageCircle aria-hidden="true" size={17} />
-              加入微信群
             </button>
           </div>
         </section>

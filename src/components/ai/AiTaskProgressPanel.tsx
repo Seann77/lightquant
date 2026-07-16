@@ -1263,7 +1263,7 @@ function getAnalysisBusinessTitle(phase: unknown) {
   }
 
   if (phase === "validating") {
-    return "检查风险与完整性";
+    return "整理解析结果";
   }
 
   return "解析策略逻辑";
@@ -1279,7 +1279,7 @@ function getAnalysisBusinessMessage(phase: string | null) {
   }
 
   if (phase === "validating") {
-    return "正在检查潜在风险和输出完整性。";
+    return "正在整理解析报告。";
   }
 
   if (phase === "failed") {

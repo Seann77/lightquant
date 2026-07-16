@@ -75,7 +75,7 @@ export type AiTaskData = {
     chargedPoints: number;
     waivedByMembership: boolean;
     membershipType: "beta_vip" | null;
-    membershipLabel: "内测VIP" | null;
+    membershipLabel: string | null;
     membershipEndsAt: string | null;
   };
   visibleThinking?: string | null;

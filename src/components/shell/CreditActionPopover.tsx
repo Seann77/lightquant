@@ -3,8 +3,6 @@
 import { CreditCard, FileText, Gift, LogOut } from "lucide-react";
 
 type CreditActionPopoverProps = {
-  betaVipActive?: boolean;
-  betaVipExpiryLabel?: string;
   monthlyExpiresAt?: string | null;
   monthlyPlanName?: string | null;
   onClose: () => void;
@@ -17,8 +15,6 @@ type CreditActionPopoverProps = {
 };
 
 export function CreditActionPopover({
-  betaVipActive: _betaVipActive = false,
-  betaVipExpiryLabel: _betaVipExpiryLabel = "",
   monthlyExpiresAt = null,
   monthlyPlanName = null,
   onClose,

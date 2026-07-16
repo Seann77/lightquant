@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     }
 
     const page = Number(request.nextUrl.searchParams.get("page") ?? "1");
-    const pageSize = Number(request.nextUrl.searchParams.get("pageSize") ?? "20");
+    const pageSize = Number(request.nextUrl.searchParams.get("pageSize") ?? "10");
     const filters = parseLedgerFilters(request);
 
     return ok(await listCreditLedgerForUser(userId, { page, pageSize }, filters), requestId);

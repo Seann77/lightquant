@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } f
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   BarChart3,
-  DollarSign,
   FileUp,
   LoaderCircle,
   Sparkles,
@@ -23,6 +22,7 @@ import {
   getConversationActiveTab,
   getFriendlyAiError as getFriendlyError,
   persistConversationActiveTab,
+  rememberClientRequestStartedAt,
   replaceWorkbenchConversationUrl,
   streamWorkbenchAiTask,
   useStableElapsedSeconds,
@@ -60,6 +60,7 @@ export function CodeAnalysisClient() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [lastSuccessfulFingerprint, setLastSuccessfulFingerprint] = useState<string | null>(null);
+  const [pendingAnalysisClientRequestId, setPendingAnalysisClientRequestId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollingAnalysisTaskIdRef = useRef<string | null>(null);
   const streamingAnalysisTaskIdRef = useRef<string | null>(null);
@@ -70,6 +71,7 @@ export function CodeAnalysisClient() {
   const elapsedSeconds = useStableElapsedSeconds(analysisBusy, {
     task: data?.task ?? null,
     taskId: data?.task.id ?? null,
+    clientRequestId: data?.task.clientRequestId ?? pendingAnalysisClientRequestId,
     localCreatedAt: data?.task.createdAt ?? null,
     finishedAt: data?.task.finishedAt ?? null
   });
@@ -95,6 +97,7 @@ export function CodeAnalysisClient() {
     setUploadedFile(null);
     setUploading(false);
     setUploadError("");
+    setPendingAnalysisClientRequestId(null);
     pollingAnalysisTaskIdRef.current = null;
     streamingAnalysisTaskIdRef.current = null;
   }, []);
@@ -141,6 +144,7 @@ export function CodeAnalysisClient() {
       setStreamState(createThinkingStateFromTaskData(restored.taskData));
       setActiveTab(getConversationActiveTab(conversationData.conversation, codeAnalysisTabs, codeAnalysisTabs[0]));
       setLoading(false);
+      setPendingAnalysisClientRequestId(null);
       pollingAnalysisTaskIdRef.current = null;
       streamingAnalysisTaskIdRef.current = null;
 
@@ -320,6 +324,11 @@ export function CodeAnalysisClient() {
       return;
     }
 
+    const clientRequestId = createWorkbenchClientRequestId("analysis");
+    const submitStartedAt = new Date().toISOString();
+    rememberClientRequestStartedAt(clientRequestId, submitStartedAt, { overwrite: true });
+    setPendingAnalysisClientRequestId(clientRequestId);
+
     const currentConversationId = data?.conversation?.id ?? conversationIdFromUrl ?? undefined;
 
     setLoading(true);
@@ -339,7 +348,7 @@ export function CodeAnalysisClient() {
         prompt: undefined,
         inputCode: finalInputText,
         inputFileId: uploadedFile?.contentText ? uploadedFile.fileId : undefined,
-        clientRequestId: createWorkbenchClientRequestId("analysis")
+        clientRequestId
       }, {
         onTask: (payload) => {
           streamingAnalysisTaskIdRef.current = payload.task.id;
@@ -390,6 +399,7 @@ export function CodeAnalysisClient() {
       }));
     } finally {
       setLoading(false);
+      setPendingAnalysisClientRequestId(null);
       streamingAnalysisTaskIdRef.current = null;
     }
   }
@@ -464,10 +474,6 @@ export function CodeAnalysisClient() {
                     ? "已完成解析"
                     : "开始解析"}
             </button>
-            <div className="lq-cost-pill">
-              <DollarSign aria-hidden="true" />
-              <span>每次代码解析消耗 100 积分</span>
-            </div>
           </div>
         </div>
 
@@ -508,7 +514,6 @@ export function CodeAnalysisClient() {
           </div>
         )}
       </section>
-      <p className="lq-risk lq-bottom-risk lq-workbench-risk">AI 生成策略需自行回测验证，投资有风险，请谨慎使用。</p>
     </WorkbenchShell>
   );
 }

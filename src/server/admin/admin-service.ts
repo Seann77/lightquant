@@ -8,6 +8,7 @@ import type {
   CreditLedgerType,
   OrderStatus,
   Pagination,
+  User,
   UploadedFileScanStatus
 } from "@/server/domain";
 import { requireAdmin } from "@/server/admin/admin-auth";
@@ -53,34 +54,62 @@ export async function listAdminCreditLedger(input: {
   }), input);
 }
 
-export async function adjustAdminUserCredits(input: {
+type AdminCreditAdjustmentInput = {
   phone: string;
   amount: number;
   reason: string;
   note?: string;
+};
+
+type AdminCreditAdjustmentRequest = AdminCreditAdjustmentInput & {
   requestId: string;
   requestIp: string | null;
   clientRequestId?: string;
-}) {
+};
+
+export async function previewAdminUserCreditAdjustment(input: AdminCreditAdjustmentInput) {
   const admin = await requireAdmin();
+
+  return previewAdminUserCreditAdjustmentForAdmin(admin.user, input);
+}
+
+export async function previewAdminUserCreditAdjustmentForAdmin(adminUser: User, input: AdminCreditAdjustmentInput) {
+  const normalized = normalizeAdminCreditAdjustment(input);
+  const targetUser = await findActiveCreditAdjustmentTarget(adminUser, normalized.phone);
+  const account = await getRepository().getCreditAccount(targetUser.id);
+
+  return {
+    targetUserId: targetUser.id,
+    phone: targetUser.phone,
+    isCurrentAdmin: targetUser.id === adminUser.id,
+    currentBalance: account?.balance ?? 0,
+    amount: normalized.amount,
+    estimatedBalance: (account?.balance ?? 0) + normalized.amount,
+    reason: normalized.reason,
+    note: normalized.note ?? ""
+  };
+}
+
+export async function adjustAdminUserCredits(input: AdminCreditAdjustmentRequest) {
+  const admin = await requireAdmin();
+
+  return adjustAdminUserCreditsForAdmin(admin.user, input);
+}
+
+export async function adjustAdminUserCreditsForAdmin(adminUser: User, input: AdminCreditAdjustmentRequest) {
 
   if (!isAdminWriteEnabled()) {
     throw new ApiError("FORBIDDEN", "后台写操作未开启", 403);
   }
 
-  const phone = normalizePhone(input.phone);
-  const amount = normalizePositiveInteger(input.amount, "补积分数量");
-  const reason = normalizeLength(input.reason, "补积分原因", 5, 200);
-  const note = normalizeOptionalLength(input.note, "备注", 200);
-  const targetUser = await getRepository().findUserByPhone(phone);
-
-  if (!targetUser || targetUser.status !== "active") {
-    throw new ApiError("NOT_FOUND", "用户不存在或不可用", 404);
-  }
+  const normalized = normalizeAdminCreditAdjustment(input);
+  const targetUser = await findActiveCreditAdjustmentTarget(adminUser, normalized.phone);
 
   const now = new Date().toISOString();
   const clientRequestId = normalizeClientRequestId(input.clientRequestId) ?? randomUUID();
-  const remark = note ? `管理员补积分：${reason}；备注：${note}` : `管理员补积分：${reason}`;
+  const remark = normalized.note
+    ? `管理员补积分：${normalized.reason}；备注：${normalized.note}`
+    : `管理员补积分：${normalized.reason}`;
   const result = await getRepository().applyAdminCreditAdjustment({
     ledger: {
       userId: targetUser.id,
@@ -88,25 +117,26 @@ export async function adjustAdminUserCredits(input: {
       scene: "admin_credit_adjustment",
       type: "bonus",
       direction: "in",
-      amount,
+      amount: normalized.amount,
       sourceType: "admin_adjustment",
       sourceId: clientRequestId,
       idempotencyKey: `admin_credit_adjustment:${clientRequestId}`,
       remark,
-      createdAt: now
+      createdAt: now,
+      grantType: "permanent"
     },
     audit: {
-      adminUserId: admin.user.id,
-      adminPhone: admin.user.phone,
+      adminUserId: adminUser.id,
+      adminPhone: adminUser.phone,
       action: "credit.adjust",
       targetType: "user",
       targetId: targetUser.id,
-      summary: `管理员为用户 ${maskPhone(targetUser.phone)} 补 ${amount} 积分`,
+      summary: `管理员为用户 ${maskPhone(targetUser.phone)} 补 ${normalized.amount} 积分`,
       metadata: {
         targetPhoneMasked: maskPhone(targetUser.phone),
-        amount,
-        reason,
-        note: note ?? null,
+        amount: normalized.amount,
+        reason: normalized.reason,
+        note: normalized.note ?? null,
         sourceType: "admin_adjustment",
         sourceId: clientRequestId
       },
@@ -117,10 +147,41 @@ export async function adjustAdminUserCredits(input: {
   });
 
   return {
+    targetUserId: targetUser.id,
+    phone: targetUser.phone,
+    isCurrentAdmin: targetUser.id === adminUser.id,
+    amount: normalized.amount,
     account: result.account,
     ledger: result.ledger,
     duplicated: result.duplicated
   };
+}
+
+function normalizeAdminCreditAdjustment(input: AdminCreditAdjustmentInput) {
+  return {
+    phone: normalizePhone(input.phone),
+    amount: normalizePositiveInteger(input.amount, "补积分数量"),
+    reason: normalizeLength(input.reason, "补积分原因", 5, 200),
+    note: normalizeOptionalLength(input.note, "备注", 200)
+  };
+}
+
+async function findActiveCreditAdjustmentTarget(adminUser: User, phone: string) {
+  const targetUser = await getRepository().findUserByPhone(phone);
+
+  if (!targetUser) {
+    if (phone === adminUser.phone) {
+      throw new ApiError("NOT_FOUND", "当前管理员尚未创建可入账的用户账户，请先使用该手机号登录用户端完成注册。", 404);
+    }
+
+    throw new ApiError("NOT_FOUND", "目标用户不存在", 404);
+  }
+
+  if (targetUser.status !== "active") {
+    throw new ApiError("FORBIDDEN", "目标用户账号不可用", 403);
+  }
+
+  return targetUser;
 }
 
 export async function listAdminOrders(input: { page: number; pageSize: number; phone?: string; status?: string; createdFrom?: string; createdTo?: string }) {

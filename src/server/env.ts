@@ -304,22 +304,28 @@ export function getAiTaskTimeoutMs() {
 
 function inferAiModelMaxOutputTokens(provider: AiProviderMode, model: string) {
   const normalized = model.toLowerCase();
+  const explicitDefault = 131072;
 
   if (provider === "mock") {
-    return 64000;
+    return explicitDefault;
   }
 
   if (normalized.startsWith("mimo-") || normalized.includes("mimo")) {
-    return 64000;
+    return 131072;
   }
 
   if (normalized.startsWith("deepseek-")) {
-    return 64000;
+    return 393216;
   }
 
-  // Safe default for OpenAI-compatible model profiles without an explicit max.
-  // Operators can override it with LIGHTQUANT_AI_MODEL_MAX_OUTPUT_TOKENS.
-  return 64000;
+  console.warn("[ai-config] unknown model max output tokens; using explicit default", {
+    provider,
+    model,
+    defaultModelMaxOutputTokens: explicitDefault,
+    overrideEnv: "LIGHTQUANT_AI_MODEL_MAX_OUTPUT_TOKENS"
+  });
+
+  return explicitDefault;
 }
 
 export function getAiMaxRetries() {

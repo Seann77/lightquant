@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { LegalFooter } from "@/components/shell/LegalFooter";
 import { MaterialIcon } from "@/components/ui/MaterialIcon";
 
 type AdminShellProps = {
@@ -50,7 +51,7 @@ export function AdminShell({ active, adminPhone, children }: AdminShellProps) {
           </nav>
         </aside>
 
-        <main className="min-w-0 flex-1 overflow-x-hidden">
+        <main className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
           <header className="sticky top-0 z-10 border-b border-steel/40 bg-paper px-md py-sm md:px-xl">
             <div className="flex flex-wrap items-center justify-between gap-sm">
               <div>
@@ -75,7 +76,8 @@ export function AdminShell({ active, adminPhone, children }: AdminShellProps) {
               ))}
             </nav>
           </header>
-          <div className="px-md py-lg md:px-xl">{children}</div>
+          <div className="flex-1 px-md py-lg md:px-xl">{children}</div>
+          <LegalFooter />
         </main>
       </div>
     </section>
@@ -84,7 +86,7 @@ export function AdminShell({ active, adminPhone, children }: AdminShellProps) {
 
 export function AdminLoginRequired() {
   return (
-    <section className="flex min-h-screen items-center justify-center bg-[#f7f8fb] px-md text-center">
+    <section className="grid min-h-screen grid-rows-[1fr_auto] items-center bg-[#f7f8fb] px-md text-center">
       <div className="w-full max-w-sm rounded-lg border border-steel/40 bg-paper p-xl shadow-sm">
         <MaterialIcon className="text-outline" size={32}>lock</MaterialIcon>
         <h1 className="mt-sm text-body-emphasis text-ink">请先登录</h1>
@@ -93,6 +95,7 @@ export function AdminLoginRequired() {
           去登录
         </Link>
       </div>
+      <LegalFooter />
     </section>
   );
 }

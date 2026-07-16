@@ -7,8 +7,8 @@ import {
   AlertTriangle,
   Bot,
   Code2,
-  DollarSign,
   FileUp,
+  Info,
   LoaderCircle,
   MessageCircle,
   Paperclip,
@@ -29,6 +29,14 @@ import { PlatformDropdown } from "@/components/ui/PlatformDropdown";
 import { AssistantThinkingMessage, type AssistantThinkingStatus } from "@/components/ai/AssistantThinkingMessage";
 import { MessageAttachmentList, WorkbenchFileUploadStatus } from "@/components/ai/AttachmentPreviewCard";
 import { WorkbenchShell } from "@/components/ai/WorkbenchShell";
+import {
+  canCopyConversionTab,
+  ConversionCodePreview,
+  ConversionFailureState,
+  ConversionNotesPreview,
+  getConversionCopyContent,
+  getConversionFailureInfo
+} from "@/components/ai/ConversionResultPanel";
 import {
   CopyCodeButton,
   FullCodeResultPanel,
@@ -1093,10 +1101,6 @@ function StrategyModeContent() {
               </button>
               <input accept={getUploadAccept("strategy_generation")} className="hidden" onChange={handleFileChange} ref={fileInputRef} type="file" />
               <div className="lq-composer-actions">
-                <div className="lq-cost-pill">
-                  <DollarSign aria-hidden="true" />
-                  <span>每次策略生成消耗 50 积分</span>
-                </div>
                 {activeJobRunning && activeJob ? (
                   <button
                     aria-label="停止当前任务"
@@ -1123,7 +1127,6 @@ function StrategyModeContent() {
             </div>
             <WorkbenchFileUploadStatus file={uploadedFile} message={uploadError} />
           </div>
-          <p className="lq-risk lq-bottom-risk">AI 生成策略需自行回测验证，投资有风险，请谨慎使用。</p>
         </div>
       </section>
     </WorkbenchShell>
@@ -1148,6 +1151,7 @@ function ConvertModeContent() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [lastSuccessfulFingerprint, setLastSuccessfulFingerprint] = useState<string | null>(null);
+  const [pendingConversionClientRequestId, setPendingConversionClientRequestId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const conversionPreviewRef = useRef<HTMLDivElement>(null);
   const conversionAutoFollowRef = useRef(true);
@@ -1163,6 +1167,7 @@ function ConvertModeContent() {
   const elapsedSeconds = useStableElapsedSeconds(conversionLoading, {
     task: taskData?.task ?? null,
     taskId: taskData?.task.id ?? null,
+    clientRequestId: taskData?.task.clientRequestId ?? pendingConversionClientRequestId,
     localCreatedAt: taskData?.task.createdAt ?? null,
     finishedAt: taskData?.task.finishedAt ?? null
   });
@@ -1242,6 +1247,7 @@ function ConvertModeContent() {
       cancelRequestedRef.current = false;
       pollingConversionTaskIdRef.current = null;
       streamingConversionTaskIdRef.current = null;
+      setPendingConversionClientRequestId(null);
 
       if (isAiTaskDataCompleteSuccess(restored.taskData)) {
         setLastSuccessfulFingerprint(restoredFingerprint);
@@ -1358,6 +1364,7 @@ function ConvertModeContent() {
     setUploadError("");
     setLoading(false);
     setCanceling(false);
+    setPendingConversionClientRequestId(null);
     pollingConversionTaskIdRef.current = null;
     streamingConversionTaskIdRef.current = null;
     conversionAutoFollowRef.current = true;
@@ -1425,6 +1432,11 @@ function ConvertModeContent() {
       return;
     }
 
+    const clientRequestId = createWorkbenchClientRequestId("convert");
+    const submitStartedAt = new Date().toISOString();
+    rememberClientRequestStartedAt(clientRequestId, submitStartedAt, { overwrite: true });
+    setPendingConversionClientRequestId(clientRequestId);
+
     const currentConversationId = taskData?.conversation?.id ?? conversationIdFromUrl ?? undefined;
     setLoading(true);
     setCanceling(false);
@@ -1448,7 +1460,7 @@ function ConvertModeContent() {
         inputCode: finalInputText,
         prompt: finalPrompt,
         inputFileId: uploadedFile?.fileId,
-        clientRequestId: createWorkbenchClientRequestId("convert")
+        clientRequestId
       }, {
         onTask: (data) => {
           streamingConversionTaskIdRef.current = data.task.id;
@@ -1497,12 +1509,14 @@ function ConvertModeContent() {
         setStreamState((current) => ({
           ...current,
           status: "failed",
-          error: friendly
+          error: friendly,
+          finalAnswerMarkdown: ""
         }));
       }
     } finally {
       setLoading(false);
       setCanceling(false);
+      setPendingConversionClientRequestId(null);
       streamingConversionTaskIdRef.current = null;
     }
   }
@@ -1527,6 +1541,7 @@ function ConvertModeContent() {
         error: "任务已取消"
       }));
       setLoading(false);
+      setPendingConversionClientRequestId(null);
       window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
     } catch (cancelError) {
       cancelRequestedRef.current = false;
@@ -1548,21 +1563,29 @@ function ConvertModeContent() {
   }
 
   const result = taskData?.result;
-  const streamConversionResult = parseCodeConversionMarkdown(streamState.finalAnswerMarkdown);
-  const restoredConversionMarkdown = !streamState.finalAnswerMarkdown && result ? formatAiTaskResultAsMarkdown(result, "code_conversion") : "";
+  const conversionTaskStatus = taskData?.task.status ?? null;
+  const streamErrorIsTerminal = Boolean(streamState.error && !conversionLoading && conversionTaskStatus !== "SUCCEEDED");
+  const conversionFailureInfo = getConversionFailureInfo(taskData, streamErrorIsTerminal ? streamState.error : null);
+  const canExposeConversionResult = !conversionFailureInfo.failed && (!conversionTaskStatus ||
+    conversionTaskStatus === "PENDING" ||
+    conversionTaskStatus === "RUNNING" ||
+    conversionTaskStatus === "SUCCEEDED");
+  const resultForDisplay = canExposeConversionResult ? result : undefined;
+  const streamConversionResult = canExposeConversionResult
+    ? parseCodeConversionMarkdown(streamState.finalAnswerMarkdown)
+    : { targetCode: "", migrationNotes: "" };
+  const restoredConversionMarkdown = !streamState.finalAnswerMarkdown && resultForDisplay ? formatAiTaskResultAsMarkdown(resultForDisplay, "code_conversion") : "";
   const restoredConversionResult = parseCodeConversionMarkdown(restoredConversionMarkdown);
-  const targetCode = streamConversionResult.targetCode || restoredConversionResult.targetCode || getCodeConversionTabContent("目标平台代码", result);
-  const migrationNotes = streamConversionResult.migrationNotes || restoredConversionResult.migrationNotes || getCodeConversionTabContent("迁移说明", result);
+  const targetCode = streamConversionResult.targetCode || restoredConversionResult.targetCode || getCodeConversionTabContent("目标平台代码", resultForDisplay);
+  const migrationNotes = streamConversionResult.migrationNotes || restoredConversionResult.migrationNotes || getCodeConversionTabContent("迁移说明", resultForDisplay);
   const conversionPanelContent = isCodeConversionCodeTab(activeTab) ? targetCode : migrationNotes;
-  const conversionCopyContent = isCodeConversionCodeTab(activeTab) ? targetCode : migrationNotes;
-  const conversionLineCount = Math.max(10, conversionPanelContent ? conversionPanelContent.split(/\r\n|\r|\n/).length : 10);
-  const canCopyConversionContent = Boolean(conversionCopyContent.trim());
+  const conversionCopyContent = getConversionCopyContent(activeTab, targetCode, migrationNotes, conversionFailureInfo.failed);
+  const canCopyConversionContent = canCopyConversionTab(activeTab, targetCode, migrationNotes, conversionFailureInfo.failed);
   const inputTooLargeMessage = finalTotalInputChars > CODE_CONVERSION_MAX_TOTAL_INPUT_CHARS
     ? getConversionInputTooLargeMessage(finalTotalInputChars, inputSource === "attachment" && Boolean(uploadedFile))
     : "";
   const shownError = error || inputTooLargeMessage;
-  const hasConversionOutput = Boolean(targetCode.trim() || migrationNotes.trim());
-  const taskStatus = taskData?.task.status ?? (conversionLoading ? "RUNNING" : null);
+  const taskStatus = conversionTaskStatus ?? (conversionLoading ? "RUNNING" : null);
   const canCancelTask = Boolean(taskData?.task.id && (taskStatus === "PENDING" || taskStatus === "RUNNING"));
   const conversionSubmitDisabled = conversionLoading ||
     uploading ||
@@ -1603,6 +1626,10 @@ function ConvertModeContent() {
       return;
     }
 
+    if (!conversionLoading) {
+      return;
+    }
+
     if (!conversionAutoFollowRef.current) {
       return;
     }
@@ -1612,7 +1639,7 @@ function ConvertModeContent() {
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [conversionPanelContent]);
+  }, [conversionLoading, conversionPanelContent]);
 
   return (
     <WorkbenchShell className="min-h-full">
@@ -1687,22 +1714,28 @@ function ConvertModeContent() {
                   <CopyCodeButton className="lq-result-copy-btn" code={conversionCopyContent} disabled={!canCopyConversionContent} failedLabel="复制失败，请手动选择内容" key={activeTab} />
                 </div>
               </div>
-              <div className="lq-code-preview app-scrollbar" onScroll={handleConversionPreviewScroll} ref={conversionPreviewRef}>
-                <div className="lq-code-lines">{Array.from({ length: conversionLineCount }, (_, index) => <div key={index}>{index + 1}</div>)}</div>
-                {hasConversionOutput ? (
-                  isCodeConversionCodeTab(activeTab) && result?.generatedCode
-                    ? <FullCodeResultPanel result={result} title="转换后代码" />
-                    : <CodeConversionToolOutput activeTab={activeTab} content={conversionPanelContent} loading={conversionLoading} />
-                ) : streamState.error ? (
-                  <div className="lq-result-placeholder is-error">
-                    <BotIcon />
-                    <span>{streamState.error}</span>
-                  </div>
+              <div
+                className="lq-conversion-note-card"
+                title="代码转换后，实际运行效果可能因平台差异而有所不同。如遇问题，可使用策略生成功能进一步优化。"
+              >
+                <Info aria-hidden="true" className="lq-conversion-note-dot" size={16} strokeWidth={2} />
+                <span className="lq-conversion-note-copy">代码转换后，实际运行效果可能因平台差异而有所不同。如遇问题，可使用策略生成功能进一步优化。</span>
+              </div>
+              <div
+                className={`lq-code-preview app-scrollbar ${conversionFailureInfo.failed ? "is-failure" : isCodeConversionCodeTab(activeTab) ? "is-code-tab" : "is-text-tab"}`}
+                onScroll={handleConversionPreviewScroll}
+                ref={conversionPreviewRef}
+              >
+                {conversionFailureInfo.failed ? (
+                  <ConversionFailureState
+                    message={conversionFailureInfo.message}
+                    refundApplied={conversionFailureInfo.refundApplied}
+                    title={conversionFailureInfo.title}
+                  />
+                ) : isCodeConversionCodeTab(activeTab) ? (
+                  <ConversionCodePreview code={targetCode} loading={conversionLoading} />
                 ) : (
-                  <div className="lq-result-placeholder">
-                    <BotIcon />
-                    <span>{conversionLoading ? "转换中..." : "转换结果将在这里显示"}</span>
-                  </div>
+                  <ConversionNotesPreview loading={conversionLoading} notes={migrationNotes} />
                 )}
               </div>
             </div>
@@ -1734,13 +1767,8 @@ function ConvertModeContent() {
               清空内容
             </button>
           </div>
-          <div className="lq-cost-pill">
-            <DollarSign aria-hidden="true" />
-            <span>每次平台转换消耗 200 积分</span>
-          </div>
         </div>
       </section>
-      <p className="lq-risk lq-bottom-risk lq-workbench-risk">AI 生成策略需自行回测验证，投资有风险，请谨慎使用。</p>
     </WorkbenchShell>
   );
 }
@@ -2060,34 +2088,8 @@ function ErrorPanel({ message }: { message: string }) {
   return <div className="lq-error-panel">{message}</div>;
 }
 
-function CodeConversionToolOutput({ activeTab, content, loading }: { activeTab: string; content: string; loading: boolean }) {
-  if (!content.trim()) {
-    return (
-      <div className="lq-conversion-empty">
-        {loading ? "转换中..." : isCodeConversionCodeTab(activeTab) ? "暂无目标平台代码。" : "暂无迁移说明。"}
-      </div>
-    );
-  }
-
-  return (
-    <pre className={`lq-conversion-pre ${isCodeConversionCodeTab(activeTab) ? "is-code" : "is-text"}`}>
-      <code>{content}</code>
-    </pre>
-  );
-}
-
 function PlatformSelectCard({ isTarget = false, label, onChange, options, value }: { isTarget?: boolean; label: string; onChange: (value: string) => void; options: string[]; value: string }) {
   return <PlatformDropdown label={label} onChange={onChange} options={options} tone={isTarget ? "target" : "default"} value={value} />;
-}
-
-function BotIcon() {
-  return (
-    <svg fill="none" height="18" viewBox="0 0 24 24" width="18">
-      <path d="M12 3v3" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
-      <rect height="10" rx="3" stroke="currentColor" strokeWidth="1.8" width="14" x="5" y="8" />
-      <path d="M9 13h.01M15 13h.01M10 18v3h4v-3" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
-    </svg>
-  );
 }
 
 function rememberTaskFingerprintOutcome(
@@ -2297,7 +2299,7 @@ function getStrategyFinalizingMessage(job: StrategyJob) {
   const phase = job.task?.progress?.phase;
 
   if (phase === "validating") {
-    return "正在检查代码完整性";
+    return "正在检查输出是否完整传输";
   }
 
   if (phase === "merging") {
@@ -2388,7 +2390,7 @@ function createThinkingStateFromTaskData(data: AiTaskData | null | undefined, ta
     return {
       status: "failed",
       visibleThinking,
-      finalAnswerMarkdown,
+      finalAnswerMarkdown: "",
       error: data.task.errorMessage ?? null,
       taskId: data.task.id
     };
@@ -2564,7 +2566,7 @@ function getMessageBilling(message: StrategyChatMessage): AiTaskData["billing"] 
     chargedPoints: typeof billing.chargedPoints === "number" ? billing.chargedPoints : waivedByMembership ? 0 : task.costPoints,
     waivedByMembership,
     membershipType,
-    membershipLabel: membershipType ? "内测VIP" : null,
+    membershipLabel: null,
     membershipEndsAt: readNullableString(billing.membershipEndsAt)
   };
 }
@@ -2574,13 +2576,12 @@ function getBillingTag(billing: AiTaskData["billing"] | null | undefined, task: 
     return null;
   }
 
-  const nominalCostPoints = billing.nominalCostPoints ?? task.costPoints;
   const chargedPoints = billing.chargedPoints ?? task.costPoints;
-  const waived = billing.waivedByMembership === true;
+  const zeroCharge = chargedPoints === 0;
 
   return {
-    label: waived ? `内测VIP免扣 ${nominalCostPoints} 积分` : `已扣除 ${chargedPoints} 积分`,
-    waived
+    label: `已扣除 ${chargedPoints} 积分`,
+    waived: zeroCharge
   };
 }
 

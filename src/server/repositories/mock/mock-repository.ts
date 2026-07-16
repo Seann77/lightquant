@@ -25,6 +25,7 @@ import type {
   WechatGroupQrCode
 } from "@/server/domain";
 import { ApiError } from "@/server/http/api-response";
+import { assertIdempotentCreditLedgerMatches } from "@/server/credits/credit-idempotency";
 import { getOrderExpiresAt, isOrderExpired } from "@/server/payments/payment-config";
 import type {
   AiTaskPage,
@@ -731,9 +732,11 @@ export class MockLightQuantRepository implements LightQuantRepository {
 
     if (existingLedgerId) {
       const ledger = this.creditLedger.get(existingLedgerId);
-      const account = await this.ensureCreditAccount(input.userId, input.createdAt);
 
       if (ledger) {
+        assertIdempotentCreditLedgerMatches(ledger, input);
+        const account = await this.ensureCreditAccount(input.userId, input.createdAt);
+
         return {
           account,
           ledger,
@@ -866,17 +869,37 @@ export class MockLightQuantRepository implements LightQuantRepository {
   }
 
   async applyAdminCreditAdjustment(input: ApplyAdminCreditAdjustmentInput): Promise<AppliedCreditLedger> {
-    const result = await this.applyCreditLedger(input.ledger);
-    await this.createAdminAuditLog({
-      ...input.audit,
-      metadata: {
-        ...input.audit.metadata,
-        creditLedgerId: result.ledger.id,
-        duplicated: result.duplicated
-      }
-    });
+    const snapshot = {
+      creditAccounts: new Map(this.creditAccounts),
+      creditGrants: new Map(this.creditGrants),
+      creditLedger: new Map(this.creditLedger),
+      ledgerByIdempotencyKey: new Map(this.ledgerByIdempotencyKey),
+      adminAuditLogs: new Map(this.adminAuditLogs)
+    };
 
-    return result;
+    try {
+      const result = await this.applyCreditLedger(input.ledger);
+
+      if (!result.duplicated) {
+        await this.createAdminAuditLog({
+          ...input.audit,
+          metadata: {
+            ...input.audit.metadata,
+            creditLedgerId: result.ledger.id,
+            duplicated: false
+          }
+        });
+      }
+
+      return result;
+    } catch (error) {
+      restoreMap(this.creditAccounts, snapshot.creditAccounts);
+      restoreMap(this.creditGrants, snapshot.creditGrants);
+      restoreMap(this.creditLedger, snapshot.creditLedger);
+      restoreMap(this.ledgerByIdempotencyKey, snapshot.ledgerByIdempotencyKey);
+      restoreMap(this.adminAuditLogs, snapshot.adminAuditLogs);
+      throw error;
+    }
   }
 
   async createAdminAuditLog(input: CreateAdminAuditLogInput) {
@@ -1819,4 +1842,12 @@ function inferUploadedFileKind(ext: string, mimeType: string): UploadedFile["kin
   }
 
   return "text";
+}
+
+function restoreMap<K, V>(target: Map<K, V>, snapshot: Map<K, V>) {
+  target.clear();
+
+  for (const [key, value] of snapshot) {
+    target.set(key, value);
+  }
 }

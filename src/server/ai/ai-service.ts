@@ -8,7 +8,7 @@ import { runAiProvider, runAiProviderStream } from "@/server/ai/ai-provider";
 import { resolveAiRuntimeConfig } from "@/server/ai/ai-runtime-config";
 import { getAiTaskProgress, setAiTaskProgress, type AiTaskProgressSnapshot, type AiTaskProgressUpdate } from "@/server/ai/ai-task-progress";
 import { getAiPerfNow, logAiPerf, measureAiPerf } from "@/server/ai/ai-perf";
-import { getAiModelName, getAiProviderMode, getAiTaskTimeoutMs, getBetaVipConfig } from "@/server/env";
+import { getAiModelMaxOutputTokens, getAiModelName, getAiProviderMode, getAiTaskTimeoutMs, getBetaVipConfig } from "@/server/env";
 import { getUploadedImageDataUrl, inferUploadedFileKind } from "@/server/files/file-service";
 import { getAiTaskBillingForUserAt, type AiTaskBilling } from "@/server/memberships/beta-membership-service";
 import type { AiProviderAttachment, AiProviderResult, AiProviderStreamDelta } from "@/server/ai/providers/types";
@@ -41,6 +41,12 @@ type CreateAiTaskRequest = {
 type CreateAiTaskOptions = {
   responseMode?: "full" | "stream_initial";
   deferInitialRunEvents?: boolean;
+};
+
+type IncompleteOutputErrorMetadata = {
+  decision: AiOutputIntegrityDecision;
+  result?: AiProviderResult | null;
+  repairedFromReason?: string | null;
 };
 
 type ListAiConversationsRequest = {
@@ -492,11 +498,19 @@ export async function runAiTask(taskId: string, requestId: string) {
         summary: completedProviderResult ? getModelCallCompletedSummary("call_model") : getModelCallFailedSummary("call_model"),
         progressPercent: completedProviderResult ? 84 : 96,
         detailJson: completedProviderResult ? {
-          provider: providerDiagnostics.provider,
+          provider: readRecord(completedProviderResult.reportJson)?.provider ?? providerDiagnostics.provider,
           model: completedProviderResult.model,
+          requestModel: readRecord(completedProviderResult.reportJson)?.requestModel,
+          responseModel: readRecord(completedProviderResult.reportJson)?.responseModel,
+          modelMaxOutputTokens: readRecord(completedProviderResult.reportJson)?.modelMaxOutputTokens,
+          moduleMaxOutputTokens: readRecord(completedProviderResult.reportJson)?.moduleMaxOutputTokens,
+          effectiveMaxOutputTokens: readRecord(completedProviderResult.reportJson)?.effectiveMaxOutputTokens,
+          finish_reason: readRecord(completedProviderResult.reportJson)?.finish_reason,
+          streamCompleted: readRecord(completedProviderResult.reportJson)?.streamCompleted,
+          timeoutMs: readRecord(completedProviderResult.reportJson)?.timeoutMs,
           visionAttachments: providerAttachments.length,
           tokenUsage: completedProviderResult.tokenUsage
-        } : getModelCallFailureDetailJson(providerRunError)
+        } : getModelCallFailureDetailJson(providerRunError, providerDiagnostics)
       });
     }
 
@@ -679,6 +693,7 @@ export async function runAiTask(taskId: string, requestId: string) {
       const transactionRepository = getRepository();
       const failedAt = new Date().toISOString();
       await releaseReservation(taskToFail.id);
+      await createFailedDiagnosticResultIfNeeded(transactionRepository, taskToFail, apiError, failedAt);
 
       const failedTask = await transactionRepository.updateAiTask(taskToFail.id, {
         status: "FAILED",
@@ -940,11 +955,19 @@ async function runAiTaskStreaming(
         summary: completedProviderStream ? getModelCallCompletedSummary("call_model_stream") : getModelCallFailedSummary("call_model_stream"),
         progressPercent: completedProviderStream ? 86 : 96,
         detailJson: completedProviderStream ? {
-          provider: providerDiagnostics.provider,
+          provider: readRecord(completedProviderStream.result.reportJson)?.provider ?? providerDiagnostics.provider,
           model: completedProviderStream.result.model,
+          requestModel: readRecord(completedProviderStream.result.reportJson)?.requestModel,
+          responseModel: readRecord(completedProviderStream.result.reportJson)?.responseModel,
+          modelMaxOutputTokens: readRecord(completedProviderStream.result.reportJson)?.modelMaxOutputTokens,
+          moduleMaxOutputTokens: readRecord(completedProviderStream.result.reportJson)?.moduleMaxOutputTokens,
+          effectiveMaxOutputTokens: readRecord(completedProviderStream.result.reportJson)?.effectiveMaxOutputTokens,
+          finish_reason: readRecord(completedProviderStream.result.reportJson)?.finish_reason,
+          streamCompleted: readRecord(completedProviderStream.result.reportJson)?.streamCompleted,
+          timeoutMs: readRecord(completedProviderStream.result.reportJson)?.timeoutMs,
           visionAttachments: providerAttachments.length,
           tokenUsage: completedProviderStream.result.tokenUsage
-        } : getModelCallFailureDetailJson(providerStreamError)
+        } : getModelCallFailureDetailJson(providerStreamError, providerDiagnostics)
       });
     }
 
@@ -1119,6 +1142,7 @@ async function runAiTaskStreaming(
       const transactionRepository = getRepository();
       const failedAt = new Date().toISOString();
       await releaseReservation(taskToFail.id);
+      await createFailedDiagnosticResultIfNeeded(transactionRepository, taskToFail, apiError, failedAt);
 
       const failedTask = await transactionRepository.updateAiTask(taskToFail.id, {
         status: "FAILED",
@@ -1166,13 +1190,17 @@ async function repairProviderResultIfNeeded(input: {
   }
 
   if (!canAutoRepairAiOutput(input.task.type)) {
-    throw createIncompleteOutputError();
+    throw createIncompleteOutputError({
+      decision,
+      result: input.result,
+      repairedFromReason: null
+    });
   }
 
   await appendAutoRepairStartedEvent(input.task, decision);
 
   const partialDraft = formatProviderResultAsMarkdown(input.result, input.task);
-  const repairTask = buildAutoRepairTask(input.task, partialDraft, decision.reason ?? "unknown");
+  const repairTask = buildAutoRepairTask(input.task, partialDraft, decision);
   const repairResult = shouldUseStreamingMarkdownForTask({
     task: repairTask,
     conversationContext: input.conversationContext
@@ -1205,14 +1233,19 @@ async function repairProviderResultIfNeeded(input: {
 
   if (repairDecision.partial) {
     await appendAutoRepairFailedEvent(input.task, repairDecision);
-    throw createIncompleteOutputError();
+    throw createIncompleteOutputError({
+      decision: repairDecision,
+      result: repairResult,
+      repairedFromReason: decision.reason
+    });
   }
 
   await appendAutoRepairCompletedEvent(input.task, decision);
 
   return withRepairReportMetadata(repairResult, {
     repairAttempt: 1,
-    repairedFromReason: decision.reason ?? "unknown"
+    repairedFromReason: decision.reason ?? "unknown",
+    integrityReport: repairDecision.report
   });
 }
 
@@ -1235,14 +1268,18 @@ async function repairProviderStreamIfNeeded(input: {
   }
 
   if (!canAutoRepairAiOutput(input.task.type)) {
-    throw createIncompleteOutputError();
+    throw createIncompleteOutputError({
+      decision,
+      result: input.stream.result,
+      repairedFromReason: null
+    });
   }
 
   await appendAutoRepairStartedEvent(input.task, decision);
   await recordAiTaskProgress(input.task, {
     phase: "merging",
     progressPercent: 90,
-    statusMessage: "正在检查代码完整性。"
+    statusMessage: "正在检查是否截断并整理结果。"
   });
 
   await input.emit({
@@ -1257,7 +1294,7 @@ async function repairProviderStreamIfNeeded(input: {
     })
   });
 
-  const repairTask = buildAutoRepairTask(input.task, input.stream.finalAnswerMarkdown, decision.reason ?? "unknown");
+  const repairTask = buildAutoRepairTask(input.task, input.stream.finalAnswerMarkdown, decision);
   const repairStream = await runAiProviderStream(
     repairTask,
     input.conversationContext,
@@ -1275,7 +1312,11 @@ async function repairProviderStreamIfNeeded(input: {
 
   if (repairDecision.partial) {
     await appendAutoRepairFailedEvent(input.task, repairDecision);
-    throw createIncompleteOutputError();
+    throw createIncompleteOutputError({
+      decision: repairDecision,
+      result: repairStream.result,
+      repairedFromReason: decision.reason
+    });
   }
 
   await appendAutoRepairCompletedEvent(input.task, decision);
@@ -1284,18 +1325,22 @@ async function repairProviderStreamIfNeeded(input: {
     ...repairStream,
     result: withRepairReportMetadata(repairStream.result, {
       repairAttempt: 1,
-      repairedFromReason: decision.reason ?? "unknown"
+      repairedFromReason: decision.reason ?? "unknown",
+      integrityReport: repairDecision.report
     })
   };
 }
 
-function buildAutoRepairTask(task: AiTask, partialDraft: string, reason: string): AiTask {
+function buildAutoRepairTask(task: AiTask, partialDraft: string, decision: AiOutputIntegrityDecision): AiTask {
+  const config = getAiTaskConfig(task.type);
+
   return {
     ...task,
     prompt: buildAutoRepairPrompt({
       task,
       partialDraft,
-      reason
+      reason: decision.reason ?? "unknown",
+      maxSingleCallInputChars: config.maxSingleCallInputChars
     })
   };
 }
@@ -1304,16 +1349,18 @@ async function appendAutoRepairStartedEvent(task: AiTask, decision: AiOutputInte
   await appendRunEvent(task, {
     type: "validate_result",
     status: "running",
-    title: "正在检查代码完整性",
-    summary: "正在整理最终结果。",
+    title: "正在检查是否截断并整理结果",
+    summary: "正在检查输出是否完整传输，并在必要时自动整理最终结果。",
     progressPercent: 90,
     detailJson: {
       partial: true,
-      truncated: true,
+      truncated: decision.category === "physical_truncated",
       truncateReason: decision.reason,
+      incompleteCategory: decision.category,
       repairAttempt: 1,
       longCodeMode: decision.longCodeMode,
-      requiresCompleteCode: decision.requiresCompleteCode
+      requiresCompleteCode: decision.requiresCompleteCode,
+      integrityReport: decision.report
     }
   });
 }
@@ -1322,7 +1369,7 @@ async function appendAutoRepairCompletedEvent(task: AiTask, decision: AiOutputIn
   await appendRunEvent(task, {
     type: "validate_result",
     status: "completed",
-    title: "代码完整性检查完成",
+    title: "输出传输检查完成",
     summary: "最终结果已整理完成。",
     progressPercent: 94,
     detailJson: {
@@ -1336,21 +1383,137 @@ async function appendAutoRepairFailedEvent(task: AiTask, decision: AiOutputInteg
   await appendRunEvent(task, {
     type: "validate_result",
     status: "failed",
-    title: "代码完整性检查未通过",
-    summary: "本次生成没有完成。",
+    title: "输出传输检查未通过",
+    summary: "本次输出可能被截断或连接中断。",
     progressPercent: 96,
     detailJson: {
       partial: true,
-      truncated: true,
+      truncated: decision.category === "physical_truncated",
       truncateReason: decision.reason,
+      incompleteCategory: decision.category,
       repairAttempt: 1,
-      repairFailedReason: decision.reason
+      repairFailedReason: decision.reason,
+      integrityReport: decision.report
     }
   });
 }
 
-function createIncompleteOutputError() {
-  return new ApiError("AI_TASK_FAILED", "本次生成没有完成，积分已退回。你可以稍后重新提交。", 502);
+function createIncompleteOutputError(metadata?: IncompleteOutputErrorMetadata) {
+  const error = new ApiError("AI_TASK_FAILED", "本次生成没有完成，积分已退回。你可以重新提交或调整输入后再试。", 502);
+
+  if (metadata) {
+    Object.assign(error, {
+      incompleteOutput: metadata
+    });
+  }
+
+  return error;
+}
+
+async function createFailedDiagnosticResultIfNeeded(
+  repository: ReturnType<typeof getRepository>,
+  task: AiTask,
+  error: ApiError,
+  createdAt: string
+) {
+  const existing = await repository.findAiTaskResult(task.id);
+
+  if (existing) {
+    return existing;
+  }
+
+  const incomplete = readIncompleteOutputMetadata(error);
+  const providerResult = incomplete?.result ?? null;
+  const sourceReport = readRecord(providerResult?.reportJson) ?? {};
+  const diagnostics = getAiProviderDiagnostics();
+  const provider = readString(sourceReport.provider) || diagnostics.provider;
+  const requestModel = readString(sourceReport.requestModel) || diagnostics.model;
+  const responseModel = readString(sourceReport.responseModel) || providerResult?.model || requestModel;
+  const modelMaxOutputTokens = readNumber(sourceReport.modelMaxOutputTokens) ??
+    getAiModelMaxOutputTokens(provider === "mock" ? "openai_compatible" : provider as Parameters<typeof getAiModelMaxOutputTokens>[0], requestModel);
+  const moduleMaxOutputTokens = readNumber(sourceReport.moduleMaxOutputTokens) ?? getAiTaskConfig(task.type).maxOutputTokens;
+  const effectiveMaxOutputTokens = readNumber(sourceReport.effectiveMaxOutputTokens) ??
+    Math.min(moduleMaxOutputTokens, Math.floor(modelMaxOutputTokens * 0.75));
+  const finishReason = readString(sourceReport.finish_reason) ||
+    readString(sourceReport.finishReason) ||
+    (error.code === "AI_PROVIDER_TIMEOUT" ? "timeout" : "error");
+  const streamCompleted = typeof sourceReport.streamCompleted === "boolean" ? sourceReport.streamCompleted : false;
+  const wasTruncated = sourceReport.wasTruncated === true ||
+    sourceReport.truncated === true ||
+    sourceReport.partial === true ||
+    finishReason === "length" ||
+    finishReason === "timeout" ||
+    streamCompleted === false;
+  const truncateReason = incomplete?.decision.reason ||
+    readString(sourceReport.truncateReason) ||
+    (wasTruncated ? finishReason : error.code);
+  const tokenUsage = providerResult?.tokenUsage ?? {
+    promptTokens: readNumber(sourceReport.promptTokens) ?? 0,
+    completionTokens: readNumber(sourceReport.completionTokens) ?? 0,
+    totalTokens: readNumber(sourceReport.totalTokens) ?? 0
+  };
+  const reportJson = {
+    ...sourceReport,
+    provider,
+    requestModel,
+    responseModel,
+    taskType: task.type,
+    sourcePlatform: task.sourcePlatform,
+    targetPlatform: task.targetPlatform,
+    modelMaxOutputTokens,
+    moduleMaxOutputTokens,
+    effectiveMaxOutputTokens,
+    outputTokenLimit: effectiveMaxOutputTokens,
+    promptTokens: tokenUsage.promptTokens,
+    completionTokens: tokenUsage.completionTokens,
+    totalTokens: tokenUsage.totalTokens,
+    finish_reason: finishReason,
+    finishReason,
+    streamCompleted,
+    timeoutMs: readNumber(sourceReport.timeoutMs) ?? getAiTaskTimeoutMs(),
+    wasTruncated,
+    truncated: wasTruncated,
+    partial: wasTruncated,
+    truncateReason,
+    integrityStatus: wasTruncated ? "physical_truncated" : "failed",
+    repairAttempted: Boolean(incomplete),
+    repairSucceeded: false,
+    repairedFromReason: incomplete?.repairedFromReason || readString(sourceReport.repairedFromReason) || null,
+    refundApplied: true,
+    errorCode: error.code,
+    integrityReport: incomplete?.decision.report ?? sourceReport.integrityReport ?? null
+  };
+
+  return repository.createAiTaskResult({
+    taskId: task.id,
+    resultType: task.type,
+    scopeStatus: task.scopeStatus,
+    generatedCode: null,
+    explanation: error.message,
+    migrationNotes: null,
+    riskWarnings: [],
+    reportJson,
+    model: responseModel,
+    tokenUsage,
+    createdAt
+  });
+}
+
+function readIncompleteOutputMetadata(error: unknown): IncompleteOutputErrorMetadata | null {
+  const maybe = error as { incompleteOutput?: unknown };
+  const value = maybe?.incompleteOutput;
+
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const record = value as Partial<IncompleteOutputErrorMetadata>;
+
+  return record.decision ? {
+    decision: record.decision,
+    result: record.result ?? null,
+    repairedFromReason: record.repairedFromReason ?? null
+  } : null;
 }
 
 export async function getAiTaskForUser(userId: string, taskId: string) {
@@ -2376,8 +2539,14 @@ function getModelCallFailedSummary(type: ModelCallRunEventType) {
     : "AI \u6a21\u578b\u8c03\u7528\u5931\u8d25\u3002";
 }
 
-function getModelCallFailureDetailJson(error: unknown) {
+function getModelCallFailureDetailJson(error: unknown, diagnostics?: { provider: string; model: string }) {
   return {
+    provider: diagnostics?.provider,
+    requestModel: diagnostics?.model,
+    timeoutMs: getAiTaskTimeoutMs(),
+    finish_reason: error instanceof ApiError && error.code === "AI_PROVIDER_TIMEOUT" ? "timeout" : "error",
+    streamCompleted: false,
+    wasTruncated: error instanceof ApiError && error.code === "AI_PROVIDER_TIMEOUT",
     errorCode: error instanceof ApiError ? error.code : "MODEL_CALL_FAILED"
   };
 }
@@ -2953,6 +3122,14 @@ function truncateForContext(value: string, maxLength: number) {
 
 function readRecord(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function readString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function readNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 function assertInputWithinLimit(

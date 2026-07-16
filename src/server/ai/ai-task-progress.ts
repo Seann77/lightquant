@@ -179,7 +179,7 @@ function phaseLabel(taskType: AiTaskType, phase: AiTaskProgressPhase) {
   }
 
   if (phase === "validating") {
-    return taskType === "code_analysis" ? "风险检查" : "完整性检查";
+    return taskType === "code_analysis" ? "风险检查" : "传输检查";
   }
 
   if (phase === "completed") {
@@ -230,7 +230,7 @@ function statusMessage(
   }
 
   if (phase === "validating") {
-    return taskType === "code_analysis" ? "正在检查潜在风险和输出完整性。" : "正在检查输出完整性、空结果、明显截断和重复片段。";
+    return taskType === "code_analysis" ? "正在整理解析报告。" : "正在检查输出是否完整传输。";
   }
 
   if (phase === "completed") {

@@ -38,8 +38,12 @@ export function isAiTaskResultPartial(result: AiTaskData["result"] | null | unde
 }
 
 export function canContinueAiTaskResult(result: AiTaskData["result"] | null | undefined) {
-  void result;
-  return false;
+  const report = readRecord(result?.reportJson);
+  const reason = typeof report?.truncateReason === "string" ? report.truncateReason : "";
+
+  return report?.canContinue === true &&
+    report?.truncated === true &&
+    (report?.integrityStatus === "physical_truncated" || ["length", "timeout", "stream_error"].includes(reason));
 }
 
 export function isAiTaskDataPartial(data: AiTaskData | null | undefined) {

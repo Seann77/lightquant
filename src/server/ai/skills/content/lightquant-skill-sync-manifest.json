@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "syncType": "one_way_cleaned_local_skill_to_website_prompt",
+  "syncedAt": "2026-07-14T10:41:04Z",
+  "sources": [
+    {
+      "path": "/Users/a1-6/.codex/skills/lightquant-strategy-dev/SKILL.md",
+      "sha256": "4df39f7f83660d1d563d1131ec1758e3426a2d74cd1e89c5384edf7b411d3823",
+      "includedRuleCategories": [
+        "strategy_intent_preservation",
+        "hard_failure_priority",
+        "platform_native_implementation",
+        "hard_vs_soft_platform_constraints",
+        "order_state_discipline"
+      ]
+    },
+    {
+      "path": "/Users/a1-6/.codex/skills/lightquant-strategy-conversion/SKILL.md",
+      "sha256": "62367f07021a1c64d565e270453e2d66eccf7940947a84e353b9c6d75b741add",
+      "includedRuleCategories": [
+        "convert_behavior_not_surface_syntax",
+        "qmt_target_mode_selection",
+        "joinquant_to_qmt_lifecycle_mapping",
+        "bar_date_and_lookahead_guards",
+        "qmt_data_financial_order_guardrails",
+        "conversion_completion_semantics"
+      ]
+    },
+    {
+      "path": "/Users/a1-6/.codex/skills/lightquant-code-explainer/SKILL.md",
+      "sha256": "bc6f4d32adb3a9d1a3ee343eb18bbf7721b35286ac8122cdc9304bec4a64d36d",
+      "includedRuleCategories": [
+        "plain_chinese_user_readable_explanation",
+        "platform_detection_from_code_evidence",
+        "missing_info_phrase",
+        "identifier_evidence_only",
+        "risk_and_parameter_extraction"
+      ]
+    },
+    {
+      "path": "/Users/a1-6/.codex/skills/lightquant-shared-references/safety-and-output-rules.md",
+      "sha256": "d835df0954e52bf5ff8f2e013917b9b8082026f39d4ece68e00105caec7c6877",
+      "includedRuleCategories": [
+        "scope_boundaries",
+        "no_investment_advice",
+        "platform_uncertainty_disclosure",
+        "risk_warning_focus"
+      ]
+    },
+    {
+      "path": "/Users/a1-6/.codex/skills/lightquant-shared-references/platform-ptrade.md",
+      "sha256": "43fd3865362a0c10a6e989c0d0c5a5710ca0ab7e183313c2c5ccde91a524b363",
+      "includedRuleCategories": [
+        "ptrade_platform_boundary",
+        "ptrade_data_shape_protection",
+        "ptrade_lifecycle_frequency",
+        "ptrade_pre_order_guards",
+        "ptrade_order_state_discipline"
+      ]
+    },
+    {
+      "path": "/Users/a1-6/.codex/skills/lightquant-shared-references/platform-joinquant.md",
+      "sha256": "708a18206db6253f12941374920f7a483119ea749936f0550fe5329aa60bc209",
+      "includedRuleCategories": [
+        "joinquant_platform_boundary",
+        "joinquant_legacy_code_guardrails",
+        "joinquant_data_and_api_protection",
+        "joinquant_state_initialization",
+        "joinquant_order_result_discipline"
+      ]
+    },
+    {
+      "path": "/Users/a1-6/.codex/skills/lightquant-shared-references/platform-qmt.md",
+      "sha256": "f14f4d8fdb3775153152b82a702263ead5ed0e94532afc0cca797171f80fac0d",
+      "includedRuleCategories": [
+        "qmt_built_in_python_boundary",
+        "qmt_xtquant_boundary",
+        "qmt_vba_boundary",
+        "qmt_symbol_format_boundaries",
+        "qmt_bar_time_state",
+        "qmt_data_shape_guards",
+        "qmt_order_submission_semantics",
+        "qmt_encoding_and_log_safety"
+      ]
+    },
+    {
+      "path": "/Users/a1-6/.codex/skills/lightquant-shared-references/conversion-matrix.md",
+      "sha256": "ee5f6b48269cb92201576fe062d217fec540f12d49a7d25d1deb0c9f2ffd2215",
+      "includedRuleCategories": [
+        "cross_platform_mapping_categories",
+        "platform_direction_rules",
+        "qmt_conversion_mode_rules",
+        "approximation_policy",
+        "conversion_review_checklist"
+      ]
+    }
+  ],
+  "syncedTo": [
+    "src/server/ai/skills/content/lightquant-domain-rules.md",
+    "src/server/ai/skills/content/strategy-generation.md",
+    "src/server/ai/skills/content/code-conversion.md",
+    "src/server/ai/skills/content/code-analysis.md"
+  ],
+  "explicitlyExcludedLocalExecutionRuleCategories": [
+    "local_reference_file_reading_instructions",
+    "codex_patch_or_edit_workflow",
+    "local_pdf_or_windows_path_lookup",
+    "py_compile_or_fake_contextinfo_smoke_commands",
+    "local_encoding_detection_commands",
+    "local_backtest_or_shell_execution_requirements",
+    "bidirectional_sync_or_live_skill_sync_system"
+  ]
+}

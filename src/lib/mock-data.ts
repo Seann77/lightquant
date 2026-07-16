@@ -159,8 +159,10 @@ export const moreItems = [
     variant: "points",
     rules: [
       { icon: "add_circle", label: "新用户注册：", text: "赠送 300 基础积分。" },
-      { icon: "remove_circle", label: "策略生成：", text: "每次成功生成消耗 10 积分。" },
-      { icon: "remove_circle", label: "代码转换：", text: "每次语言转换（如 Python 至 C++）消耗 5 积分。" }
+      { icon: "add_circle", label: "邀请好友：", text: "好友通过你的邀请完成注册后，你可获得 200 基础积分奖励。" },
+      { icon: "remove_circle", label: "策略生成：", text: "每次成功生成或修改策略消耗 50 积分。" },
+      { icon: "remove_circle", label: "代码转换：", text: "每次完成平台间代码转换消耗 200 积分。" },
+      { icon: "remove_circle", label: "代码解析：", text: "每次成功解析策略代码消耗 100 积分。" }
     ]
   },
   {

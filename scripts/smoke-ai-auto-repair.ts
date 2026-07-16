@@ -22,7 +22,8 @@ async function main() {
         "strategy_generation initial stream emits final_delta preview",
         "auto repair does not emit repair-stage final_delta drafts",
         "auto repair confirms the original reservation only on success",
-      "auto repair releases the original reservation on failure",
+        "auto repair may throw after persisting a failed/refunded task",
+        "auto repair releases the original reservation, stores refund diagnostics, and does not expose partial success results on failure",
       "auto repair runs at most once"
     ],
     success,
@@ -116,21 +117,29 @@ async function runScenario(scenario: Scenario) {
     }
 
     expect("code conversion repair failure hides final delta drafts", !finalDeltaDraft);
-    expect("failure throws", thrown);
     const latestTask = response?.task ?? await findOnlyTask(repository, user.id);
+    expect("failure may throw after persisted failure", Boolean(latestTask));
     expect("failure task recorded", latestTask);
     const failedTask = await repository.findAiTaskById(latestTask!.id);
     const result = await repository.findAiTaskResult(latestTask!.id);
     const reservation = await repository.findCreditReservationByTaskId(latestTask!.id);
     const accountAfter = await repository.ensureCreditAccount(user.id, new Date().toISOString());
     expect("failure task failed", failedTask?.status === "FAILED");
-    expect("failure has no success result", !result);
+    expect("failure stores diagnostic result", result);
+    expect("failure result is not exposed as success", !response?.result);
+    expect("failure error message mentions refund", failedTask?.errorMessage?.includes("积分已退回"));
+    expect("failure result refund metadata", result?.reportJson?.refundApplied === true);
+    expect("failure result repair attempted", result?.reportJson?.repairAttempted === true);
+    expect("failure result repair not succeeded", result?.reportJson?.repairSucceeded === false);
+    expect("failure result physical truncated", result?.reportJson?.integrityStatus === "physical_truncated");
     expect("failure releases reservation", reservation?.status === "RELEASED");
     expect("failure keeps balance", accountAfter.balance === accountBefore.balance);
 
     return {
       taskStatus: failedTask?.status,
       reservationStatus: reservation?.status,
+      hasDiagnosticResult: Boolean(result),
+      threwAfterPersistedFailure: Boolean(thrown),
       requestCount,
       balanceBefore: accountBefore.balance,
       balanceAfter: accountAfter.balance

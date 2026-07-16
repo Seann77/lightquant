@@ -18,7 +18,7 @@ const partialAssistant = createMessage({
         truncated: true,
         truncateReason: "length",
         canContinue: true,
-        outputTokenLimit: 64000
+        outputTokenLimit: 80000
       }
     }
   }

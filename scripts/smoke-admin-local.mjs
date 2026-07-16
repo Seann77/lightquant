@@ -38,6 +38,12 @@ try {
 
   const unauthenticated = await createClient().requestJson("GET", "/api/v1/admin/overview");
   assertFailure("unauthenticated-admin-overview", unauthenticated, "UNAUTHORIZED");
+  const unauthenticatedPreview = await createClient().requestJson("POST", "/api/v1/admin/credit-adjustments/preview", {
+    phone: "15800000001",
+    amount: 1,
+    reason: "未登录预览校验"
+  });
+  assertFailure("unauthenticated-credit-adjustment-preview", unauthenticatedPreview, "UNAUTHORIZED");
 
   const result = {
     ok: true,
@@ -58,6 +64,12 @@ try {
     });
     const nonAdminOverview = await nonAdminClient.requestJson("GET", "/api/v1/admin/overview");
     assertFailure("non-admin-overview", nonAdminOverview, "NOT_FOUND");
+    const nonAdminPreview = await nonAdminClient.requestJson("POST", "/api/v1/admin/credit-adjustments/preview", {
+      phone: nonAdminPhone,
+      amount: 1,
+      reason: "非管理员预览校验"
+    });
+    assertFailure("non-admin-credit-adjustment-preview", nonAdminPreview, "NOT_FOUND");
 
     result.nonAdmin = {
       phoneMasked: maskPhone(nonAdminPhone),

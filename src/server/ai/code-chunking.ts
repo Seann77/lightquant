@@ -426,8 +426,8 @@ async function mergeChunkResults(
     completedChunks: chunkResults.length,
     currentChunk: null,
     statusMessage: taskType === "code_analysis"
-      ? "正在检查潜在风险和输出完整性。"
-      : "正在检查 JSON 结构、空结果、明显截断和重复片段。"
+      ? "正在整理解析报告。"
+      : "正在检查输出是否完整传输。"
   });
   const validation = validateMergedResult(taskType, generatedCode, explanation, chunkResults);
 

@@ -4,9 +4,10 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { flushSync } from "react-dom";
 import { useCallback, useEffect, useRef, useState, type ReactNode, type UIEvent } from "react";
-import { Code2, LoaderCircle, Menu, MessageCircle, Repeat2, Sparkles, UserRoundPlus } from "lucide-react";
+import { Code2, LoaderCircle, Menu, MessageCircle, Repeat2, Sparkles, UserRoundPlus, X } from "lucide-react";
 import { CreditActionPopover } from "@/components/shell/CreditActionPopover";
 import { InviteFriendModal } from "@/components/shell/InviteFriendModal";
+import { LegalFooter } from "@/components/shell/LegalFooter";
 import { Logo } from "@/components/shell/Logo";
 import { LoginModal } from "@/components/shell/LoginModal";
 import { RechargeModal } from "@/components/shell/RechargeModal";
@@ -153,14 +154,13 @@ export function AppShell({ children, initialCurrentUser = null, paymentFeatureEn
   const [inviteOpen, setInviteOpen] = useState(false);
   const [rechargeOpen, setRechargeOpen] = useState(false);
   const [wechatOpen, setWechatOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const mode = searchParams.get("mode");
+  const isStrategyLayout = pathname === "/chat" && mode !== "convert";
   const inviteCodeFromUrl = searchParams.get("inviteCode") ?? searchParams.get("invite") ?? "";
   const isAdminPath = pathname.startsWith("/admin");
   const isLoggedIn = Boolean(currentUser);
   const userPoints = currentUser?.creditAccount.balance ?? 0;
-  const betaVip = currentUser?.membership?.betaVip;
-  const betaVipActive = betaVip?.active === true;
-  const betaVipExpiryLabel = betaVip?.endsAt ? formatBetaVipExpiry(betaVip.endsAt) : "";
   const currentUserId = currentUser?.user.id ?? null;
   const [recentConversations, setRecentConversations] = useState<RecentConversation[]>([]);
   const [recentNextCursor, setRecentNextCursor] = useState<string | null>(null);
@@ -179,6 +179,31 @@ export function AppShell({ children, initialCurrentUser = null, paymentFeatureEn
       setLoginOpen(true);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname, mode]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [mobileMenuOpen]);
 
   const clearRecentSwitchResetTimer = useCallback(() => {
     if (recentSwitchResetTimerRef.current === null) {
@@ -489,8 +514,19 @@ export function AppShell({ children, initialCurrentUser = null, paymentFeatureEn
   }
 
   return (
-    <div className="lq-frame">
-      <aside className="lq-sidebar">
+    <div className={`lq-frame ${mobileMenuOpen ? "is-mobile-menu-open" : ""}`.trim()}>
+      <aside
+        className="lq-sidebar"
+        id="lq-primary-navigation"
+        onClick={(event) => {
+          if (event.target instanceof Element && event.target.closest("a")) {
+            setMobileMenuOpen(false);
+          }
+        }}
+      >
+        <button aria-label="关闭菜单" className="lq-mobile-sidebar-close" onClick={() => setMobileMenuOpen(false)} type="button">
+          <X aria-hidden="true" size={20} />
+        </button>
         <Logo />
 
         <nav aria-label="主导航" className="lq-nav">
@@ -562,8 +598,6 @@ export function AppShell({ children, initialCurrentUser = null, paymentFeatureEn
 
         <div className="lq-login-area">
           <CreditActionPopover
-            betaVipActive={betaVipActive}
-            betaVipExpiryLabel={betaVipExpiryLabel}
             monthlyExpiresAt={currentUser?.creditAccount.monthlyExpiresAt ?? null}
             monthlyPlanName={currentUser?.creditAccount.monthlyPlanName ?? null}
             onClose={() => setCreditActionsOpen(false)}
@@ -576,16 +610,11 @@ export function AppShell({ children, initialCurrentUser = null, paymentFeatureEn
           />
           <button
             aria-label={isLoggedIn ? "打开积分操作菜单" : "打开登录注册弹窗"}
-            className={`lq-login-card ${betaVipActive ? "is-vip" : ""}`.trim()}
+            className="lq-login-card"
             onClick={handleCreditStatusClick}
             type="button"
           >
             <span className="lq-login-avatar-shell">
-              {betaVipActive ? (
-                <span className="lq-vip-badge" title={betaVipExpiryLabel ? `内测VIP · ${betaVipExpiryLabel}到期` : "内测VIP"}>
-                  内测VIP
-                </span>
-              ) : null}
               <span className="lq-login-icon">
                 <UserRoundPlus aria-hidden="true" size={21} strokeWidth={1.8} />
               </span>
@@ -598,10 +627,21 @@ export function AppShell({ children, initialCurrentUser = null, paymentFeatureEn
         </div>
       </aside>
 
+      {mobileMenuOpen ? (
+        <button aria-label="关闭菜单" className="lq-mobile-nav-backdrop" onClick={() => setMobileMenuOpen(false)} type="button" />
+      ) : null}
+
       <div className="lq-content">
-        <header className="lq-topbar">
+        <header className="lq-topbar lq-mobile-topbar">
           <div className="lq-mobile-menu">
-            <button aria-label="打开菜单" className="lq-icon-button h-10 w-10" type="button">
+            <button
+              aria-controls="lq-primary-navigation"
+              aria-expanded={mobileMenuOpen}
+              aria-label={mobileMenuOpen ? "关闭菜单" : "打开菜单"}
+              className="lq-icon-button h-10 w-10"
+              onClick={() => setMobileMenuOpen((open) => !open)}
+              type="button"
+            >
               <Menu aria-hidden="true" size={20} />
             </button>
             <Logo />
@@ -613,9 +653,15 @@ export function AppShell({ children, initialCurrentUser = null, paymentFeatureEn
           </button>
         </header>
 
+        <button aria-label="加入微信群" className="lq-wechat-float" onClick={() => setWechatOpen(true)} type="button">
+          <MessageCircle aria-hidden="true" />
+          <span>加入微信群</span>
+        </button>
+
         <main aria-busy={mainSwitching || undefined} className="lq-main app-scrollbar">
-          <div className={`lq-main-stage ${mainSwitching ? "is-switching" : ""}`}>
+          <div className={`lq-main-stage ${isStrategyLayout ? "is-strategy-layout" : ""} ${mainSwitching ? "is-switching" : ""}`.trim()}>
             {children}
+            <LegalFooter />
           </div>
           {mainSwitching ? (
             <div aria-live="polite" className="lq-main-switch-overlay" role="status">
@@ -669,16 +715,6 @@ function mergeRecentConversations(current: RecentConversation[], incoming: Recen
   }
 
   return merged;
-}
-
-function formatBetaVipExpiry(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  return `${date.getMonth() + 1}月${date.getDate()}日`;
 }
 
 function RecentConversationIcon({ conversation }: { conversation: RecentConversation }) {

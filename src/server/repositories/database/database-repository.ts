@@ -26,6 +26,7 @@ import type {
   WechatGroupQrCode
 } from "@/server/domain";
 import { ApiError } from "@/server/http/api-response";
+import { assertIdempotentCreditLedgerMatches } from "@/server/credits/credit-idempotency";
 import { measureAiPerf } from "@/server/ai/ai-perf";
 import { getOrderExpiresAt, isOrderExpired } from "@/server/payments/payment-config";
 import { getPrismaClient } from "@/server/repositories/database/prisma-client";
@@ -1007,14 +1008,17 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
   async applyAdminCreditAdjustment(input: ApplyAdminCreditAdjustmentInput): Promise<AppliedCreditLedger> {
     return this.withTransaction(async (repository) => {
       const result = await repository.applyCreditLedgerInTransaction(input.ledger);
-      await repository.createAdminAuditLog({
-        ...input.audit,
-        metadata: {
-          ...input.audit.metadata,
-          creditLedgerId: result.ledger.id,
-          duplicated: result.duplicated
-        }
-      });
+
+      if (!result.duplicated) {
+        await repository.createAdminAuditLog({
+          ...input.audit,
+          metadata: {
+            ...input.audit.metadata,
+            creditLedgerId: result.ledger.id,
+            duplicated: false
+          }
+        });
+      }
 
       return result;
     });
@@ -1045,6 +1049,8 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
     });
 
     if (existing) {
+      assertIdempotentCreditLedgerMatches(toCreditLedger(existing), input);
+
       return {
         account: await this.ensureCreditAccount(input.userId, input.createdAt),
         ledger: toCreditLedger(existing),
@@ -1066,6 +1072,8 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
     });
 
     if (existingAfterLock) {
+      assertIdempotentCreditLedgerMatches(toCreditLedger(existingAfterLock), input);
+
       return {
         account: await this.ensureCreditAccount(input.userId, input.createdAt),
         ledger: toCreditLedger(existingAfterLock),
@@ -1130,10 +1138,6 @@ export class DatabaseLightQuantRepository implements LightQuantRepository {
         expiresAt: input.grantExpiresAt ? toDate(input.grantExpiresAt) : null,
         createdAt: toDate(input.createdAt),
         updatedAt: toDate(input.createdAt)
-      }
-    }).catch((error) => {
-      if (!isUniqueConstraintError(error)) {
-        throw error;
       }
     });
 

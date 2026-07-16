@@ -1129,7 +1129,7 @@ function readAiTaskBilling(value: unknown, task: AiTaskData["task"]): AiTaskData
     chargedPoints: typeof billing.chargedPoints === "number" ? billing.chargedPoints : waivedByMembership ? 0 : task.costPoints,
     waivedByMembership,
     membershipType,
-    membershipLabel: membershipType ? "内测VIP" : null,
+    membershipLabel: null,
     membershipEndsAt: readNullableString(billing.membershipEndsAt)
   };
 }

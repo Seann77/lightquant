@@ -90,14 +90,28 @@ expect("partial result detected", isAiTaskResultPartial({
     canContinue: true
   }
 }));
-expect("partial result is not user-continuable", !canContinueAiTaskResult({
+// 兼容历史任务：新任务不再产生 semantic_incomplete，仅确认旧数据不会被当成“继续输出”入口。
+expect("legacy semantic partial result is not user-continuable", !canContinueAiTaskResult({
   scopeStatus: "in_scope",
   explanation: null,
   riskWarnings: [],
   reportJson: {
     partial: true,
     truncated: true,
-    canContinue: true
+    canContinue: true,
+    integrityStatus: "semantic_incomplete"
+  }
+}));
+expect("physical partial result is user-continuable", canContinueAiTaskResult({
+  scopeStatus: "in_scope",
+  explanation: null,
+  riskWarnings: [],
+  reportJson: {
+    partial: true,
+    truncated: true,
+    canContinue: true,
+    integrityStatus: "physical_truncated",
+    truncateReason: "length"
   }
 }));
 
@@ -108,7 +122,8 @@ console.log(JSON.stringify({
     "platform and prompt sensitivity",
     "stable file id preference",
     "fallback file content hash",
-    "partial detection without user continuation"
+    "legacy semantic partial compatibility without user continuation",
+    "physical truncation continuation eligibility"
   ]
 }, null, 2));
 

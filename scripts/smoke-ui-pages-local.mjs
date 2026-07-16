@@ -4,17 +4,20 @@ const pages = [
   {
     path: "/chat?mode=strategy",
     name: "strategy generation",
-    includes: ["LightQuant", "策略生成", "50 积分"]
+    includes: ["LightQuant", "策略生成"],
+    excludes: ["每次策略生成消耗 50 积分"]
   },
   {
     path: "/chat?mode=convert",
     name: "code conversion",
-    includes: ["LightQuant", "平台代码转换", "开始转换", "200 积分"]
+    includes: ["LightQuant", "平台代码转换", "开始转换"],
+    excludes: ["每次平台转换消耗 200 积分"]
   },
   {
     path: "/code-analysis",
     name: "code analysis",
-    includes: ["LightQuant", "代码翻译解析", "开始解析", "100 积分"]
+    includes: ["LightQuant", "代码翻译解析", "开始解析"],
+    excludes: ["每次代码解析消耗 100 积分"]
   },
   {
     path: "/credits",
@@ -61,7 +64,7 @@ for (const page of pages) {
   });
   const body = await response.text();
   const missing = page.includes.filter((text) => !body.includes(text));
-  const forbidden = forbiddenText.filter((text) => body.includes(text));
+  const forbidden = [...forbiddenText, ...(page.excludes ?? [])].filter((text) => body.includes(text));
 
   results.push({
     name: page.name,

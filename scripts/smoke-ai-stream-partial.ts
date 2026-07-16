@@ -90,7 +90,7 @@ async function testLengthPartial() {
     expect("length truncated", report?.truncated === true);
     expect("length reason", report?.truncateReason === "length");
     expect("length can continue", report?.canContinue === true);
-    expect("length output token limit", report?.outputTokenLimit === 64000);
+    expect("length output token limit", report?.outputTokenLimit === 75000);
   } finally {
     server.close();
   }
@@ -184,7 +184,7 @@ async function testTimeoutPartial() {
     expect("timeout truncated", report?.truncated === true);
     expect("timeout reason", report?.truncateReason === "timeout");
     expect("timeout can continue", report?.canContinue === true);
-    expect("timeout output token limit", report?.outputTokenLimit === 64000);
+    expect("timeout output token limit", report?.outputTokenLimit === 75000);
   } finally {
     server.close();
   }
