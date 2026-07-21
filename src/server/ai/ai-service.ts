@@ -3,6 +3,7 @@ import { getFileExtension, getFileUploadRule, isFileExtensionAllowedForPurpose, 
 import { getCreditAccountForUser, confirmReservation, refundConfirmedAiTaskCost, releaseReservation, reserveCredits } from "@/server/credits/credit-service";
 import { ApiError } from "@/server/http/api-response";
 import { getRepository, withRepositoryTransaction } from "@/server/repositories";
+import type { LightQuantRepository } from "@/server/repositories/types";
 import { getAiTaskConfig, getTotalInputChars, parseAiTaskType } from "@/server/ai/ai-task-config";
 import { runAiProvider, runAiProviderStream } from "@/server/ai/ai-provider";
 import { resolveAiRuntimeConfig } from "@/server/ai/ai-runtime-config";
@@ -25,6 +26,7 @@ import {
   withRepairReportMetadata,
   type AiOutputIntegrityDecision
 } from "@/server/ai/output-integrity";
+import { getSingleTaskConversationConflict } from "@/server/ai/single-task-conversation";
 
 type CreateAiTaskRequest = {
   type: string;
@@ -197,6 +199,7 @@ export async function createAiTask(userId: string, input: CreateAiTaskRequest, r
           lastMessageAt: now,
           updatedAt: now
         }));
+        await assertSingleTaskConversationSubmissionAllowed(transactionRepository, conversationId, type);
       } else {
         conversation = await measureAiPerf("create_task.tx.create_conversation", {
           requestId,
@@ -1736,9 +1739,9 @@ export async function getAiConversationSnapshotForUser(userId: string, conversat
       };
     }))
   ]);
-  const taskResponses = taskResultEntries.map(({ task, result }) => toTaskResponse(task, result));
+  const taskResponses = taskResultEntries.map(({ task, result }) => toTaskResponse(task, result, { includeInput: true }));
   const latestTaskEntry = taskResultEntries.at(-1) ?? null;
-  const latestTask = latestTaskEntry ? toTaskResponse(latestTaskEntry.task, latestTaskEntry.result) : null;
+  const latestTask = latestTaskEntry ? toTaskResponse(latestTaskEntry.task, latestTaskEntry.result, { includeInput: true }) : null;
   const latestResult = latestTaskEntry?.result ? toResultResponse(latestTaskEntry.result) : null;
 
   return {
@@ -1901,7 +1904,7 @@ function toTaskListItemResponse(task: AiTask) {
   };
 }
 
-export function toTaskResponse(task: AiTask, result?: AiTaskResult | null) {
+export function toTaskResponse(task: AiTask, result?: AiTaskResult | null, options: { includeInput?: boolean } = {}) {
   return {
     id: task.id,
     type: task.type,
@@ -1910,6 +1913,10 @@ export function toTaskResponse(task: AiTask, result?: AiTaskResult | null) {
     sourcePlatform: task.sourcePlatform,
     targetPlatform: task.targetPlatform,
     title: getTaskListTitle(task),
+    ...(options.includeInput ? {
+      prompt: task.prompt,
+      inputCode: task.inputCode
+    } : {}),
     promptPreview: normalizePreview(task.prompt),
     hasInputCode: Boolean(task.inputCode),
     hasInputFile: Boolean(task.inputFileId),
@@ -2423,17 +2430,52 @@ async function prepareConversationForTask(
     throw new ApiError("VALIDATION_ERROR", "当前会话不属于该 AI 模块", 400);
   }
 
+  await assertSingleTaskConversationSubmissionAllowed(getRepository(), conversation.id, type);
+
   const messages = await getRepository().listAiMessages(conversation.id, {
     limit: MAX_CONTEXT_MESSAGES,
     ascending: true
   });
-  const contextText = trimToMaxChars(buildConversationContextText(messages), MAX_CONTEXT_CHARS);
+  const contextText = type === "strategy_generation"
+    ? trimToMaxChars(buildConversationContextText(messages), MAX_CONTEXT_CHARS)
+    : "";
 
   return {
     conversation,
     contextText,
     messages
   };
+}
+
+async function assertSingleTaskConversationSubmissionAllowed(
+  repository: LightQuantRepository,
+  conversationId: string,
+  type: AiTaskType
+) {
+  if (type === "strategy_generation") {
+    return;
+  }
+
+  const tasks = await repository.listAiTasksForConversation(conversationId, {
+    ascending: false
+  });
+  const conflict = getSingleTaskConversationConflict(tasks, type);
+
+  if (conflict === "completed") {
+    throw new ApiError(
+      "SINGLE_TASK_CONVERSATION_COMPLETED",
+      "当前任务已完成，如需重新处理请新建任务。",
+      409
+    );
+  }
+
+  if (conflict === "in_progress") {
+    throw new ApiError(
+      "SINGLE_TASK_CONVERSATION_IN_PROGRESS",
+      "当前任务正在处理中，请勿重复提交。",
+      409
+    );
+  }
 }
 
 async function appendRunEvent(

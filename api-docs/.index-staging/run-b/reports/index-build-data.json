@@ -1,0 +1,740 @@
+{
+  "conflicts_by_type": {
+    "description": 132,
+    "environments": 6,
+    "only_in_primary": 29,
+    "only_in_supplementary": 13,
+    "parameters": 110,
+    "returns": 125,
+    "signature": 13
+  },
+  "documents_by_platform_variant": {
+    "joinquant/web-help": 73,
+    "ptrade/guojin": 23,
+    "ptrade/shenwan": 87,
+    "qmt/builtin-python": 14
+  },
+  "documents_without_symbols_with_chunks": [
+    {
+      "document_type": "strategy_api",
+      "markdown_file": "api-docs/normalized/ptrade/guojin/strategy-api-cb4ba40b.md",
+      "title": "使用说明"
+    },
+    {
+      "document_type": "strategy_api",
+      "markdown_file": "api-docs/normalized/ptrade/guojin/strategy-api-9787fb53.md",
+      "title": "开始写策略"
+    },
+    {
+      "document_type": "strategy_api",
+      "markdown_file": "api-docs/normalized/ptrade/guojin/strategy-api-894e17f1.md",
+      "title": "策略示例"
+    },
+    {
+      "document_type": "strategy_api",
+      "markdown_file": "api-docs/normalized/ptrade/guojin/strategy-api-45a6d115.md",
+      "title": "常见问题"
+    },
+    {
+      "document_type": "strategy_api",
+      "markdown_file": "api-docs/normalized/ptrade/guojin/strategy-api-7943a302.md",
+      "title": "支持的三方库"
+    },
+    {
+      "document_type": "strategy_api",
+      "markdown_file": "api-docs/normalized/ptrade/guojin/strategy-api-9583f0ee.md",
+      "title": "三方库变动"
+    },
+    {
+      "document_type": "strategy_api",
+      "markdown_file": "api-docs/normalized/ptrade/guojin/strategy-api-cea7a34e.md",
+      "title": "接口版本变动"
+    },
+    {
+      "document_type": "market_data",
+      "markdown_file": "api-docs/normalized/ptrade/guojin/industry-concepts-c06a033d.md",
+      "title": "证监会行业编号"
+    },
+    {
+      "document_type": "market_data",
+      "markdown_file": "api-docs/normalized/ptrade/guojin/industry-concepts-b3ecf888.md",
+      "title": "聚源行业分类"
+    },
+    {
+      "document_type": "market_data",
+      "markdown_file": "api-docs/normalized/ptrade/guojin/industry-concepts-fa6f784b.md",
+      "title": "地域板块信息"
+    },
+    {
+      "document_type": "market_data",
+      "markdown_file": "api-docs/normalized/ptrade/guojin/industry-concepts-62ebef37.md",
+      "title": "概念板块"
+    },
+    {
+      "document_type": "strategy_api",
+      "markdown_file": "api-docs/normalized/qmt/builtin-python/builtin-python--doc-start-now.md",
+      "title": "1. 快速开始"
+    },
+    {
+      "document_type": "strategy_api",
+      "markdown_file": "api-docs/normalized/qmt/builtin-python/builtin-python--doc-user-attention.md",
+      "title": "2. 使用须知"
+    },
+    {
+      "document_type": "strategy_api",
+      "markdown_file": "api-docs/normalized/qmt/builtin-python/builtin-python--doc-variable-convention.md",
+      "title": "3. 变量约定"
+    },
+    {
+      "document_type": "strategy_api",
+      "markdown_file": "api-docs/normalized/qmt/builtin-python/builtin-python--doc-interface-operation.md",
+      "title": "9. 界面操作"
+    },
+    {
+      "document_type": "strategy_api",
+      "markdown_file": "api-docs/normalized/qmt/builtin-python/builtin-python--doc-enum-constants.md",
+      "title": "11. 枚举常量"
+    },
+    {
+      "document_type": "strategy_api",
+      "markdown_file": "api-docs/normalized/qmt/builtin-python/builtin-python--doc-code-examples.md",
+      "title": "13. 完整示例"
+    },
+    {
+      "document_type": "strategy_api",
+      "markdown_file": "api-docs/normalized/qmt/builtin-python/builtin-python--doc-question-answer.md",
+      "title": "14. 常见问题"
+    },
+    {
+      "document_type": "guide",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/help-introduce-bb090baf.md",
+      "title": "新建策略"
+    },
+    {
+      "document_type": "guide",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/help-introduce-d4adf31b.md",
+      "title": "新建回测"
+    },
+    {
+      "document_type": "guide",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/help-introduce-9c7bd507.md",
+      "title": "新建交易"
+    },
+    {
+      "document_type": "guide",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/help-introduce-ab81b92f.md",
+      "title": "策略运行周期"
+    },
+    {
+      "document_type": "guide",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/help-introduce-9a4e03e3.md",
+      "title": "策略运行时间"
+    },
+    {
+      "document_type": "guide",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/help-introduce-30e75e95.md",
+      "title": "交易策略委托下单时间"
+    },
+    {
+      "document_type": "guide",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/help-introduce-89aa8a16.md",
+      "title": "回测支持业务类型"
+    },
+    {
+      "document_type": "guide",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/help-introduce-872cc60b.md",
+      "title": "交易支持业务类型"
+    },
+    {
+      "document_type": "guide",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/help-introduce-b41a3b5a.md",
+      "title": "交易标的对应最小价差"
+    },
+    {
+      "document_type": "guide",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/help-quickstart-f6582c93.md",
+      "title": "简单但是完整的策略"
+    },
+    {
+      "document_type": "guide",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/help-quickstart-29dd478d.md",
+      "title": "添加一些交易"
+    },
+    {
+      "document_type": "guide",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/help-quickstart-4e777bd5.md",
+      "title": "实用的策略"
+    },
+    {
+      "document_type": "guide",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/help-quickstart-3dee3fd9.md",
+      "title": "模拟盘和实盘注意事项"
+    },
+    {
+      "document_type": "guide",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/help-quickstart-8f193134.md",
+      "title": "策略中支持的代码尾缀"
+    },
+    {
+      "document_type": "guide",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/help-quickstart-de87a137.md",
+      "title": "关于异常处理"
+    },
+    {
+      "document_type": "guide",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/help-quickstart-297cf6b9.md",
+      "title": "关于限价交易的价格"
+    },
+    {
+      "document_type": "guide",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/help-engine-e187e04d.md",
+      "title": "数据字典"
+    },
+    {
+      "document_type": "guide",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/help-third--python3-5.md",
+      "title": "Python3.5支持的三方库"
+    },
+    {
+      "document_type": "guide",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/help-third--python3-11.md",
+      "title": "Python3.11支持的三方库"
+    },
+    {
+      "document_type": "guide",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/help-third-9583f0ee.md",
+      "title": "三方库变动"
+    },
+    {
+      "document_type": "guide",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/help-backtest-results-9a377ae8.md",
+      "title": "概述"
+    },
+    {
+      "document_type": "guide",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/help-backtest-results-eb2bee65.md",
+      "title": "绩效指标"
+    },
+    {
+      "document_type": "api_index",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/api-list-6bf79051.md",
+      "title": "接口列表"
+    },
+    {
+      "document_type": "guide",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/demo-b49ccec3.md",
+      "title": "股票策略示例"
+    },
+    {
+      "document_type": "guide",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/demo-392fbd64.md",
+      "title": "两融策略示例"
+    },
+    {
+      "document_type": "faq",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/qa-71751d13.md",
+      "title": "关于量化平台部署"
+    },
+    {
+      "document_type": "faq",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/qa-2573d669.md",
+      "title": "关于数据"
+    },
+    {
+      "document_type": "faq",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/qa-fde52aaa.md",
+      "title": "关于研究"
+    },
+    {
+      "document_type": "faq",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/qa-7083023d.md",
+      "title": "关于回测"
+    },
+    {
+      "document_type": "faq",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/qa-f2db792b.md",
+      "title": "关于实盘交易"
+    },
+    {
+      "document_type": "faq",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/qa-ab521b5c.md",
+      "title": "关于委托"
+    },
+    {
+      "document_type": "faq",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/qa-573bc5d4.md",
+      "title": "关于三方库"
+    },
+    {
+      "document_type": "faq",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/qa-d2909f16.md",
+      "title": "其他"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--ptrade1-0-qtv202501-06-000.md",
+      "title": "PTrade1.0-QTV202501.06.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--ptrade1-0-qtv202501-05-000.md",
+      "title": "PTrade1.0-QTV202501.05.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--ptrade1-0-qtv202501-04-000.md",
+      "title": "PTrade1.0-QTV202501.04.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--ptrade1-0-qtv202501-03-000.md",
+      "title": "PTrade1.0-QTV202501.03.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--ptrade1-0-qtv202501-01-000.md",
+      "title": "PTrade1.0-QTV202501.01.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--ptrade1-0-qtv202501-00-000.md",
+      "title": "PTrade1.0-QTV202501.00.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--ptrade1-0-qtv202401-07-000.md",
+      "title": "PTrade1.0-QTV202401.07.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--ptrade1-0-qtv202401-06-000.md",
+      "title": "PTrade1.0-QTV202401.06.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--ptrade1-0-qtv202401-05-000.md",
+      "title": "PTrade1.0-QTV202401.05.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--ptrade1-0-qtv202401-04-000.md",
+      "title": "PTrade1.0-QTV202401.04.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--ptrade1-0-qtv202401-02-000.md",
+      "title": "PTrade1.0-QTV202401.02.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--ptrade1-0-qtv202401-01-000.md",
+      "title": "PTrade1.0-QTV202401.01.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--ptrade1-0-qtv202401-00-000.md",
+      "title": "PTrade1.0-QTV202401.00.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--ptrade1-0-qtv202301-03-000.md",
+      "title": "PTrade1.0-QTV202301.03.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--ptrade1-0-qtv202301-02-000.md",
+      "title": "PTrade1.0-QTV202301.02.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--ptrade1-0-qtv202301-01-000.md",
+      "title": "PTrade1.0-QTV202301.01.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--ptrade1-0-qtv202301-00-000.md",
+      "title": "PTrade1.0-QTV202301.00.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--pboxqt1-0v202202-03-000.md",
+      "title": "PBOXQT1.0V202202.03.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--pboxqt1-0v202202-02-000.md",
+      "title": "PBOXQT1.0V202202.02.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--pboxqt1-0v202202-01-000.md",
+      "title": "PBOXQT1.0V202202.01.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--pboxqt1-0v202202-00-000.md",
+      "title": "PBOXQT1.0V202202.00.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--pboxqt1-0v202201-02-000.md",
+      "title": "PBOXQT1.0V202201.02.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--pboxqt1-0v202201-01-000.md",
+      "title": "PBOXQT1.0V202201.01.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--pboxqt1-0v202201-00-000.md",
+      "title": "PBOXQT1.0V202201.00.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--pboxqt1-0v202101-09-000.md",
+      "title": "PBOXQT1.0V202101.09.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--pboxqt1-0v202101-08-000.md",
+      "title": "PBOXQT1.0V202101.08.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--pboxqt1-0v202101-07-000.md",
+      "title": "PBOXQT1.0V202101.07.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--pboxqt1-0v202101-06-000.md",
+      "title": "PBOXQT1.0V202101.06.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--pboxqt1-0v202101-05-000.md",
+      "title": "PBOXQT1.0V202101.05.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--pboxqt1-0v202101-04-000.md",
+      "title": "PBOXQT1.0V202101.04.000"
+    },
+    {
+      "document_type": "changelog",
+      "markdown_file": "api-docs/normalized/ptrade/shenwan/changelog--pboxqt1-0v202101-03-000.md",
+      "title": "PBOXQT1.0V202101.03.000"
+    },
+    {
+      "document_type": "strategy_api",
+      "markdown_file": "api-docs/normalized/joinquant/api--api.md",
+      "title": "API文档"
+    },
+    {
+      "document_type": "strategy_api",
+      "markdown_file": "api-docs/normalized/joinquant/api-9787fb53.md",
+      "title": "开始写策略"
+    },
+    {
+      "document_type": "strategy_api",
+      "markdown_file": "api-docs/normalized/joinquant/api-38164575.md",
+      "title": "策略引擎介绍"
+    },
+    {
+      "document_type": "strategy_api",
+      "markdown_file": "api-docs/normalized/joinquant/api-00895ac9.md",
+      "title": "撮合流程"
+    },
+    {
+      "document_type": "strategy_api",
+      "markdown_file": "api-docs/normalized/joinquant/api--6.md",
+      "title": "非交易时段下单的特别说明"
+    },
+    {
+      "document_type": "strategy_api",
+      "markdown_file": "api-docs/normalized/joinquant/api-894e17f1.md",
+      "title": "策略示例"
+    },
+    {
+      "document_type": "market_data",
+      "markdown_file": "api-docs/normalized/joinquant/stock-439cebae.md",
+      "title": "获取股票数据"
+    },
+    {
+      "document_type": "market_data",
+      "markdown_file": "api-docs/normalized/joinquant/stock-410d4e5d.md",
+      "title": "获取融资融券标的列表"
+    },
+    {
+      "document_type": "market_data",
+      "markdown_file": "api-docs/normalized/joinquant/stock-e5757df6.md",
+      "title": "获取融资融券汇总数据"
+    },
+    {
+      "document_type": "market_data",
+      "markdown_file": "api-docs/normalized/joinquant/stock-5adeb6a6.md",
+      "title": "获取股票资金流向数据"
+    },
+    {
+      "document_type": "market_data",
+      "markdown_file": "api-docs/normalized/joinquant/stock-0254ff48.md",
+      "title": "获取龙虎榜数据"
+    },
+    {
+      "document_type": "market_data",
+      "markdown_file": "api-docs/normalized/joinquant/stock-8f204171.md",
+      "title": "上市公司分红送股（除权除息）数据"
+    },
+    {
+      "document_type": "market_data",
+      "markdown_file": "api-docs/normalized/joinquant/stock-07c75616.md",
+      "title": "沪深市场每日成交概况"
+    },
+    {
+      "document_type": "market_data",
+      "markdown_file": "api-docs/normalized/joinquant/stock-9c7c1503.md",
+      "title": "市场通（沪港通，深港通和港股通）"
+    },
+    {
+      "document_type": "market_data",
+      "markdown_file": "api-docs/normalized/joinquant/stock-9448fe44.md",
+      "title": "上市公司概况"
+    },
+    {
+      "document_type": "market_data",
+      "markdown_file": "api-docs/normalized/joinquant/stock-8481cc0a.md",
+      "title": "上市公司股东和股本信息"
+    },
+    {
+      "document_type": "market_data",
+      "markdown_file": "api-docs/normalized/joinquant/stock-83697827.md",
+      "title": "获取报告期财务数据"
+    },
+    {
+      "document_type": "market_data",
+      "markdown_file": "api-docs/normalized/joinquant/fund-1fbacf19.md",
+      "title": "获取基金数据"
+    },
+    {
+      "document_type": "market_data",
+      "markdown_file": "api-docs/normalized/joinquant/future-34e5b8b4.md",
+      "title": "获取期货数据"
+    },
+    {
+      "document_type": "market_data",
+      "markdown_file": "api-docs/normalized/joinquant/future-b2d13f8c.md",
+      "title": "期货列表"
+    },
+    {
+      "document_type": "market_data",
+      "markdown_file": "api-docs/normalized/joinquant/index-926f88b1.md",
+      "title": "获取沪深指数数据"
+    },
+    {
+      "document_type": "market_data",
+      "markdown_file": "api-docs/normalized/joinquant/index-7492c80d.md",
+      "title": "沪深指数列表"
+    },
+    {
+      "document_type": "market_data",
+      "markdown_file": "api-docs/normalized/joinquant/platedata-b596e359.md",
+      "title": "行业概念数据"
+    },
+    {
+      "document_type": "market_data",
+      "markdown_file": "api-docs/normalized/joinquant/platedata-942cc037.md",
+      "title": "行业类"
+    },
+    {
+      "document_type": "market_data",
+      "markdown_file": "api-docs/normalized/joinquant/platedata-4ebd3e5c.md",
+      "title": "概念类"
+    },
+    {
+      "document_type": "factor",
+      "markdown_file": "api-docs/normalized/joinquant/factor-092a521b.md",
+      "title": "因子定义和计算"
+    },
+    {
+      "document_type": "factor",
+      "markdown_file": "api-docs/normalized/joinquant/factor-b8046175.md",
+      "title": "因子数据处理函数"
+    },
+    {
+      "document_type": "factor",
+      "markdown_file": "api-docs/normalized/joinquant/factor-62754d53.md",
+      "title": "因子分析"
+    },
+    {
+      "document_type": "factor",
+      "markdown_file": "api-docs/normalized/joinquant/factor-ef4ab02b.md",
+      "title": "因子分析结果"
+    },
+    {
+      "document_type": "factor",
+      "markdown_file": "api-docs/normalized/joinquant/factor-0d53f086.md",
+      "title": "示例"
+    },
+    {
+      "document_type": "factor",
+      "markdown_file": "api-docs/normalized/joinquant/factor-5938c55b.md",
+      "title": "附录"
+    },
+    {
+      "document_type": "factor",
+      "markdown_file": "api-docs/normalized/joinquant/factor-values-a6d0fc6c.md",
+      "title": "使用方法"
+    },
+    {
+      "document_type": "factor",
+      "markdown_file": "api-docs/normalized/joinquant/factor-values-136427b8.md",
+      "title": "风险模型因子列表"
+    },
+    {
+      "document_type": "factor",
+      "markdown_file": "api-docs/normalized/joinquant/factor-values-49485c26.md",
+      "title": "基本面及量价因子列表"
+    },
+    {
+      "document_type": "factor",
+      "markdown_file": "api-docs/normalized/joinquant/technicalanalysis-47901a95.md",
+      "title": "因子说明"
+    },
+    {
+      "document_type": "factor",
+      "markdown_file": "api-docs/normalized/joinquant/technicalanalysis-f546e169.md",
+      "title": "重要提示 ★"
+    },
+    {
+      "document_type": "research_data",
+      "markdown_file": "api-docs/normalized/joinquant/jqdata--jqdata--1d8ffec6.md",
+      "title": "JQData用户协议"
+    },
+    {
+      "document_type": "research_data",
+      "markdown_file": "api-docs/normalized/joinquant/jqdata--jqdata--ac93286d.md",
+      "title": "JQData常见报错及数据处理规则"
+    },
+    {
+      "document_type": "research_data",
+      "markdown_file": "api-docs/normalized/joinquant/jqdata-fc7fe5fe.md",
+      "title": "合并现金流量表"
+    },
+    {
+      "document_type": "research_data",
+      "markdown_file": "api-docs/normalized/joinquant/jqdata-a1a2fd28.md",
+      "title": "上市公司基础信息"
+    },
+    {
+      "document_type": "research_data",
+      "markdown_file": "api-docs/normalized/joinquant/jqdata-e81fdaf0.md",
+      "title": "宏观数据"
+    },
+    {
+      "document_type": "research_data",
+      "markdown_file": "api-docs/normalized/joinquant/jqdata-fad0df1c.md",
+      "title": "新闻联播文本"
+    },
+    {
+      "document_type": "research_data",
+      "markdown_file": "api-docs/normalized/joinquant/jqdata--tick.md",
+      "title": "tick数据(机构)"
+    },
+    {
+      "document_type": "finance",
+      "markdown_file": "api-docs/normalized/joinquant/macrodata-a5578545.md",
+      "title": "宏观经济数据（或将停止更新）"
+    },
+    {
+      "document_type": "faq",
+      "markdown_file": "api-docs/normalized/joinquant/faq-45a6d115.md",
+      "title": "常见问题"
+    }
+  ],
+  "excluded_name_count": 0,
+  "generated_at": "2026-07-18T13:06:01.421Z",
+  "joinquant_alias": {
+    "alias_source_file": "api-docs/raw/joinquant/main/rendered.html",
+    "alias_type": "document_source_alias",
+    "evidence": {
+      "reason": "normalized_manifest_alias",
+      "source_sha256": "a84c968d87be6bd9b24732c2950207bc14fbc377ba537c9b1e110c7ac9246751"
+    },
+    "id": "alias:a05bf94e3439c8cd",
+    "platform": "joinquant",
+    "target_document_ids": [
+      "doc:4037896f5986bdc1",
+      "doc:804e790c98dba99c",
+      "doc:966578a8a5345b78",
+      "doc:9cb8b5ba449ac492",
+      "doc:b7543c15f351aca3",
+      "doc:c678bca06d0c3332",
+      "doc:df6c01dbf7339143",
+      "doc:e14c0ca1f295e925"
+    ],
+    "target_source_file": "api-docs/raw/joinquant/api/rendered.html",
+    "variant": "web-help"
+  },
+  "missing_sources": [],
+  "parameter_parse_failures": 1,
+  "ptrade": {
+    "common": 132,
+    "conflicts": 174,
+    "only_guojin": 29,
+    "only_shenwan": 64
+  },
+  "qmt": {
+    "documents": 14,
+    "symbols": 230,
+    "vba_included": false
+  },
+  "review_required_symbols": [
+    {
+      "canonical_name": "set_subportfolios",
+      "markdown_file": "api-docs/normalized/joinquant/api--api--814c0653.md",
+      "platform": "joinquant",
+      "source_anchor": "init_subportfolios",
+      "variant": "web-help",
+      "warning": [
+        "signature_parse_failed"
+      ]
+    }
+  ],
+  "signature_parse_failures": 1,
+  "symbols_by_confidence": {
+    "high": 1108,
+    "medium": 60
+  },
+  "symbols_by_platform_variant": {
+    "joinquant/web-help": 578,
+    "ptrade/guojin": 161,
+    "ptrade/shenwan": 199,
+    "qmt/builtin-python": 230
+  },
+  "symbols_by_record_type": {
+    "api_function": 485,
+    "callback": 28,
+    "data_table": 9,
+    "factor": 301,
+    "field": 181,
+    "indicator": 98,
+    "method": 45,
+    "object": 21
+  },
+  "totals": {
+    "alias_documents": 1,
+    "aliases": 391,
+    "chunks": 1451,
+    "chunks_with_code": 1020,
+    "chunks_with_table": 224,
+    "conflicts": 174,
+    "documents": 197,
+    "indexed_documents": 197,
+    "markdown_files": 197,
+    "needs_review": 1,
+    "skipped_documents": 0,
+    "source_pages": 36,
+    "symbols": 1168
+  },
+  "unresolved_candidate_headings": 0
+}

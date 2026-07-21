@@ -1,0 +1,2474 @@
+<!DOCTYPE html><html><head> <meta charset="UTF-8"> <title>Alpha101 - JoinQuant</title> <meta charset="utf-8"> <meta name="keywords" content="joinquant,聚宽,量化,宽客,quant,量化交易,量化平台,量化投资,量化策略,程序化交易,量化交易平台,python,金融工程,level2,level1"> <meta name="description" content="聚宽（JoinQuant）量化交易平台是为量化爱好者（宽客）量身打造的云平台，我们为您提供精准的回测功能、高速实盘交易接口、易用的API文档、由易入难的策略库，便于您快速实现、使用自己的量化交易策略。"> <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no"> <link type="text/css" href="https://cdn.joinquant.com/third/bootstrap/css/bootstrap.min.css" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/third/bootstrap/css/bootstrap-dialog.min.css" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/third/awesome/font-awesome.min.css" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/third/jquery-ui/ui.jqgrid.css?v=17679309750001783575403239" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/third/jquery-ui/jqGrid.overrides.css?v=17679309750001783575403239" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/third/jquery-ui/jquery-ui.min.css?v=17679309750001783575403239" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/common/css/common.css?v=17679309750001783575403239" rel="stylesheet"> <link rel="stylesheet" href="https://cdn.joinquant.com/third/silviomoreto-bootstrap-select/dist/css/bootstrap-select.css" type="text/css"> <link type="text/css" href="https://cdn.joinquant.com/third/backtotop/css/style.css?v=17679309750001783575403239" rel="stylesheet"> <link rel="stylesheet" href="https://cdn.joinquant.com/themes/jq/static/common/css/jq-common.css?v=17679309750001783575403239"> <link type="text/css" href="https://cdn.joinquant.com/themes/jq/static/default/css/iconfont.css" rel="stylesheet"> <link rel="stylesheet" href="https://cdn.joinquant.com/themes/jq/static/dist/asset/general/backtotop.bundle.css?v=17679309750001783575403239"> <link rel="icon" href="https://cdn.joinquant.com/common/img/favicon-16-16.png?v=2" type="image/x-icon"> <link rel="stylesheet" type="text/css" href="https://cdn.joinquant.com/themes/jq/static/user/css/loginDialog.css?v=17679309750001783575403239"> <link rel="stylesheet" type="text/css" href="https://cdn.joinquant.com/default/css/slide.css?v=17679309750001783575403239"> <link rel="stylesheet" type="text/css" href="https://cdn.joinquant.com/themes/jq/static/default/css/flexslider.css?v=17679309750001783575403239"> <link type="text/css" href="https://cdn.joinquant.com/themes/jq/static/default/css/style.css?v=17679309750001783575403239" rel="stylesheet"> <style>.tips.isfirst{background-position:calc(50% + 58px) 0}</style> <style>span.new{background:rgba(0,0,0,0)}.side-bar .top .name.user-alias img{width:16px;height:16px;float:none;margin-right:0}.kk_footer .wp20.last img{position:relative;top:-2px}.kk_footer .wp20.last .item>a{position:relative;left:-5px}</style> <style>header#kk_nav .nav .dropdown-menu a{display:block;padding:5px 35px;font-size:13px}.sanjiao.display{display:none}@media(max-width:320px){header#kk_nav .nav a{padding:11px 20px}}@media(min-width:768px){.sanjiao.display{display:block}.dropdown-menu{left:-90px;overflow-y:visible}#kk_nav .nav .dropdown-menu a{color:#333}.sanjiao:after,.sanjiao:before{left:80%}}.last>a,.nav.navbar-nav .help-mobile{padding-bottom:8px!important;outline:0}#kk_nav{position:fixed;width:100%;height:50px;z-index:100}.kk_main>.kk_body{top:50px}.mobile .top_50{top:0}span.new{background:rgba(0,0,0,0)}.side-bar .top .name.user-alias img{width:16px;height:16px;float:none;margin-right:0}.kk_footer .wp20.last img{position:relative;top:-2px}.kk_footer .wp20.last .item>a{position:relative;left:-5px}.kk_main{min-height:auto}</style> <link rel="stylesheet" type="text/css" href="https://cdn.joinquant.com/std/dist/asset/jq-plugin.css?v=17679309750001783575403239"> <link rel="stylesheet" type="text/css" href="https://cdn.joinquant.com/std/dist/asset/general/login-dialog.bundle.css?v=17679309750001783575403239">  <link type="text/css" href="https://cdn.joinquant.com/third/amaze/css/amazeui.min.css" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/third/amaze/css/amazeui.tree.min.css" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/third/markdown/default2.css?v=17679309750001783575403239" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/std/dist/modules/help/api/help.bundle.css?v=17679309750001783575403239" rel="stylesheet"> <style type="text/css">.MathJax_Hover_Frame {border-radius: .25em; -webkit-border-radius: .25em; -moz-border-radius: .25em; -khtml-border-radius: .25em; box-shadow: 0px 0px 15px #83A; -webkit-box-shadow: 0px 0px 15px #83A; -moz-box-shadow: 0px 0px 15px #83A; -khtml-box-shadow: 0px 0px 15px #83A; border: 1px solid #A6D ! important; display: inline-block; position: absolute}
+.MathJax_Menu_Button .MathJax_Hover_Arrow {position: absolute; cursor: pointer; display: inline-block; border: 2px solid #AAA; border-radius: 4px; -webkit-border-radius: 4px; -moz-border-radius: 4px; -khtml-border-radius: 4px; font-family: 'Courier New',Courier; font-size: 9px; color: #F0F0F0}
+.MathJax_Menu_Button .MathJax_Hover_Arrow span {display: block; background-color: #AAA; border: 1px solid; border-radius: 3px; line-height: 0; padding: 4px}
+.MathJax_Hover_Arrow:hover {color: white!important; border: 2px solid #CCC!important}
+.MathJax_Hover_Arrow:hover span {background-color: #CCC!important}
+</style><style type="text/css">#MathJax_About {position: fixed; left: 50%; width: auto; text-align: center; border: 3px outset; padding: 1em 2em; background-color: #DDDDDD; color: black; cursor: default; font-family: message-box; font-size: 120%; font-style: normal; text-indent: 0; text-transform: none; line-height: normal; letter-spacing: normal; word-spacing: normal; word-wrap: normal; white-space: nowrap; float: none; z-index: 201; border-radius: 15px; -webkit-border-radius: 15px; -moz-border-radius: 15px; -khtml-border-radius: 15px; box-shadow: 0px 10px 20px #808080; -webkit-box-shadow: 0px 10px 20px #808080; -moz-box-shadow: 0px 10px 20px #808080; -khtml-box-shadow: 0px 10px 20px #808080; filter: progid:DXImageTransform.Microsoft.dropshadow(OffX=2, OffY=2, Color='gray', Positive='true')}
+#MathJax_About.MathJax_MousePost {outline: none}
+.MathJax_Menu {position: absolute; background-color: white; color: black; width: auto; padding: 5px 0px; border: 1px solid #CCCCCC; margin: 0; cursor: default; font: menu; text-align: left; text-indent: 0; text-transform: none; line-height: normal; letter-spacing: normal; word-spacing: normal; word-wrap: normal; white-space: nowrap; float: none; z-index: 201; border-radius: 5px; -webkit-border-radius: 5px; -moz-border-radius: 5px; -khtml-border-radius: 5px; box-shadow: 0px 10px 20px #808080; -webkit-box-shadow: 0px 10px 20px #808080; -moz-box-shadow: 0px 10px 20px #808080; -khtml-box-shadow: 0px 10px 20px #808080; filter: progid:DXImageTransform.Microsoft.dropshadow(OffX=2, OffY=2, Color='gray', Positive='true')}
+.MathJax_MenuItem {padding: 1px 2em; background: transparent}
+.MathJax_MenuArrow {position: absolute; right: .5em; padding-top: .25em; color: #666666; font-size: .75em}
+.MathJax_MenuActive .MathJax_MenuArrow {color: white}
+.MathJax_MenuArrow.RTL {left: .5em; right: auto}
+.MathJax_MenuCheck {position: absolute; left: .7em}
+.MathJax_MenuCheck.RTL {right: .7em; left: auto}
+.MathJax_MenuRadioCheck {position: absolute; left: .7em}
+.MathJax_MenuRadioCheck.RTL {right: .7em; left: auto}
+.MathJax_MenuLabel {padding: 1px 2em 3px 1.33em; font-style: italic}
+.MathJax_MenuRule {border-top: 1px solid #DDDDDD; margin: 4px 3px}
+.MathJax_MenuDisabled {color: GrayText}
+.MathJax_MenuActive {background-color: #606872; color: white}
+.MathJax_MenuDisabled:focus, .MathJax_MenuLabel:focus {background-color: #E8E8E8}
+.MathJax_ContextMenu:focus {outline: none}
+.MathJax_ContextMenu .MathJax_MenuItem:focus {outline: none}
+#MathJax_AboutClose {top: .2em; right: .2em}
+.MathJax_Menu .MathJax_MenuClose {top: -10px; left: -10px}
+.MathJax_MenuClose {position: absolute; cursor: pointer; display: inline-block; border: 2px solid #AAA; border-radius: 18px; -webkit-border-radius: 18px; -moz-border-radius: 18px; -khtml-border-radius: 18px; font-family: 'Courier New',Courier; font-size: 24px; color: #F0F0F0}
+.MathJax_MenuClose span {display: block; background-color: #AAA; border: 1.5px solid; border-radius: 18px; -webkit-border-radius: 18px; -moz-border-radius: 18px; -khtml-border-radius: 18px; line-height: 0; padding: 8px 0 6px}
+.MathJax_MenuClose:hover {color: white!important; border: 2px solid #CCC!important}
+.MathJax_MenuClose:hover span {background-color: #CCC!important}
+.MathJax_MenuClose:hover:focus {outline: none}
+</style><style type="text/css">.MathJax_Preview .MJXf-math {color: inherit!important}
+</style><style type="text/css">.MJX_Assistive_MathML {position: absolute!important; top: 0; left: 0; clip: rect(1px, 1px, 1px, 1px); padding: 1px 0 0 0!important; border: 0!important; height: 1px!important; width: 1px!important; overflow: hidden!important; display: block!important; -webkit-touch-callout: none; -webkit-user-select: none; -khtml-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none}
+.MJX_Assistive_MathML.MJX_Assistive_MathML_Block {width: 100%!important}
+</style><style type="text/css">#MathJax_Zoom {position: absolute; background-color: #F0F0F0; overflow: auto; display: block; z-index: 301; padding: .5em; border: 1px solid black; margin: 0; font-weight: normal; font-style: normal; text-align: left; text-indent: 0; text-transform: none; line-height: normal; letter-spacing: normal; word-spacing: normal; word-wrap: normal; white-space: nowrap; float: none; -webkit-box-sizing: content-box; -moz-box-sizing: content-box; box-sizing: content-box; box-shadow: 5px 5px 15px #AAAAAA; -webkit-box-shadow: 5px 5px 15px #AAAAAA; -moz-box-shadow: 5px 5px 15px #AAAAAA; -khtml-box-shadow: 5px 5px 15px #AAAAAA; filter: progid:DXImageTransform.Microsoft.dropshadow(OffX=2, OffY=2, Color='gray', Positive='true')}
+#MathJax_ZoomOverlay {position: absolute; left: 0; top: 0; z-index: 300; display: inline-block; width: 100%; height: 100%; border: 0; padding: 0; margin: 0; background-color: white; opacity: 0; filter: alpha(opacity=0)}
+#MathJax_ZoomFrame {position: relative; display: inline-block; height: 0; width: 0}
+#MathJax_ZoomEventTrap {position: absolute; left: 0; top: 0; z-index: 302; display: inline-block; border: 0; padding: 0; margin: 0; background-color: white; opacity: 0; filter: alpha(opacity=0)}
+</style><style type="text/css">.MathJax_Preview {color: #888}
+#MathJax_Message {position: fixed; left: 1em; bottom: 1.5em; background-color: #E6E6E6; border: 1px solid #959595; margin: 0px; padding: 2px 8px; z-index: 102; color: black; font-size: 80%; width: auto; white-space: nowrap}
+#MathJax_MSIE_Frame {position: absolute; top: 0; left: 0; width: 0px; z-index: 101; border: 0px; margin: 0px; padding: 0px}
+.MathJax_Error {color: #CC0000; font-style: italic}
+</style><style type="text/css">.MJXp-script {font-size: .8em}
+.MJXp-right {-webkit-transform-origin: right; -moz-transform-origin: right; -ms-transform-origin: right; -o-transform-origin: right; transform-origin: right}
+.MJXp-bold {font-weight: bold}
+.MJXp-italic {font-style: italic}
+.MJXp-scr {font-family: MathJax_Script,'Times New Roman',Times,STIXGeneral,serif}
+.MJXp-frak {font-family: MathJax_Fraktur,'Times New Roman',Times,STIXGeneral,serif}
+.MJXp-sf {font-family: MathJax_SansSerif,'Times New Roman',Times,STIXGeneral,serif}
+.MJXp-cal {font-family: MathJax_Caligraphic,'Times New Roman',Times,STIXGeneral,serif}
+.MJXp-mono {font-family: MathJax_Typewriter,'Times New Roman',Times,STIXGeneral,serif}
+.MJXp-largeop {font-size: 150%}
+.MJXp-largeop.MJXp-int {vertical-align: -.2em}
+.MJXp-math {display: inline-block; line-height: 1.2; text-indent: 0; font-family: 'Times New Roman',Times,STIXGeneral,serif; white-space: nowrap; border-collapse: collapse}
+.MJXp-display {display: block; text-align: center; margin: 1em 0}
+.MJXp-math span {display: inline-block}
+.MJXp-box {display: block!important; text-align: center}
+.MJXp-box:after {content: " "}
+.MJXp-rule {display: block!important; margin-top: .1em}
+.MJXp-char {display: block!important}
+.MJXp-mo {margin: 0 .15em}
+.MJXp-mfrac {margin: 0 .125em; vertical-align: .25em}
+.MJXp-denom {display: inline-table!important; width: 100%}
+.MJXp-denom > * {display: table-row!important}
+.MJXp-surd {vertical-align: top}
+.MJXp-surd > * {display: block!important}
+.MJXp-script-box > *  {display: table!important; height: 50%}
+.MJXp-script-box > * > * {display: table-cell!important; vertical-align: top}
+.MJXp-script-box > *:last-child > * {vertical-align: bottom}
+.MJXp-script-box > * > * > * {display: block!important}
+.MJXp-mphantom {visibility: hidden}
+.MJXp-munderover, .MJXp-munder {display: inline-table!important}
+.MJXp-over {display: inline-block!important; text-align: center}
+.MJXp-over > * {display: block!important}
+.MJXp-munderover > *, .MJXp-munder > * {display: table-row!important}
+.MJXp-mtable {vertical-align: .25em; margin: 0 .125em}
+.MJXp-mtable > * {display: inline-table!important; vertical-align: middle}
+.MJXp-mtr {display: table-row!important}
+.MJXp-mtd {display: table-cell!important; text-align: center; padding: .5em 0 0 .5em}
+.MJXp-mtr > .MJXp-mtd:first-child {padding-left: 0}
+.MJXp-mtr:first-child > .MJXp-mtd {padding-top: 0}
+.MJXp-mlabeledtr {display: table-row!important}
+.MJXp-mlabeledtr > .MJXp-mtd:first-child {padding-left: 0}
+.MJXp-mlabeledtr:first-child > .MJXp-mtd {padding-top: 0}
+.MJXp-merror {background-color: #FFFF88; color: #CC0000; border: 1px solid #CC0000; padding: 1px 3px; font-style: normal; font-size: 90%}
+.MJXp-scale0 {-webkit-transform: scaleX(.0); -moz-transform: scaleX(.0); -ms-transform: scaleX(.0); -o-transform: scaleX(.0); transform: scaleX(.0)}
+.MJXp-scale1 {-webkit-transform: scaleX(.1); -moz-transform: scaleX(.1); -ms-transform: scaleX(.1); -o-transform: scaleX(.1); transform: scaleX(.1)}
+.MJXp-scale2 {-webkit-transform: scaleX(.2); -moz-transform: scaleX(.2); -ms-transform: scaleX(.2); -o-transform: scaleX(.2); transform: scaleX(.2)}
+.MJXp-scale3 {-webkit-transform: scaleX(.3); -moz-transform: scaleX(.3); -ms-transform: scaleX(.3); -o-transform: scaleX(.3); transform: scaleX(.3)}
+.MJXp-scale4 {-webkit-transform: scaleX(.4); -moz-transform: scaleX(.4); -ms-transform: scaleX(.4); -o-transform: scaleX(.4); transform: scaleX(.4)}
+.MJXp-scale5 {-webkit-transform: scaleX(.5); -moz-transform: scaleX(.5); -ms-transform: scaleX(.5); -o-transform: scaleX(.5); transform: scaleX(.5)}
+.MJXp-scale6 {-webkit-transform: scaleX(.6); -moz-transform: scaleX(.6); -ms-transform: scaleX(.6); -o-transform: scaleX(.6); transform: scaleX(.6)}
+.MJXp-scale7 {-webkit-transform: scaleX(.7); -moz-transform: scaleX(.7); -ms-transform: scaleX(.7); -o-transform: scaleX(.7); transform: scaleX(.7)}
+.MJXp-scale8 {-webkit-transform: scaleX(.8); -moz-transform: scaleX(.8); -ms-transform: scaleX(.8); -o-transform: scaleX(.8); transform: scaleX(.8)}
+.MJXp-scale9 {-webkit-transform: scaleX(.9); -moz-transform: scaleX(.9); -ms-transform: scaleX(.9); -o-transform: scaleX(.9); transform: scaleX(.9)}
+.MathJax_PHTML .noError {vertical-align: ; font-size: 90%; text-align: left; color: black; padding: 1px 3px; border: 1px solid}
+</style><style type="text/css">#YSF-BTN-HOLDER{position: fixed;max-width:300px;max-height:300px;right: 30px; bottom: 24px; cursor: pointer; overflow: visible; filter: alpha(opacity=100);opacity:1;z-index: 9990} #YSF-BTN-HOLDER:hover{filter: alpha(opacity=95);opacity:.95} #YSF-BTN-HOLDER img{ display: block;overflow: hidden; } #YSF-BTN-CIRCLE{display: none;position: absolute;right: -5px;top: -6px;width: auto;min-width: 12px;height: 20px;padding: 0 4px;background-color: #f00;font-size: 12px;line-height: 20px;color: #fff;text-align: center;white-space: nowrap;font-family: sans-serif;border-radius: 10px;z-index:1;} #YSF-BTN-BUBBLE{display: none;position: absolute;left: -274px;bottom:-15px;width: 278px;height: 80px;box-sizing: border-box;padding: 14px 22px;filter: alpha(opacity=100);opacity:1;background: url(//res.qiyukf.net/sdk/res/img/sdk/bg_floatMsg2x.png)  no-repeat;background:url(//res.qiyukf.net/sdk/res/img/sdk/bg_floatMsg.png); background-size: 278px 80px; z-index: 1;} #YSF-BTN-HOLDER.layer-6{bottom:0;} #YSF-BTN-HOLDER.layer-1 #YSF-BTN-BUBBLE{top:0} #YSF-BTN-HOLDER.layer-6 #YSF-BTN-BUBBLE{bottom:-6px;} #YSF-BTN-BUBBLE:hover{filter: alpha(opacity=95);opacity:.95} #YSF-BTN-CONTENT{height:45px;padding: 0;white-space: normal;word-break: break-all;text-align: left;font-size: 14px;line-height: 1.6;color: #222;overflow: hidden;z-index: 0;} #YSF-BTN-ARROW{ display: none; } #YSF-BTN-CLOSE{position: absolute; width:15px; height:15px;right: 4px;top: -3px; filter: alpha(opacity=90); opacity:.9; cursor: pointer; background: url(//res.qiyukf.net/sdk/res/img/sdk/btn-close.png) no-repeat;z-index: 1} #YSF-BTN-CLOSE:hover{filter: alpha(opacity=100); opacity: 1;} #YSF-PANEL-CORPINFO.ysf-chat-layeropen{ width: 511px; height: 500px; border-radius: 8px; box-shadow: 0 0 20px 0 rgba(0, 0, 0, .15);} #YSF-PANEL-CORPINFO{ position: fixed; bottom: 0px; right: 20px; width: 0; height: 0; z-index: 99999; } #YSF-PANEL-INFO.ysf-chat-layeropen{ width: 360px; height: 500px; border-radius: 8px; filter: alpha(opacity=100);opacity:1; box-shadow: 0 0 20px 0 rgba(0, 0, 0, .15);} #YSF-PANEL-INFO{ position: fixed; bottom: 0px; right: 20px; width: 0px; height: 0px; filter: alpha(opacity=0);opacity:0;z-index: 99999;} #YSF-PANEL-INFO .u-btn{background-color: none;} #YSF-CUSTOM-ENTRY{background-color: #F96868;} #YSF-CUSTOM-ENTRY-0{position: relative;width:auto;background-color: none;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-1{position: relative;width:auto;background-color: none;border-radius: 14px; box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-2{position: relative;width:auto;background-color: none;border-radius: 8px;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-3{position: relative;width:auto;background-color: none;border-radius: 50%;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-4{position: relative;width:auto;background-color: none;border-radius: 50%;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-5{position: relative;width:auto;background-color: none;border-radius: 8px;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-6{position: relative;width:auto;background-color: none;border-radius: 8px;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-7{position: relative;width:auto;background-color: none;border-radius: 50%;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-8{position: relative;width:auto;background-color: none;border-radius: 8px;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-0 img{max-width: 300px;max-height: 300px;} #YSF-CUSTOM-ENTRY-1 img{width:28px;height:auto;} #YSF-CUSTOM-ENTRY-2 img{width:58px;height:auto;} #YSF-CUSTOM-ENTRY-3 img{width:60px;height:auto;} #YSF-CUSTOM-ENTRY-4 img{width:60px;height:auto;} #YSF-CUSTOM-ENTRY-5 img{width:60px;height:auto;} #YSF-CUSTOM-ENTRY-6 img{width:58px;height:auto;} #YSF-CUSTOM-ENTRY-7 img{width:60px;height:auto;} #YSF-CUSTOM-ENTRY-8 img{width:60px;height:auto;} #YSF-IFRAME-LAYER{ border:0; outline:none; } .ysf-online-invite-wrap{z-index:10001;position:fixed;_position:absolute;top:50%;left:50%;} .ysf-online-invite{position:relative;top:-50%;left:-50%;cursor:pointer;border-radius: 16px;box-shadow: 0 10px 30px 0 rgba(47,56,111,0.15);} .ysf-online-invite img{display:block;width:250px;} .ysf-online-invite .ysf-online-invite-img{width:100%;height:100%} .ysf-online-invite .text{position:absolute;top:-11px;left:0;right:0;overflow:hidden;margin: 36px 20px 0 67px;line-height:140%;color:#526069;font-size:14px;font-family:"Microsoft YaHei","微软雅黑",tahoma,arial,simsun,"宋体";text-align:left;white-space:normal;word-wrap:break-word;} .ysf-online-invite .close{position:absolute;top:12px;right:12px;width:16px;height:16px;background:url("https://ysf.nosdn.127.net/operation/4602027f7e6a0109ac433863d7d0acdf") no-repeat;cursor:pointer;background-size: cover;} #YSF-PANEL-MOBILE{ background: rgba(46,47,49,0.7); position: fixed; bottom: 0px; right: 0px; width: 100%; height: 0px; transition-property: height,bottom; transition-duration: 0.3s; transition-timing-function: ease; transition-delay: 0s; z-index: 99999; } #YSF-PANEL-MOBILE.ysf-chat-layeropen{ width: 100%; height: 100%; transition-property:height,bottom; transition-duration: 0.3s; transition-timing-function: ease; transition-delay: 0s; } #YSF-IFRAME-LAYER.ysf-chat-mobile-layeropen{ height: 90% !important; transition-property: height,bottom; transition-duration: 0.3s; transition-timing-function: ease; transition-delay: 0s; } #YSF-IFRAME-LAYER.ysf-chat-mobile-layeropen.ysf-chat-mobile-invite-layer{ height: 33% !important; } #YSF-IFRAME-LAYER{ position: absolute; bottom: 0px;left: 0; right: 0px; width: 0px; height: 0px; transition-property: height,bottom; transition-duration: 0.3s; transition-timing-function: ease; transition-delay: 0s; z-index: 9999; } .YSF-PANEL-BODY-FIXED{ position: fixed !important; left: 0; right: 0;} .YSF-INVITE-LAYER-WRAPPER {cursor: pointer; position: relative; border: 1px solid #eaf0f6; background: #fff;box-shadow: 0 5px 20px rgba(0,0,0,0.1); border-radius: 4px; width: 220px; padding: 16px; box-sizing: border-box; margin-bottom: 12px; background: #FFFFFF;box-shadow: 0 6px 20px 0 rgba(40,53,75,0.17);border-radius: 8px;} .YSF-INVITE-LAYER-HEADER {display: flex;align-items: center;justify-content: space-between;margin-bottom: 8px;} .YSF-INVITE-LAYER-HEADER-LEFT {display: flex;flex: 1;align-items: center;} .YSF-INVITE-LAYER-RICHTEXT { height: 44px; max-width: 168px; word-break: break-all; overflow: hidden; text-overflow: ellipsis; font-size: 14px; color: #333333; line-height: 22px; text-align: left; } .YSF-INVITE-LAYER-RICHTEXT p { margin: 0;} #YSF-BTN-HOLDER .YSF-INVITE-LAYER-AVATAR { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; } .YSF-INVITE-LAYER-KEFU-NAME { font-size: 12px; color: #999999; margin-left: 4px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; } #YSF-ONLINE-INVITE-LAYER-CLOSE{ width:12px; height:12px; background:url("https://ysf.nosdn.127.net/operation/0e5ee37a71d33e05b74d1a5aa3cdd99a") no-repeat; background-size: cover; cursor:pointer; } #YSF-INVITE-LAYER-WRAPPER-ENTRY { position: relative; float: right; } .YSF-LAYER-ENTRY-CIRCLE { width: auto; min-width: 12px; height: 20px; padding: 0 4px; border-radius: 10px; color: #FFFFFF; background-color: #f00; font-size: 12px; line-height: 20px; white-space: nowrap; z-index:1; background: url("https://ysf.nosdn.127.net/operation/997228b687d805f7a5d6244865615ec9") no-repeat; background-size: cover; position: absolute; top: 6px; right: -8px; } .YSF-INVITE-IMG {background-color: none;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);float: right;} .YSF_INVITE-IMG-0{max-width: 300px; height:auto;} .YSF_INVITE-IMG-1{width:28px; height:auto; border-radius: 14px;} .YSF_INVITE-IMG-2{width:58px; height:auto; border-radius: 8px;} .YSF_INVITE-IMG-3{width:60px; height:auto; border-radius: 50%;} .YSF_INVITE-IMG-4{width:60px; height:auto; border-radius: 50%;} .YSF_INVITE-IMG-5{width:60px; height:auto; border-radius: 8px;} .YSF_INVITE-IMG-6{width:58px; height:auto; border-radius: 8px;} .YSF_INVITE-IMG-7{width:60px; height:auto; border-radius: 50%;} .YSF_INVITE-IMG-8{width:60px; height:auto; border-radius: 8px;} #YSF-BTN-HOLDER .portrait_icon{width: 24px;height: 24px;vertical-align: middle;display: inline-block;}</style></head> <body><div id="MathJax_Message" style="display: none;"></div> <div class="kk_main in_wrap"> <input type="hidden" id="imagePath" value="https://image.joinquant.com"> <input type="hidden" id="cdnPath" value="https://cdn.joinquant.com"> <input type="hidden" id="filePath" value="https://file.joinquant.com"> <input type="hidden" id="version" value="17679309750001783575403239"> <header id="kk_nav" class="kk_nav navbar narbar-static-top"> <div class="kk_nav_container js-jq-header"><div class="navbar-header clear" style="position:relative;z-index:1">  <a href="/" title="joinQuant" class="navbar-brand fleft headerLogBg">  </a>  </div> <nav id="kk_navbar" class="kk_navbar collapse navbar-collapse relative" aria-expanded="false"> <ul class="nav navbar-nav">  <li> <a href="/" class="">   首页   </a>      </li>  <li> <a href="javascript:void(0)" class="">   量化研究平台   </a>    <div class="submenu">  <a href="/research" class="item"> 研究环境   </a>  <a href="/algorithm/index/list" class="item"> 策略回测   </a>  <a href="/algorithm/trade/list?process=1" class="item"> 模拟列表   </a>  <a href="/view/factorlib/list" class="item"> 因子看板   </a>  <a href="/help/api/help?name=api" class="item"> 平台API文档   </a>  <a href="https://www.joinquant.com/data" class="item"> 平台数据字典   </a>  <a href="/post/4589" class="item"> 新手指引   </a>  <a href="https://www.joinquant.com/view/vip/charge" class="item"> 平台会员   </a>  </div>    </li>  <li> <a href="/community/new" class="">   聚宽社区   </a>    <div class="submenu">  <a href="https://www.joinquant.com/view/community/list?listType=5" class="item"> 精选文章   </a>  </div>    </li>  <li> <a href="javascript:void(0)" class="">   帮助   </a>    <div class="submenu">  <a href="/faq" class="item"> 常见问题   </a>  <a href="/view/algorithm/pythonConversion?utm_source=Nav" class="item"> Python 2 to 3   </a>  <a href="https://www.joinquant.com/help/api/help#faq:%E5%AE%9E%E7%9B%98%E8%AF%B4%E6%98%8E" class="item"> 实盘说明   </a>  <a href="/study" class="item"> 量化课堂   </a>  <a href="/help/api/help?name=factor" class="item"> 因子分析   </a>  </div>    </li>  <li> <a href="javascript:void(0)" class="">   JQData本地数据   </a>    <div class="submenu">  <a href="https://www.joinquant.com/default/index/sdk?utm_campaign=JQData%E7%94%B3%E8%AF%B7&amp;utm_medium=%E7%BD%91%E9%A1%B5&amp;utm_source=%E8%81%9A%E5%AE%BD&amp;gio_link_id=xRxqAjP5" class="item"> 申请试用   </a>  <a href="https://www.joinquant.com/help/api/doc?name=JQDatadoc" class="item"> Python版API   </a>  <a href="https://www.joinquant.com/help/api/doc?name=logon&amp;id=9830" class="item"> 试用及购买   </a>  </div>    </li>  <li> <a href="javascript:void(0)" class="">   平台会员   </a>    <div class="submenu">  <a href="https://www.joinquant.com/view/vip/charge" class="item"> 平台会员   </a>  <a href="https://www.joinquant.com/view/credits/list" class="item"> 积分商城   </a>  </div>    </li>  <li> <a href="/user/login/index?type=login" class="">   登录   </a>      </li>  <li> <a href="/user/register/index?type=register" class="">   注册   </a>      </li>  <div class="hidden" id="userInfoForCs" _userid="" _alias="" _mob=""></div> </ul> </nav></div> </header> <div class="kk_body"> <div class="in_body"> </div></div></div> <div class="js-app" style="min-height:450px"> <div class="jq-l-help-api" id="help"> <div class="help-api-search"> <div class="search-input"> <input type="text" placeholder="搜索你想要的数据，如股票分钟数据、十大股东等(Enter搜索)" id="searchInput" autocomplete="off"> <svg class="enter-icon" viewBox="0 0 1024 1024" title="Enter搜索"> <path d="M639.199519 894.900713 253.016039 894.900713l0 0-96.577592 0c-5.27412 0-9.983375-1.539053-14.378475-3.768837-9.168824 1.098008-18.714224-1.381463-25.746384-8.413624l-44.143383-44.175105c-12.18246-12.183484-12.18246-31.933293 0-44.145429l208.851679-273.122471c12.18246-12.17939 31.962969-12.17939 44.145429 0l44.145429 44.146453c12.17939 12.211113 12.17939 31.994692 0 44.173059L249.498936 766.299777l335.880817 0c98.149391-5.276167 176.393429-83.266425 181.228551-181.035146L766.608304 348.34264c0-17.772782 14.377452-32.149211 32.151257-32.149211l64.98813 0c17.772782 0 32.150234 14.376429 32.150234 32.149211l0 33.593096 0 225.27472 0 32.496112C895.897925 780.64653 780.985756 894.900713 639.199519 894.900713z"> </path> </svg> </div> <div class="search-result"> <span id="searchBack">返回</span> <ul class="search-list" id="searchListBody"></ul> </div> </div> <div class="help-api-left"> <div> <ul class="am-tree am-tree-folder-select" role="tree" id="jq-api-tree" style="overflow:initial"> <li class="am-tree-branch am-hide" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder"></span>
+        <span class="am-tree-label"></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li>
+  <li class="am-tree-item am-hide" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item"></span>
+      <span class="am-tree-label"></span>
+    </button>
+  </li> <li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="aboutData" href="#name:aboutData">关于聚宽数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="Stock" href="#name:Stock">股票数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="plateData" href="#name:plateData">行业概念数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="index" href="#name:index">指数数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="macroData" href="#name:macroData">宏观经济数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="Future" href="#name:Future">期货数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="Option" href="#name:Option">期权数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="fund" href="#name:fund">场内基金数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="OTCfund" href="#name:OTCfund">场外基金数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="technicalanalysis" href="#name:technicalanalysis">技术分析指标</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch am-tree-open" data-template="treebranch" role="treeitem" aria-expanded="true">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-minus-square-o"></span>
+        <span class="am-tree-label"><a data-name="Alpha101" href="#name:Alpha101">Alphas101</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children am-tree-folder-select" role="group"> <li class="am-tree-branch am-hide" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder"></span>
+        <span class="am-tree-label"></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li>
+  <li class="am-tree-item am-hide" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item"></span>
+      <span class="am-tree-label"></span>
+    </button>
+  </li> <li class="am-tree-branch am-tree-open" data-template="treebranch" role="treeitem" aria-expanded="true" id="first" aria-labelledby="first-label">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-minus-square-o"></span>
+        <span class="am-tree-label" id="first-label"><a href="#WorldQuant101Alphas因子函数使用说明">WorldQuant 101 Alphas 因子函数使用说明</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#因子来源">因子来源</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#因子使用">因子使用</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#公用函数说明">公用函数说明</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#公用变量说明">公用变量说明</a></span>
+    </button>
+  </li><li class="am-tree-branch am-tree-open" data-template="treebranch" role="treeitem" aria-expanded="true">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-minus-square-o"></span>
+        <span class="am-tree-label"><a href="#因子说明">因子说明</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha（获取全部因子值）">alpha（获取全部因子值）</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_001">alpha_001</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_002">alpha_002</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_003">alpha_003</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_004">alpha_004</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_005">alpha_005</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_006">alpha_006</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_007">alpha_007</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_008">alpha_008</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_009">alpha_009</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_010">alpha_010</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_011">alpha_011</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_012">alpha_012</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_013">alpha_013</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_014">alpha_014</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_015">alpha_015</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_016">alpha_016</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_017">alpha_017</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_018">alpha_018</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_019">alpha_019</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_020">alpha_020</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_021">alpha_021</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_022">alpha_022</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_023">alpha_023</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_024">alpha_024</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_025">alpha_025</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_026">alpha_026</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_027">alpha_027</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_028">alpha_028</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_029">alpha_029</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_030">alpha_030</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_031">alpha_031</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_032">alpha_032</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_033">alpha_033</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_034">alpha_034</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_035">alpha_035</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_036">alpha_036</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_037">alpha_037</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_038">alpha_038</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_039">alpha_039</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_040">alpha_040</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_041">alpha_041</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_042">alpha_042</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_043">alpha_043</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_044">alpha_044</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_045">alpha_045</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_046">alpha_046</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_047">alpha_047</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_048（未实现）">alpha_048（未实现）</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_049">alpha_049</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_050">alpha_050</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_051">alpha_051</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_052">alpha_052</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_053">alpha_053</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_054">alpha_054</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_055">alpha_055</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_056">alpha_056</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_057">alpha_057</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_058（未实现）">alpha_058（未实现）</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_059（未实现）">alpha_059（未实现）</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_060">alpha_060</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_061">alpha_061</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_062">alpha_062</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_063（未实现）">alpha_063（未实现）</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_064">alpha_064</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_065">alpha_065</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_066">alpha_066</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_067（未实现）">alpha_067（未实现）</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_068">alpha_068</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_069（未实现）">alpha_069（未实现）</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_070（未实现）">alpha_070（未实现）</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_071">alpha_071</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_072">alpha_072</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_073">alpha_073</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_074">alpha_074</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_075">alpha_075</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_076（未实现）">alpha_076（未实现）</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_077">alpha_077</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_078">alpha_078</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_079（未实现）">alpha_079（未实现）</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_080（未实现）">alpha_080（未实现）</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_081">alpha_081</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_082（未实现）">alpha_082（未实现）</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_083">alpha_083</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_084">alpha_084</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_085">alpha_085</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_086">alpha_086</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_087（未实现）">alpha_087（未实现）</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_088">alpha_088</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_089（未实现）">alpha_089（未实现）</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_090（未实现）">alpha_090（未实现）</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_091（未实现）">alpha_091（未实现）</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_092">alpha_092</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_093（未实现）">alpha_093（未实现）</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_094">alpha_094</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_095">alpha_095</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_096">alpha_096</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_097（未实现）">alpha_097（未实现）</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_098">alpha_098</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_099">alpha_099</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_100（未实现）">alpha_100（未实现）</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#alpha_101">alpha_101</a></span>
+    </button>
+  </li></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="Alpha191" href="#name:Alpha191">Alphas191</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="factor_values" href="#name:factor_values">聚宽因子库</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="Public" href="#name:Public">舆情数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="bond" href="#name:bond">债券数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li></ul> </div> </div> <div class="help-api-right"> <div id="jq-api-subcontent" class="hidden"></div> <div id="jq-api-content"><h2 id="WorldQuant101Alphas因子函数使用说明">WorldQuant 101 Alphas 因子函数使用说明</h2>
+
+<h3 id="因子来源">因子来源</h3>
+<p>根据 WorldQuant LLC 发表的论文 <a href="https://arxiv.org/ftp/arxiv/papers/1601/1601.00991.pdf">101 Formulaic Alphas</a> 中给出的 101 个 Alphas 因子公式，我们将公式编写成了函数，方便大家使用。</p>
+<h3 id="因子使用">因子使用</h3>
+<pre><code class="python language-python hljs"><span class="hljs-comment"># 导入 Alpha101 库</span>
+<span class="hljs-meta">&gt;&gt;&gt; </span><span class="hljs-keyword">from</span> jqlib.alpha101 <span class="hljs-keyword">import</span> *
+
+<span class="hljs-comment">#传入一个股票list,获取股票list的alpha_001因子值</span>
+a=alpha_001(<span class="hljs-string">'2018-12-24'</span>,[<span class="hljs-string">'000001.XSHE'</span>,<span class="hljs-string">'000002.XSHE'</span>])
+print(a)
+<span class="hljs-number">000001.</span>XSHE    <span class="hljs-number">0.0</span>
+<span class="hljs-number">000002.</span>XSHE    <span class="hljs-number">0.5</span>
+Name: rank_value_boolean, dtype: float64
+
+<span class="hljs-comment"># 获取沪深300成分股的 alpha_001 因子值</span>
+<span class="hljs-meta">&gt;&gt;&gt; </span>a = alpha_001(<span class="hljs-string">'2017-03-10'</span>,<span class="hljs-string">'000300.XSHG'</span>)
+
+<span class="hljs-comment"># 查看前5行的因子值</span>
+<span class="hljs-meta">&gt;&gt;&gt; </span>a.head()
+<span class="hljs-number">000001.</span>XSHE   <span class="hljs-number">-0.496667</span>
+<span class="hljs-number">000002.</span>XSHE    <span class="hljs-number">0.226667</span>
+<span class="hljs-number">000008.</span>XSHE   <span class="hljs-number">-0.043333</span>
+<span class="hljs-number">000009.</span>XSHE   <span class="hljs-number">-0.093333</span>
+<span class="hljs-number">000027.</span>XSHE   <span class="hljs-number">-0.030000</span>
+Name: rank_value_boolean, dtype: float64
+
+<span class="hljs-comment"># 查看平安银行的因子值</span>
+<span class="hljs-meta">&gt;&gt;&gt; </span>a[<span class="hljs-string">'000001.XSHE'</span>]
+<span class="hljs-number">-0.49666666666666665</span>
+
+<span class="hljs-comment"># 获取所有股票 alpha_007 的因子值</span>
+<span class="hljs-meta">&gt;&gt;&gt; </span>a = alpha_007(<span class="hljs-string">'2014-10-22'</span>)
+<span class="hljs-comment"># 查看欣旺达(300207)的因子值</span>
+<span class="hljs-meta">&gt;&gt;&gt; </span>a[<span class="hljs-string">'300207.XSHE'</span>]
+<span class="hljs-number">0.8</span>
+
+<span class="hljs-comment"># 获取多个股票多个因子值</span>
+<span class="hljs-keyword">from</span> jqlib.alpha101 <span class="hljs-keyword">import</span> *
+df2 = alpha(enddate=<span class="hljs-string">'2019-01-22'</span>, index=[<span class="hljs-string">'000001.XSHE'</span>, <span class="hljs-string">'000002.XSHE'</span>], fq=<span class="hljs-string">'pre'</span>, alpha=[<span class="hljs-number">5</span>,<span class="hljs-number">10</span>,<span class="hljs-number">15</span>,<span class="hljs-number">20</span>]) 
+print(df2)
+
+<span class="hljs-comment"># 查询函数说明</span>
+<span class="hljs-meta">&gt;&gt;&gt; </span>alpha_101?
+Type:        cython_function_or_method
+String form: &lt;cyfunction alpha_101 at <span class="hljs-number">0x7f037a0167d0</span>&gt;
+Docstring:
+公式：
+((close - open) / ((high - low) + <span class="hljs-number">.001</span>))
+
+Inputs:
+    enddate: 查询日期
+    index: 股票池,可传入股票list或指数代码，传入指数代码，对应该指数的所有成分股。默认是指定日期的所有上市股票。
+
+Outputs:
+    因子的值
+</code></pre>
+<h3 id="公用函数说明">公用函数说明</h3>
+<p>abs(x),log(x),sign(x) = standard definitions 
+<em>分别为：取绝对值、对数值、正负号（正数返回1，负数返回-1）</em></p>
+<p>rank(x) = cross-sectional rank 
+<em>股票的排名，数值从1-最后，若输入值含nan，则nan不参与排名，输出为股票对应排名值（排名所占总位数的百分比）</em></p>
+<p>delay(x,d) = value of x d days ago 
+<em>x变量d天之前的值</em></p>
+<p>correlation(x,y,d) = time-serial correlation of x and y for the past d days 
+<em>x和y两个变量d天以来的值的相关系数</em></p>
+<p>covariance(x,y,d) = time-serial covariance of x and y for the past d days 
+<em>x和y两个变量d天以来的值的协方差</em></p>
+<p>scale(x,a) = rescaled x such that sum(abs(x))=a (the default is a=1) 
+<em>将x中的值标准化，使x的绝对值的和为a，默认a=1</em></p>
+<p>delta(x,d) = today’s value of x minus the value of x d days ago 
+<em>指定enddate的x值减去d天之前的x值</em></p>
+<p>signedpower(x,a) = x^a 
+<em>x值的a次方，如果x为一个list或者series，则为x中每一个值的a次方</em></p>
+<p>decay_linear(x,d) = weighted moving average over the past d days with linearly decaying weights d,d-1,…,1 (rescaled up to 1) 
+<em>x中时间从最远到最近的值，分别乘权重d，d-1，…，1（权重要进行标准化，使和为1）再求和</em></p>
+<p>ts_min(x,d) = time-series min over the past d days 
+<em>x中d天内最小的值</em></p>
+<p>ts_max(x,d) = time-series max over the past d days 
+<em>x中d天内最大的值</em></p>
+<p>ts_argmin(x,d) = which day ts_min(x,d) occurred on 
+<em>ts_min(x,d)发生在d天中的第几天，最远的天为第一天</em></p>
+<p>ts_argmax(x,d) = which day ts_max(x,d) occurred on 
+<em>ts_max(x,d)发生在d天中的第几天，最远的天为第一天</em></p>
+<p>ts_rank(x,d) = time-series rank in the past d days 
+<em>x中，最后一天的值，在这d天中，排多少名，输出为对应的排名值（即该名次占总排名数的百分比）</em></p>
+<p>min(x,d) = ts_min(x,d) 
+<em>当遇到min函数时，当ts_min函数处理</em>——-注意！！实际上遇到min时，当min中的输入不是（x,d）而是（x,y）时，取x、y两个值中的最小值</p>
+<p>max(x,d) = ts_max(x,d) 
+<em>当遇到max函数时，当ts_max函数处理</em>——注意！！实际上遇到max时，当max中的输入不是（x,d）而是（x,y）时，取x、y两个值中的最大值</p>
+<p>sum(x,d) = time-series sum over the past d days 
+<em>d天以来x值的和</em></p>
+<p>product(x,d) = time-series product over the past d days 
+<em>d天以来x值的乘积</em></p>
+<p>stddev(x,d) = moving time series standard deviation over the past d days 
+<em>d天以来，x值的标准差</em></p>
+<h3 id="公用变量说明">公用变量说明</h3>
+<p>returns = daily close-to-close returns 
+<em>收益率，输入n+1行closeprice，输出n行returns，index为closeprice的后面n个index，columns为closeprice中的columns</em></p>
+<p>open,close,high,low,volume = standard definitions for daily price and volume data 
+<em>开盘价，收盘价，最高价，最低价，交易数量</em></p>
+<p>vwap = daily volume-weighted average price 
+<em>在我们的函数程序里，用均价avg来表示这里的vwap</em></p>
+<p>cap = market cap 
+<em>市值，在我们的函数程序里，提取的是聚宽财务报表数据中的market_cap</em></p>
+<p>adv{d} = average daily dollar volume for the past d days 
+<em>过去d天内的平均交易金额</em></p>
+<h3 id="因子说明">因子说明</h3>
+
+<h4 id="alpha（获取全部因子值）">alpha（获取全部因子值）</h4>
+<p>获取标的101个全部因子值，因计算量较大，运行会有少许缓慢</p>
+<pre><code class="python language-python hljs"><span class="hljs-keyword">from</span> jqlib.alpha101 <span class="hljs-keyword">import</span> *
+alpha(enddate=<span class="hljs-keyword">None</span>, index=<span class="hljs-string">'all'</span>, fq=<span class="hljs-string">'pre'</span>, alpha=[])
+</code></pre>
+<ul>
+<li><p>输入：</p>
+<ul>
+<li>enddate: 必选参数，计算哪一天的因子 </li>
+<li>index: 默认参数<ul>
+<li>如果想要成分股，可传入股票指数的字符串，默认为所有股票’all’，如index='all' 或 index='000300.XSHG'</li>
+<li>如果想要自定义股票列表，传入一个list，如 index=['000001.XSHE', '000002.XSHE'] </li></ul></li>
+<li>fq: 复权选项:<ul>
+<li><code>'pre'</code>: 前复权,默认为前复权</li>
+<li><code>None</code>: 不复权，返回实际价格</li>
+<li><code>'post'</code>: 动态后复权</li></ul></li>
+<li>alpha，因子列表，<strong>默认全取</strong>。也可指定获取其中的某些因子，写法如alpha=['alpha_005', 'alpha_010', 'alpha_015', 'alpha_020']，或 alpha=[5,10,15,20]  </li></ul></li>
+<li><p>输出：</p>
+<ul>
+<li>一个 DataFrame，包括股票列表中每一只股票的 alpha001-alpha101 的值</li></ul></li>
+</ul>
+<h4 id="alpha_001">alpha_001</h4>
+<pre><code class="python language-python hljs">alpha_001(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+<li><p>(rank(Ts_ArgMax(SignedPower(((returns &lt; 0) ? stddev(returns, 20) : close), 2.), 5)) - 0.5)</p></li>
+</ul>
+<h4 id="alpha_002">alpha_002</h4>
+<pre><code class="python language-python hljs">alpha_002(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(-1*correlation(rank(delta(log(volume), 2)), rank(((close - open) / open)), 6))</p></li>
+</ul>
+<h4 id="alpha_003">alpha_003</h4>
+<pre><code class="python language-python hljs">alpha_003(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(-1*correlation(rank(open), rank(volume), 10)) </p></li>
+</ul>
+<h4 id="alpha_004">alpha_004</h4>
+<pre><code class="python language-python hljs">alpha_004(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(-1*Ts_Rank(rank(low), 9))</p></li>
+</ul>
+<h4 id="alpha_005">alpha_005</h4>
+<pre><code class="python language-python hljs">alpha_005(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(rank((open - (sum(vwap, 10) / 10)))<em>(-1</em>abs(rank((close - vwap)))))</p></li>
+</ul>
+<h4 id="alpha_006">alpha_006</h4>
+<pre><code class="python language-python hljs">alpha_006(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(-1*correlation(open, volume, 10))</p></li>
+</ul>
+<h4 id="alpha_007">alpha_007</h4>
+<pre><code class="python language-python hljs">alpha_007(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个Series：index为成分股代码，values：符合条件的为公式里的数值，不符合条件的为-1</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>((adv20 &lt; volume) ? ((-1<em>ts_rank(abs(delta(close, 7)), 60))</em>sign(delta(close, 7))) : (-1*1))</p></li>
+</ul>
+<h4 id="alpha_008">alpha_008</h4>
+<pre><code class="python language-python hljs">alpha_008(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(-1<em>rank(((sum(open, 5)</em>sum(returns, 5)) - delay((sum(open, 5)*sum(returns, 5)), 10))))</p></li>
+</ul>
+<h4 id="alpha_009">alpha_009</h4>
+<pre><code class="python language-python hljs">alpha_009(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>((0 &lt; ts_min(delta(close, 1), 5)) ? delta(close, 1) : ((ts_max(delta(close, 1), 5) &lt; 0) ? delta(close, 1) : (-1*delta(close, 1))))</p></li>
+</ul>
+<h4 id="alpha_010">alpha_010</h4>
+<pre><code class="python language-python hljs">alpha_010(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>rank(((0 &lt; ts_min(delta(close, 1), 4)) ? delta(close, 1) : ((ts_max(delta(close, 1), 4) &lt; 0) ? delta(close, 1) : (-1*delta(close, 1)))))</p></li>
+</ul>
+<h4 id="alpha_011">alpha_011</h4>
+<pre><code class="python language-python hljs">alpha_011(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>((rank(ts_max((vwap - close), 3)) + rank(ts_min((vwap - close), 3)))*rank(delta(volume, 3)))</p></li>
+</ul>
+<h4 id="alpha_012">alpha_012</h4>
+<pre><code class="python language-python hljs">alpha_012(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(sign(delta(volume, 1))*(-1 * delta(close, 1)))</p></li>
+</ul>
+<h4 id="alpha_013">alpha_013</h4>
+<pre><code class="python language-python hljs">alpha_013(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(-1*rank(covariance(rank(close), rank(volume), 5)))</p></li>
+</ul>
+<h4 id="alpha_014">alpha_014</h4>
+<pre><code class="python language-python hljs">alpha_014(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>((-1<em>rank(delta(returns, 3)))</em>correlation(open, volume, 10))</p></li>
+</ul>
+<h4 id="alpha_015">alpha_015</h4>
+<pre><code class="python language-python hljs">alpha_015(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(-1*sum(rank(correlation(rank(high), rank(volume), 3)), 3))</p></li>
+</ul>
+<h4 id="alpha_016">alpha_016</h4>
+<pre><code class="python language-python hljs">alpha_016(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(-1*rank(covariance(rank(high), rank(volume), 5)))</p></li>
+</ul>
+<h4 id="alpha_017">alpha_017</h4>
+<pre><code class="python language-python hljs">alpha_017(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个Series：index为成分股代码，values为对应的因子值，取值有问题的股票对应值为-0.0</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(((-1<em>rank(ts_rank(close, 10)))</em>rank(delta(delta(close, 1), 1)))*rank(ts_rank((volume / adv20), 5)))</p></li>
+</ul>
+<h4 id="alpha_018">alpha_018</h4>
+<pre><code class="python language-python hljs">alpha_018(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(-1*rank(((stddev(abs((close - open)), 5) + (close - open)) + correlation(close, open, 10))))</p></li>
+</ul>
+<h4 id="alpha_019">alpha_019</h4>
+<pre><code class="python language-python hljs">alpha_019(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>((-1<em>sign(((close - delay(close, 7)) + delta(close, 7))))</em>(1 + rank((1 + sum(returns, 250)))))</p></li>
+</ul>
+<h4 id="alpha_020">alpha_020</h4>
+<pre><code class="python language-python hljs">alpha_020(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(((-1<em>rank((open - delay(high, 1))))</em> rank((open - delay(close, 1))))* rank((open - delay(low, 1))))</p></li>
+</ul>
+<h4 id="alpha_021">alpha_021</h4>
+<pre><code class="python language-python hljs">alpha_021(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个Series：index为成分股代码，values为1或-1，取决于满不满足某些因子中的条件</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>((((sum(close, 8) / 8) + stddev(close, 8)) &lt; (sum(close, 2) / 2)) ? (-1* 1) : (((sum(close, 2) / 2) &lt; ((sum(close, 8) / 8) - stddev(close, 8))) ? 1 : (((1 &lt; (volume / adv20)) or ((volume / adv20) == 1)) ? 1 : (-1* 1))))</p></li>
+</ul>
+<h4 id="alpha_022">alpha_022</h4>
+<pre><code class="python language-python hljs">alpha_022(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(-1* (delta(correlation(high, volume, 5), 5)* rank(stddev(close, 20))))</p></li>
+</ul>
+<h4 id="alpha_023">alpha_023</h4>
+<pre><code class="python language-python hljs">alpha_023(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个Series：index为成分股代码，values为对应因子值或0.00，当不满足条件时为0.00</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(((sum(high, 20) / 20) &lt; high) ? (-1* delta(high, 2)) : 0)</p></li>
+</ul>
+<h4 id="alpha_024">alpha_024</h4>
+<pre><code class="python language-python hljs">alpha_024(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>((((delta((sum(close, 100) / 100), 100) / delay(close, 100)) &lt; 0.05) or ((delta((sum(close, 100) / 100), 100) / delay(close, 100)) == 0.05)) ? (-1* (close - ts_min(close, 100))) : (-1* delta(close, 3)))</p></li>
+</ul>
+<h4 id="alpha_025">alpha_025</h4>
+<pre><code class="python language-python hljs">alpha_025(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>rank(((((-1* returns)* adv20)* vwap)* (high - close)))</p></li>
+</ul>
+<h4 id="alpha_026">alpha_026</h4>
+<pre><code class="python language-python hljs">alpha_026(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(-1* ts_max(correlation(ts_rank(volume, 5), ts_rank(high, 5), 5), 3))</p></li>
+</ul>
+<h4 id="alpha_027">alpha_027</h4>
+<pre><code class="python language-python hljs">alpha_027(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个Series：index为成分股代码，values为1或-1，满足条件为-1，不满足为1</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>((0.5 &lt; rank((sum(correlation(rank(volume), rank(vwap), 6), 2) / 2.0))) ? (-1* 1) : 1)</p></li>
+</ul>
+<h4 id="alpha_028">alpha_028</h4>
+<pre><code class="python language-python hljs">alpha_028(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>scale(((correlation(adv20, low, 5) + ((high + low) / 2)) - close))</p></li>
+</ul>
+<h4 id="alpha_029">alpha_029</h4>
+<pre><code class="python language-python hljs">alpha_029(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(min(product(rank(rank(scale(log(sum(ts_min(rank(rank((-1<em>rank(delta((close - 1), 5))))), 2), 1))))), 1), 5) + ts_rank(delay((-1</em> returns), 6), 5))</p></li>
+</ul>
+<h4 id="alpha_030">alpha_030</h4>
+<pre><code class="python language-python hljs">alpha_030(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(((1.0 - rank(((sign((close - delay(close, 1))) + sign((delay(close, 1) - delay(close, 2)))) + sign((delay(close, 2) - delay(close, 3))))))* sum(volume, 5)) / sum(volume, 20))</p></li>
+</ul>
+<h4 id="alpha_031">alpha_031</h4>
+<pre><code class="python language-python hljs">alpha_031(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>((rank(rank(rank(decay_linear((-1* rank(rank(delta(close, 10)))), 10)))) + rank((-1* delta(close, 3)))) + sign(scale(correlation(adv20, low, 12))))</p></li>
+</ul>
+<h4 id="alpha_032">alpha_032</h4>
+<pre><code class="python language-python hljs">alpha_032(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(scale(((sum(close, 7) / 7) - close)) + (20* scale(correlation(vwap, delay(close, 5), 230))))</p></li>
+</ul>
+<h4 id="alpha_033">alpha_033</h4>
+<pre><code class="python language-python hljs">alpha_033(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>rank((-1* ((1 - (open / close))^1)))</p></li>
+</ul>
+<h4 id="alpha_034">alpha_034</h4>
+<pre><code class="python language-python hljs">alpha_034(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>rank(((1 - rank((stddev(returns, 2) / stddev(returns, 5)))) + (1 - rank(delta(close, 1)))))</p></li>
+</ul>
+<h4 id="alpha_035">alpha_035</h4>
+<pre><code class="python language-python hljs">alpha_035(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>((Ts_Rank(volume, 32)* (1 - Ts_Rank(((close + high) - low), 16)))* (1 - Ts_Rank(returns, 32)))</p></li>
+</ul>
+<h4 id="alpha_036">alpha_036</h4>
+<pre><code class="python language-python hljs">alpha_036(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(((((2.21* rank(correlation((close - open), delay(volume, 1), 15))) + (0.7* rank((open - close)))) + (0.73* rank(Ts_Rank(delay((-1* returns), 6), 5)))) + rank(abs(correlation(vwap, adv20, 6)))) + (0.6* rank((((sum(close, 200) / 200) - open)* (close - open)))))</p></li>
+</ul>
+<h4 id="alpha_037">alpha_037</h4>
+<pre><code class="python language-python hljs">alpha_037(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(rank(correlation(delay((open - close), 1), close, 200)) + rank((open - close)))</p></li>
+</ul>
+<h4 id="alpha_038">alpha_038</h4>
+<pre><code class="python language-python hljs">alpha_038(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>((-1* rank(Ts_Rank(close, 10)))* rank((close / open)))</p></li>
+</ul>
+<h4 id="alpha_039">alpha_039</h4>
+<pre><code class="python language-python hljs">alpha_039(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>((-1* rank((delta(close, 7)* (1 - rank(decay_linear((volume / adv20), 9))))))* (1 + rank(sum(returns, 250))))</p></li>
+</ul>
+<h4 id="alpha_040">alpha_040</h4>
+<pre><code class="python language-python hljs">alpha_040(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>((-1* rank(stddev(high, 10)))* correlation(high, volume, 10))</p></li>
+</ul>
+<h4 id="alpha_041">alpha_041</h4>
+<pre><code class="python language-python hljs">alpha_041(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(((high* low)^0.5) - vwap)</p></li>
+</ul>
+<h4 id="alpha_042">alpha_042</h4>
+<pre><code class="python language-python hljs">alpha_042(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(rank((vwap - close)) / rank((vwap + close)))</p></li>
+</ul>
+<h4 id="alpha_043">alpha_043</h4>
+<pre><code class="python language-python hljs">alpha_043(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(ts_rank((volume / adv20), 20)* ts_rank((-1* delta(close, 7)), 8))</p></li>
+</ul>
+<h4 id="alpha_044">alpha_044</h4>
+<pre><code class="python language-python hljs">alpha_044(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(-1* correlation(high, rank(volume), 5))</p></li>
+</ul>
+<h4 id="alpha_045">alpha_045</h4>
+<pre><code class="python language-python hljs">alpha_045(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(-1* ((rank((sum(delay(close, 5), 20) / 20))* correlation(close, volume, 2))* rank(correlation(sum(close, 5), sum(close, 20), 2))))</p></li>
+</ul>
+<h4 id="alpha_046">alpha_046</h4>
+<pre><code class="python language-python hljs">alpha_046(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个Series：index为成分股代码，values为1或-1或对应因子值，取决于满不满足某些因子中的条件</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>((0.25 &lt; (((delay(close, 20) - delay(close, 10)) / 10) - ((delay(close, 10) - close) / 10))) ? (-1* 1) : (((((delay(close, 20) - delay(close, 10)) / 10) - ((delay(close, 10) - close) / 10)) &lt; 0) ? 1 : ((-1* 1)* (close - delay(close, 1)))))</p></li>
+</ul>
+<h4 id="alpha_047">alpha_047</h4>
+<pre><code class="python language-python hljs">alpha_047(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>((((rank((1 / close))* volume) / adv20)* ((high* rank((high - close))) / (sum(high, 5) / 5))) - rank((vwap - delay(vwap, 5))))</p></li>
+</ul>
+<h4 id="alpha_048（未实现）">alpha_048（未实现）</h4>
+<ul>
+<li><p>因子公式：</p></li>
+
+<li><p>(indneutralize(((correlation(delta(close, 1), delta(delay(close, 1), 1), 250)* delta(close, 1)) / close), IndClass.subindustry) / sum(((delta(close, 1) / delay(close, 1))^2), 250))</p></li>
+</ul>
+<h4 id="alpha_049">alpha_049</h4>
+<pre><code class="python language-python hljs">alpha_049(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个Series：index为成分股代码，values为对应因子值或1，当满足条件时为1</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(((((delay(close, 20) - delay(close, 10)) / 10) - ((delay(close, 10) - close) / 10)) &lt; (-1* 0.1)) ? 1 : ((-1* 1)* (close - delay(close, 1))))</p></li>
+</ul>
+<h4 id="alpha_050">alpha_050</h4>
+<pre><code class="python language-python hljs">alpha_050(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(-1* ts_max(rank(correlation(rank(volume), rank(vwap), 5)), 5))</p></li>
+</ul>
+<h4 id="alpha_051">alpha_051</h4>
+<pre><code class="python language-python hljs">alpha_051(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个Series：index为成分股代码，values为对应因子值或1，当满足条件时为1</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(((((delay(close, 20) - delay(close, 10)) / 10) - ((delay(close, 10) - close) / 10)) &lt; (-1* 0.05)) ? 1 : ((-1* 1)* (close - delay(close, 1))))</p></li>
+</ul>
+<h4 id="alpha_052">alpha_052</h4>
+<pre><code class="python language-python hljs">alpha_052(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>((((-1* ts_min(low, 5)) + delay(ts_min(low, 5), 5))* rank(((sum(returns, 240) - sum(returns, 20)) / 220)))* ts_rank(volume, 5))</p></li>
+</ul>
+<h4 id="alpha_053">alpha_053</h4>
+<pre><code class="python language-python hljs">alpha_053(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(-1* delta((((close - low) - (high - close)) / (close - low)), 9))</p></li>
+</ul>
+<h4 id="alpha_054">alpha_054</h4>
+<pre><code class="python language-python hljs">alpha_054(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>((-1* ((low - close)* (open^5))) / ((low - high)* (close^5)))</p></li>
+</ul>
+<h4 id="alpha_055">alpha_055</h4>
+<pre><code class="python language-python hljs">alpha_055(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(-1* correlation(rank(((close - ts_min(low, 12)) / (ts_max(high, 12) - ts_min(low, 12)))), rank(volume), 6))</p></li>
+</ul>
+<h4 id="alpha_056">alpha_056</h4>
+<pre><code class="python language-python hljs">alpha_056(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(0 - (1* (rank((sum(returns, 10) / sum(sum(returns, 2), 3)))* rank((returns* cap)))))</p></li>
+</ul>
+<h4 id="alpha_057">alpha_057</h4>
+<pre><code class="python language-python hljs">alpha_057(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(0 - (1* ((close - vwap) / decay_linear(rank(ts_argmax(close, 30)), 2))))</p></li>
+</ul>
+<h4 id="alpha_058（未实现）">alpha_058（未实现）</h4>
+<ul>
+<li><p>因子公式：</p></li>
+
+<li><p>(-1* Ts_Rank(decay_linear(correlation(IndNeutralize(vwap, IndClass.sector), volume, 3.92795), 7.89291), 5.50322))</p></li>
+</ul>
+<h4 id="alpha_059（未实现）">alpha_059（未实现）</h4>
+<ul>
+<li><p>因子公式：</p></li>
+
+<li><p>(-1* Ts_Rank(decay_linear(correlation(IndNeutralize(((vwap* 0.728317) + (vwap* (1 - 0.728317))), IndClass.industry), volume, 4.25197), 16.2289), 8.19648))</p></li>
+</ul>
+<h4 id="alpha_060">alpha_060</h4>
+<pre><code class="python language-python hljs">alpha_060(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(0 - (1* ((2* scale(rank(((((close - low) - (high - close)) / (high - low))* volume)))) - scale(rank(ts_argmax(close, 10))))))</p></li>
+</ul>
+<h4 id="alpha_061">alpha_061</h4>
+<pre><code class="python language-python hljs">alpha_061(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个Series：index为成分股代码，values为1或-1，当满足条件时为1，否则为-1</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(rank((vwap - ts_min(vwap, 16.1219))) &lt; rank(correlation(vwap, adv180, 17.9282)))</p></li>
+</ul>
+<h4 id="alpha_062">alpha_062</h4>
+<pre><code class="python language-python hljs">alpha_062(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个Series：index为成分股代码，values为1或-1，当满足条件时为-1，否则为1</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>((rank(correlation(vwap, sum(adv20, 22.4101), 9.91009)) &lt; rank(((rank(open) + rank(open)) &lt; (rank(((high + low) / 2)) + rank(high)))))*-1)</p></li>
+</ul>
+<h4 id="alpha_063（未实现）">alpha_063（未实现）</h4>
+<ul>
+<li><p>因子公式：</p></li>
+
+<li><p>((rank(decay_linear(delta(IndNeutralize(close, IndClass.industry), 2.25164), 8.22237)) - rank(decay_linear(correlation(((vwap* 0.318108) + (open* (1 - 0.318108))), sum(adv180, 37.2467), 13.557), 12.2883)))* -1)</p></li>
+</ul>
+<h4 id="alpha_064">alpha_064</h4>
+<pre><code class="python language-python hljs">alpha_064(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个Series：index为成分股代码，values为1或-1，当满足条件时为-1，否则为1</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>((rank(correlation(sum(((open* 0.178404) + (low* (1 - 0.178404))), 12.7054), sum(adv120, 12.7054), 16.6208)) &lt; rank(delta(((((high + low) / 2)* 0.178404) + (vwap* (1 - 0.178404))), 3.69741)))* -1)</p></li>
+</ul>
+<h4 id="alpha_065">alpha_065</h4>
+<pre><code class="python language-python hljs">alpha_065(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个Series：index为成分股代码，values为1或-1，当满足条件时为-1，否则为1</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>((rank(correlation(((open* 0.00817205) + (vwap* (1 - 0.00817205))), sum(adv60, 8.6911), 6.40374)) &lt; rank((open - ts_min(open, 13.635))))* -1)</p></li>
+</ul>
+<h4 id="alpha_066">alpha_066</h4>
+<pre><code class="python language-python hljs">alpha_066(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>((rank(decay_linear(delta(vwap, 3.51013), 7.23052)) + Ts_Rank(decay_linear(((((low* 0.96633) + (low* (1 - 0.96633))) - vwap) / (open - ((high + low) / 2))), 11.4157), 6.72611))* -1)</p></li>
+</ul>
+<h4 id="alpha_067（未实现）">alpha_067（未实现）</h4>
+<ul>
+<li><p>因子公式：</p></li>
+
+<li><p>((rank((high - ts_min(high, 2.14593)))^rank(correlation(IndNeutralize(vwap, IndClass.sector), IndNeutralize(adv20, IndClass.subindustry), 6.02936)))* -1)</p></li>
+</ul>
+<h4 id="alpha_068">alpha_068</h4>
+<pre><code class="python language-python hljs">alpha_068(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个Series：index为成分股代码，values为1或-1，当满足条件时为-1，否则为1</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>((Ts_Rank(correlation(rank(high), rank(adv15), 8.91644), 13.9333) &lt; rank(delta(((close* 0.518371) + (low* (1 - 0.518371))), 1.06157)))* -1)</p></li>
+</ul>
+<h4 id="alpha_069（未实现）">alpha_069（未实现）</h4>
+<ul>
+<li><p>因子公式：</p></li>
+
+<li><p>((rank(ts_max(delta(IndNeutralize(vwap, IndClass.industry), 2.72412), 4.79344))^Ts_Rank(correlation(((close* 0.490655) + (vwap* (1 - 0.490655))), adv20, 4.92416), 9.0615))* -1)</p></li>
+</ul>
+<h4 id="alpha_070（未实现）">alpha_070（未实现）</h4>
+<ul>
+<li><p>因子公式：</p></li>
+
+<li><p>((rank(delta(vwap, 1.29456))^Ts_Rank(correlation(IndNeutralize(close, IndClass.industry), adv50, 17.8256), 17.9171))* -1)</p></li>
+</ul>
+<h4 id="alpha_071">alpha_071</h4>
+<pre><code class="python language-python hljs">alpha_071(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>max(Ts_Rank(decay_linear(correlation(Ts_Rank(close, 3.43976), Ts_Rank(adv180, 12.0647), 18.0175), 4.20501), 15.6948), Ts_Rank(decay_linear((rank(((low + open) - (vwap + vwap)))^2), 16.4662), 4.4388))</p></li>
+</ul>
+<h4 id="alpha_072">alpha_072</h4>
+<pre><code class="python language-python hljs">alpha_072(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(rank(decay_linear(correlation(((high + low) / 2), adv40, 8.93345), 10.1519)) / rank(decay_linear(correlation(Ts_Rank(vwap, 3.72469), Ts_Rank(volume, 18.5188), 6.86671), 2.95011)))</p></li>
+</ul>
+<h4 id="alpha_073">alpha_073</h4>
+<pre><code class="python language-python hljs">alpha_073(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(max(rank(decay_linear(delta(vwap, 4.72775), 2.91864)), Ts_Rank(decay_linear(((delta(((open* 0.147155) + (low* (1 - 0.147155))), 2.03608) / ((open* 0.147155) + (low* (1 - 0.147155))))* -1), 3.33829), 16.7411))* -1)</p></li>
+</ul>
+<h4 id="alpha_074">alpha_074</h4>
+<pre><code class="python language-python hljs">alpha_074(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个Series：index为成分股代码，values为1或-1，当满足条件时为-1，否则为1</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>((rank(correlation(close, sum(adv30, 37.4843), 15.1365)) &lt; rank(correlation(rank(((high* 0.0261661) + (vwap* (1 - 0.0261661)))), rank(volume), 11.4791)))* -1)</p></li>
+</ul>
+<h4 id="alpha_075">alpha_075</h4>
+<pre><code class="python language-python hljs">alpha_075(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个Series：index为成分股代码，values为1或-1，当满足条件时为1，否则为-1</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(rank(correlation(vwap, volume, 4.24304)) &lt; rank(correlation(rank(low), rank(adv50), 12.4413)))</p></li>
+</ul>
+<h4 id="alpha_076（未实现）">alpha_076（未实现）</h4>
+<ul>
+<li><p>因子公式：</p></li>
+
+<li><p>(max(rank(decay_linear(delta(vwap, 1.24383), 11.8259)), Ts_Rank(decay_linear(Ts_Rank(correlation(IndNeutralize(low, IndClass.sector), adv81, 8.14941), 19.569), 17.1543), 19.383))* -1)</p></li>
+</ul>
+<h4 id="alpha_077">alpha_077</h4>
+<pre><code class="python language-python hljs">alpha_077(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>min(rank(decay_linear(((((high + low) / 2) + high) - (vwap + high)), 20.0451)), rank(decay_linear(correlation(((high + low) / 2), adv40, 3.1614), 5.64125)))</p></li>
+</ul>
+<h4 id="alpha_078">alpha_078</h4>
+<pre><code class="python language-python hljs">alpha_078(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(rank(correlation(sum(((low* 0.352233) + (vwap* (1 - 0.352233))), 19.7428), sum(adv40, 19.7428), 6.83313))^rank(correlation(rank(vwap), rank(volume), 5.77492)))</p></li>
+</ul>
+<h4 id="alpha_079（未实现）">alpha_079（未实现）</h4>
+<ul>
+<li><p>因子公式：</p></li>
+
+<li><p>(rank(delta(IndNeutralize(((close* 0.60733) + (open* (1 - 0.60733))), IndClass.sector), 1.23438)) &lt; rank(correlation(Ts_Rank(vwap, 3.60973), Ts_Rank(adv150, 9.18637), 14.6644)))</p></li>
+</ul>
+<h4 id="alpha_080（未实现）">alpha_080（未实现）</h4>
+<ul>
+<li><p>因子公式：</p></li>
+
+<li><p>((rank(Sign(delta(IndNeutralize(((open* 0.868128) + (high* (1 - 0.868128))), IndClass.industry), 4.04545)))^Ts_Rank(correlation(high, adv10, 5.11456), 5.53756))* -1)</p></li>
+</ul>
+<h4 id="alpha_081">alpha_081</h4>
+<ul>
+<li><p>因子公式：</p></li>
+
+<li><p>((rank(Log(product(rank((rank(correlation(vwap, sum(adv10, 49.6054), 8.47743))^4)), 14.9655))) &lt; rank(correlation(rank(vwap), rank(volume), 5.07914)))* -1)</p></li>
+</ul>
+<h4 id="alpha_082（未实现）">alpha_082（未实现）</h4>
+<ul>
+<li><p>因子公式：</p></li>
+
+<li><p>(min(rank(decay_linear(delta(open, 1.46063), 14.8717)), Ts_Rank(decay_linear(correlation(IndNeutralize(volume, IndClass.sector), ((open* 0.634196) + (open* (1 - 0.634196))), 17.4842), 6.92131), 13.4283))* -1)</p></li>
+</ul>
+<h4 id="alpha_083">alpha_083</h4>
+<pre><code class="python language-python hljs">alpha_083(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>((rank(delay(((high - low) / (sum(close, 5) / 5)), 2))* rank(rank(volume))) / (((high - low) / (sum(close, 5) / 5)) / (vwap - close)))</p></li>
+</ul>
+<h4 id="alpha_084">alpha_084</h4>
+<pre><code class="python language-python hljs">alpha_084(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>SignedPower(Ts_Rank((vwap - ts_max(vwap, 15.3217)), 20.7127), delta(close, 4.96796))</p></li>
+</ul>
+<h4 id="alpha_085">alpha_085</h4>
+<pre><code class="python language-python hljs">alpha_085(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(rank(correlation(((high* 0.876703) + (close* (1 - 0.876703))), adv30, 9.61331))^rank(correlation(Ts_Rank(((high + low) / 2), 3.70596), Ts_Rank(volume, 10.1595), 7.11408)))</p></li>
+</ul>
+<h4 id="alpha_086">alpha_086</h4>
+<pre><code class="python language-python hljs">alpha_086(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个Series：index为成分股代码，values为1或-1，当满足条件时为-1，否则为1</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>((Ts_Rank(correlation(close, sum(adv20, 14.7444), 6.00049), 20.4195) &lt; rank(((open + close) - (vwap + open))))* -1)</p></li>
+</ul>
+<h4 id="alpha_087（未实现）">alpha_087（未实现）</h4>
+<ul>
+<li><p>因子公式：</p></li>
+
+<li><p>(max(rank(decay_linear(delta(((close* 0.369701) + (vwap* (1 - 0.369701))), 1.91233), 2.65461)), Ts_Rank(decay_linear(abs(correlation(IndNeutralize(adv81, IndClass.industry), close, 13.4132)), 4.89768), 14.4535))* -1)</p></li>
+</ul>
+<h4 id="alpha_088">alpha_088</h4>
+<pre><code class="python language-python hljs">alpha_088(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>min(rank(decay_linear(((rank(open) + rank(low)) - (rank(high) + rank(close))), 8.06882)), Ts_Rank(decay_linear(correlation(Ts_Rank(close, 8.44728), Ts_Rank(adv60, 20.6966), 8.01266), 6.65053), 2.61957))</p></li>
+</ul>
+<h4 id="alpha_089（未实现）">alpha_089（未实现）</h4>
+<ul>
+<li><p>因子公式：</p></li>
+
+<li><p>(Ts_Rank(decay_linear(correlation(((low* 0.967285) + (low* (1 - 0.967285))), adv10, 6.94279), 5.51607), 3.79744) - Ts_Rank(decay_linear(delta(IndNeutralize(vwap, IndClass.industry), 3.48158), 10.1466), 15.3012))</p></li>
+</ul>
+<h4 id="alpha_090（未实现）">alpha_090（未实现）</h4>
+<ul>
+<li><p>因子公式：</p></li>
+
+<li><p>((rank((close - ts_max(close, 4.66719)))^Ts_Rank(correlation(IndNeutralize(adv40, IndClass.subindustry), low, 5.38375), 3.21856))* -1)</p></li>
+</ul>
+<h4 id="alpha_091（未实现）">alpha_091（未实现）</h4>
+<ul>
+<li><p>因子公式：</p></li>
+
+<li><p>((Ts_Rank(decay_linear(decay_linear(correlation(IndNeutralize(close, IndClass.industry), volume, 9.74928), 16.398), 3.83219), 4.8667) - rank(decay_linear(correlation(vwap, adv30, 4.01303), 2.6809)))* -1)</p></li>
+</ul>
+<h4 id="alpha_092">alpha_092</h4>
+<pre><code class="python language-python hljs">alpha_092(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>min(Ts_Rank(decay_linear(((((high + low) / 2) + close) &lt; (low + open)), 14.7221), 18.8683), Ts_Rank(decay_linear(correlation(rank(low), rank(adv30), 7.58555), 6.94024), 6.80584))</p></li>
+</ul>
+<h4 id="alpha_093（未实现）">alpha_093（未实现）</h4>
+<ul>
+<li><p>因子公式：</p></li>
+
+<li><p>(Ts_Rank(decay_linear(correlation(IndNeutralize(vwap, IndClass.industry), adv81, 17.4193), 19.848), 7.54455) / rank(decay_linear(delta(((close* 0.524434) + (vwap* (1 - 0.524434))), 2.77377), 16.2664)))</p></li>
+</ul>
+<h4 id="alpha_094">alpha_094</h4>
+<pre><code class="python language-python hljs">alpha_094(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>((rank((vwap - ts_min(vwap, 11.5783)))^Ts_Rank(correlation(Ts_Rank(vwap, 19.6462), Ts_Rank(adv60, 4.02992), 18.0926), 2.70756))* -1)</p></li>
+</ul>
+<h4 id="alpha_095">alpha_095</h4>
+<pre><code class="python language-python hljs">alpha_095(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个Series：index为成分股代码，values为1或-1，当满足条件时为1，否则为-1</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(rank((open - ts_min(open, 12.4105))) &lt; Ts_Rank((rank(correlation(sum(((high + low) / 2), 19.1351), sum(adv40, 19.1351), 12.8742))^5), 11.7584))</p></li>
+</ul>
+<h4 id="alpha_096">alpha_096</h4>
+<pre><code class="python language-python hljs">alpha_096(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(max(Ts_Rank(decay_linear(correlation(rank(vwap), rank(volume), 3.83878), 4.16783), 8.38151), Ts_Rank(decay_linear(Ts_ArgMax(correlation(Ts_Rank(close, 7.45404), Ts_Rank(adv60, 4.13242), 3.65459), 12.6556), 14.0365), 13.4143))* -1)</p></li>
+</ul>
+<h4 id="alpha_097（未实现）">alpha_097（未实现）</h4>
+<ul>
+<li><p>因子公式：</p></li>
+
+<li><p>((rank(decay_linear(delta(IndNeutralize(((low* 0.721001) + (vwap* (1 - 0.721001))), IndClass.industry), 3.3705), 20.4523)) - Ts_Rank(decay_linear(Ts_Rank(correlation(Ts_Rank(low, 7.87871), Ts_Rank(adv60, 17.255), 4.97547), 18.5925), 15.7152), 6.71659))* -1)</p></li>
+</ul>
+<h4 id="alpha_098">alpha_098</h4>
+<pre><code class="python language-python hljs">alpha_098(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>(rank(decay_linear(correlation(vwap, sum(adv5, 26.4719), 4.58418), 7.18088)) - rank(decay_linear(Ts_Rank(Ts_ArgMin(correlation(rank(open), rank(adv15), 20.8187), 8.62571), 6.95668), 8.07206)))</p></li>
+</ul>
+<h4 id="alpha_099">alpha_099</h4>
+<pre><code class="python language-python hljs">alpha_099(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+<li><p>enddate: 必选参数，计算哪一天的因子</p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’</p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个Series：index为成分股代码，values为1或-1，当满足条件时为-1，否则为1</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>((rank(correlation(sum(((high + low) / 2), 19.8975), sum(adv60, 19.8975), 8.8136)) &lt; rank(correlation(low, volume, 6.28259)))* -1)</p></li>
+</ul>
+<h4 id="alpha_100（未实现）">alpha_100（未实现）</h4>
+<ul>
+<li><p>因子公式：</p></li>
+
+<li><p>(0 - (1* (((1.5* scale(indneutralize(indneutralize(rank(((((close - low) - (high - close)) / (high - low))* volume)), IndClass.subindustry), IndClass.subindustry))) - scale(indneutralize((correlation(close, rank(adv20), 5) - rank(ts_argmin(close, 30))), IndClass.subindustry)))* (volume / adv20))))</p></li>
+</ul>
+<h4 id="alpha_101">alpha_101</h4>
+<pre><code class="python language-python hljs">alpha_101(enddate, index=<span class="hljs-string">'all'</span>)
+</code></pre>
+<ul>
+<li><p>输入：</p></li>
+
+
+
+<li><p>enddate: 必选参数，计算哪一天的因子 </p></li>
+<li><p>index: 默认参数，股票指数，默认为所有股票’all’ </p></li>
+<li><p>输出：</p></li>
+
+<li><p>一个 Series：index 为成分股代码，values 为对应的因子值</p></li>
+<li><p>因子公式：</p></li>
+
+<li><p>((close - open) / ((high - low) + .001))</p></li>
+</ul></div> </div> </div> <script type="text/template" id="treeTemp"> <li class="am-tree-branch am-hide" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder"></span>
+        <span class="am-tree-label"></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader" role="alert"><span class="doc-loading"></span></div>
+  </li>
+  <li class="am-tree-item am-hide" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item"></span>
+      <span class="am-tree-label"></span>
+    </button>
+  </li> </script></div> <div id="leftsead" class="jq-leftsead" draggable="true"> <ul><li class="qiyukf__entry backtotop-popover "> <div class="popover-content" style="width:85px;margin-left:-95px;margin-top:5px">在线客服</div> </li> <li class="backtotop__progress hidden"> <span class="backtotop__progress-count hidden"></span> <div class="backtotop__record-container hidden"></div> </li> <li class="newUser backtotop__newUser hidden backtotop__scroll"> <a href="/post/24debe6786302edc2febfc09b1312a6c" target="_blank"></a> </li> <li class="toTop backtotop__toTop hidden backtotop__scroll" id="top_btn"></li> </ul> <input type="hidden" class="timeStamp" value="17679309750001783575403239"> <input type="hidden" class="js-cdn-path" value="https://cdn.joinquant.com"> </div> <script src="https://cdn.joinquant.com/std/dist/asset/vendor.js?v=17679309750001783575403239"></script> <script>window.tokenData={name:"token",value:"b8c8144d2fcf22e093799cccf7771a071d2d47f1e72a0fe4066f0f8dd8ed59179f5ecf350ff1a985999f7a788443f293"},$.ajaxSetup({data:{token:window.tokenData.value}})</script> <script src="https://cdn.joinquant.com/std/dist/asset/jq-plugin.js?v=17679309750001783575403239"></script> <script src="https://cdn.joinquant.com/std/dist/asset/general/login-dialog.bundle.js?v=17679309750001783575403239"></script> <script src="https://cdn.joinquant.com/std/dist/asset/general/message.bundle.js?v=17679309750001783575403239"></script> <script src="https://cdn.joinquant.com/std/dist/asset/general/wechat-share.bundle.js?v=17679309750001783575403239"></script> <input type="hidden" id="valid-code__token"><script src="https://cdn.joinquant.com/themes/jq/static/dist/asset/general/include.bundle.js?v=17679309750001783575403239"></script> <script src="https://cdn.joinquant.com/themes/jq/static/dist/asset/general/backtotop.bundle.js?v=17679309750001783575403239"></script> <script>!function(c,e,d,n,t){c[d]=c[d]||function(){(c[d].a=c[d].a||[]).push(arguments)},(t=e.createElement("script")).async=!0,t.src="https://qiyukf.com/script/d65beefd7552d92ee02344b3cc6173de.js",e.body.appendChild(t)}(window,document,"ysf")</script><script async="" src="https://qiyukf.com/script/d65beefd7552d92ee02344b3cc6173de.js"></script> <script charset="UTF-8" src="https://cdn.joinquant.com/std/third/MathJax-master/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script> <script charset="UTF-8" src="https://cdn.joinquant.com/std/dist/modules/help/api/help.bundle.js?v=17679309750001783575403239"></script><script src="https://cdn.joinquant.com/themes/jq/static/third/transition-notice.js"></script> <script charset="UTF-8">MathJax.Hub.Config({tex2jax:{inlineMath:[["$","$"],["\\(","\\)"]]}})</script>   <div style="top: 0px; left: 0px; visibility: hidden; position: absolute; width: 1px; height: 1px;"><iframe style="height:0px; width:0px;" src="https://qiyukf.com/webapi/sdkres/delegate.html?k=d65beefd7552d92ee02344b3cc6173de&amp;1784374732718"></iframe></div><div id="YSF-BTN-HOLDER" style="display: none;"><div id="YSF-CUSTOM-ENTRY-0" class="YSF-CUSTOM-ENTRY"><img src="https://xlx03.qiyukf.net/463a7f7a19b9c07a71b61506233233d7.jpg?imageView&amp;thumbnail=300x300"></div><span id="YSF-BTN-CIRCLE"></span><div id="YSF-BTN-BUBBLE"><div id="YSF-BTN-CONTENT"></div><span id="YSF-BTN-ARROW"></span><span id="YSF-BTN-CLOSE"></span></div></div></body></html>

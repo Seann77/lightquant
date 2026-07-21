@@ -28,7 +28,7 @@ type CodeStructureScan = {
   imports: string[];
   dependencies: string[];
   riskFlags: string[];
-  manualReviewItems: string[];
+  internalDiagnostics: string[];
 };
 
 type CodeChunk = {
@@ -225,7 +225,7 @@ export async function runChunkedCodeProcessing(input: AiProviderInput, runSingle
     chunkCount: chunks.length,
     completedChunks: chunkResults.length,
     currentChunk: null,
-    statusMessage: input.task.type === "code_conversion" ? "正在合并转换代码、迁移说明和人工复核项。" : "正在汇总解析报告。"
+    statusMessage: input.task.type === "code_conversion" ? "正在合并转换代码和必要的兼容说明。" : "正在汇总解析报告。"
   });
   return mergeChunkResults(input, scan, chunks, chunkResults);
 }
@@ -247,7 +247,7 @@ function scanCodeStructure(task: Pick<AiTask, "inputCode" | "sourcePlatform" | "
     .slice(0, 40));
   const detected = detectPlatform(code, task.sourcePlatform);
   const riskFlags = buildRiskFlags(code, usedDataApis, usedOrderApis);
-  const manualReviewItems = buildManualReviewItems(task, code, detected.platform, usedDataApis, usedOrderApis);
+  const internalDiagnostics = buildInternalDiagnostics(task, code, detected.platform, usedDataApis, usedOrderApis);
 
   return {
     inputChars: code.length,
@@ -265,7 +265,7 @@ function scanCodeStructure(task: Pick<AiTask, "inputCode" | "sourcePlatform" | "
     imports: imports.slice(0, 40),
     dependencies: buildDependencies(imports, usedDataApis, usedOrderApis),
     riskFlags,
-    manualReviewItems
+    internalDiagnostics
   };
 }
 
@@ -335,10 +335,10 @@ function buildChunkPrompt(input: AiProviderInput, scan: CodeStructureScan, chunk
     `大型代码分段${action}任务：当前只处理第 ${chunk.index + 1} / ${chunkCount} 段。`,
     "不要展示模型私有推理链。只输出兼容既有 schema 的 JSON。",
     "本段结果会由服务端与其他分段合并；请保留本段代码的交易语义、参数、调度、数据依赖、下单动作和风控意图。",
-    "如果本段引用了其他分段中的函数、全局变量或平台 API，请在 reportJson.dependencies 或 manualReviewItems 中标注，不要凭空补全未出现的逻辑。",
+    "如果本段引用了其他分段中的函数、全局变量或平台 API，请在 reportJson.dependencies 或 internalDiagnostics 中记录，供服务端合并；普通跨段依赖不是用户风险，不要写进最终说明。",
     input.task.type === "code_conversion"
-      ? "转换要求：按行为语义迁移，不只做表面语法替换；PTrade、聚宽 JoinQuant、QMT 的不确定 API 必须标注“需要人工复核”。转换到 QMT 时必须保守区分 QMT 内置 Python 与 XtQuant，不确定时不要混用 API。"
-      : "解析要求：只解释代码证据能支持的内容；识别入口、调度、数据、选股、信号、下单、持仓、风控和需要人工复核的缺口。",
+      ? "转换要求：按行为语义迁移，不只做表面语法替换；事实索引命中时按文档实现，未命中时不拒绝、不编造、不声称文档确认。只有会导致运行失败、API 明显不匹配或核心语义无法保持时，才写一条具体兼容说明。转换到 QMT 时区分内置 Python 与 XtQuant。"
+      : "解析要求：只解释代码证据能支持的内容；识别入口、调度、数据、选股、信号、下单、持仓和风控。普通跨段上下文缺口仅写入内部诊断。",
     "结构扫描摘要：",
     JSON.stringify(toPublicScanSummary(scan), null, 2),
     "当前代码段：",
@@ -354,7 +354,7 @@ function buildChunkPrompt(input: AiProviderInput, scan: CodeStructureScan, chunk
     }, null, 2),
     input.task.type === "code_analysis"
       ? "输出要求：reportJson 尽量按 overview、tradingLogic、keyParameters、risks、suggestions 五类报告字段组织；如果仍输出 codeStructure、parameters、platformDependencies、optimizationSuggestions，服务端会做兼容合并。"
-      : "输出要求：reportJson 至少包含 processingMode='chunked'、phase='processing'、chunkId、chunkIndex、chunkCount、codeStructure、dependencies、manualReviewItems。"
+      : "输出要求：reportJson 只需记录本段 codeStructure、dependencies 和 internalDiagnostics；服务端会补全分段元数据。"
   ].filter(Boolean).join("\n\n");
 }
 
@@ -378,9 +378,12 @@ async function mergeChunkResults(
   const scopeStatus = chunkResults.some((item) => item.result.scopeStatus === "in_scope") ? "in_scope" : "out_of_scope";
   const tokenUsage = sumTokenUsage(chunkResults.map((item) => item.result.tokenUsage));
   const model = unique(chunkResults.map((item) => item.result.model).filter(Boolean)).join(", ") || "unknown";
-  const manualReviewItems = unique([
-    ...scan.manualReviewItems,
-    ...chunkResults.flatMap((item) => readStringArray(item.result.reportJson?.manualReviewItems))
+  const internalDiagnostics = unique([
+    ...scan.internalDiagnostics,
+    ...chunkResults.flatMap((item) => [
+      ...readStringArray(item.result.reportJson?.internalDiagnostics),
+      ...readStringArray(item.result.reportJson?.manualReviewItems)
+    ])
   ]).slice(0, 30);
   const dependencies = unique([
     ...scan.dependencies,
@@ -399,7 +402,7 @@ async function mergeChunkResults(
       migrationNotes: null,
       riskWarnings: riskWarnings.length ? riskWarnings : ["本次请求超出当前模块范围。"],
       reportJson: buildMergedReportJson(input, scan, chunks, chunkResults, {
-        manualReviewItems,
+        internalDiagnostics,
         dependencies,
         validation: {
           status: "skipped",
@@ -416,8 +419,8 @@ async function mergeChunkResults(
     : null;
   const explanation = buildMergedExplanation(taskType, scan, chunkResults);
   const migrationNotes = taskType === "code_conversion"
-    ? buildMergedMigrationNotes(scan, chunkResults, manualReviewItems)
-    : buildAnalysisMigrationNotes(chunkResults, manualReviewItems);
+    ? buildMergedMigrationNotes(chunkResults, internalDiagnostics)
+    : null;
   await input.progressReporter?.({
     phase: "validating",
     processingMode: "chunked",
@@ -436,9 +439,9 @@ async function mergeChunkResults(
     generatedCode,
     explanation,
     migrationNotes,
-    riskWarnings: riskWarnings.length ? riskWarnings : ["请在回测和模拟盘中验证结果，不构成投资建议。"],
+    riskWarnings: taskType === "code_conversion" ? [] : riskWarnings,
     reportJson: buildMergedReportJson(input, scan, chunks, chunkResults, {
-      manualReviewItems,
+      internalDiagnostics,
       dependencies,
       validation
     }),
@@ -447,19 +450,13 @@ async function mergeChunkResults(
   };
 }
 
-function buildMergedGeneratedCode(task: Pick<AiTask, "sourcePlatform" | "targetPlatform">, chunkResults: ChunkResult[]) {
+function buildMergedGeneratedCode(task: Pick<AiTask, "targetPlatform">, chunkResults: ChunkResult[]) {
   const blocks = chunkResults
     .map((item) => item.result.generatedCode?.trim())
     .filter((code): code is string => Boolean(code));
   const uniqueBlocks = dedupeAdjacentBlocks(blocks);
   const needsQmtEncoding = isQmtBuiltInTarget(task.targetPlatform);
-  const header = [
-    needsQmtEncoding ? "#coding:gbk" : "",
-    "# LightQuant chunked conversion output",
-    task.sourcePlatform ? `# Source platform: ${task.sourcePlatform}` : "",
-    task.targetPlatform ? `# Target platform: ${task.targetPlatform}` : "",
-    "# Review all items marked manual review before backtest or live trading."
-  ].filter(Boolean).join("\n");
+  const header = needsQmtEncoding ? "#coding:gbk" : "";
 
   return [header, ...uniqueBlocks].join("\n\n").trim();
 }
@@ -481,26 +478,27 @@ function buildMergedExplanation(type: CodeProcessingTaskType, scan: CodeStructur
   return truncateText([scanOverview, ...chunkExplanations].join("\n\n"), 60000);
 }
 
-function buildMergedMigrationNotes(scan: CodeStructureScan, chunkResults: ChunkResult[], manualReviewItems: string[]) {
-  const notes = unique([
-    ...chunkResults.map((item) => item.result.migrationNotes).filter((value): value is string => Boolean(value?.trim())),
-    ...manualReviewItems.map((item) => `需要人工复核：${item}`)
-  ]);
-  const platformNotes = [
-    scan.dataApis.length ? `数据接口涉及：${scan.dataApis.join(", ")}。` : "",
-    scan.orderApis.length ? `下单接口涉及：${scan.orderApis.join(", ")}。` : ""
-  ].filter(Boolean);
+function buildMergedMigrationNotes(chunkResults: ChunkResult[], internalDiagnostics: string[]) {
+  const explicitNotes = chunkResults
+    .map((item) => item.result.migrationNotes)
+    .filter((value): value is string => Boolean(value?.trim()));
+  const criticalDiagnostics = internalDiagnostics.filter((item) =>
+    /无法运行|运行失败|API.*(?:不匹配|不存在)|没有.*等价|缺少.*能力|核心语义.*无法|内置 Python.*XtQuant|提交委托.*不等同成交/.test(item)
+  );
+  const notes = sanitizeCompatibilityNotes([...explicitNotes, ...criticalDiagnostics]);
 
-  return truncateText([...platformNotes, ...notes].join("\n\n"), 40000) || "已按分段结果合并迁移说明；请逐项复核目标平台 API 差异。";
+  return notes.length ? truncateText(notes.join("\n"), 12000) : null;
 }
 
-function buildAnalysisMigrationNotes(chunkResults: ChunkResult[], manualReviewItems: string[]) {
-  const notes = unique([
-    ...chunkResults.map((item) => item.result.migrationNotes).filter((value): value is string => Boolean(value?.trim())),
-    ...manualReviewItems.map((item) => `需要人工复核：${item}`)
-  ]);
-
-  return notes.length ? truncateText(notes.join("\n\n"), 24000) : null;
+function sanitizeCompatibilityNotes(values: string[]) {
+  return unique(values.flatMap((value) => value
+    .split(/\n{2,}|\n(?=\s*[-*+]\s+)/)
+    .map((item) => item
+      .replace(/^\s*[-*+]\s*/, "")
+      .replace(/^(?:需要人工复核|保守近似|目标平台可能需要替换为实际接口)\s*[：:]?\s*/i, "")
+      .trim())
+    .filter((item) => item && !/^(?:请.*复核|请.*验证|已完成转换|转换完成|暂无|无)$/i.test(item))))
+    .slice(0, 3);
 }
 
 function validateMergedResult(
@@ -542,7 +540,7 @@ function buildMergedReportJson(
   chunks: CodeChunk[],
   chunkResults: ChunkResult[],
   extra: {
-    manualReviewItems: string[];
+    internalDiagnostics: string[];
     dependencies: string[];
     validation: Record<string, unknown>;
   }
@@ -576,10 +574,13 @@ function buildMergedReportJson(
       scopeStatus: item.result.scopeStatus,
       explanationPreview: truncateText(item.result.explanation ?? "", 500),
       riskWarnings: item.result.riskWarnings.slice(0, 6),
-      manualReviewItems: readStringArray(item.result.reportJson?.manualReviewItems).slice(0, 8)
+      internalDiagnostics: unique([
+        ...readStringArray(item.result.reportJson?.internalDiagnostics),
+        ...readStringArray(item.result.reportJson?.manualReviewItems)
+      ]).slice(0, 8)
     })),
     ...analysisReport,
-    manualReviewItems: extra.manualReviewItems,
+    internalDiagnostics: extra.internalDiagnostics,
     dependencies: extra.dependencies,
     validation: extra.validation,
     skillId: input.skill.id,
@@ -594,7 +595,7 @@ function buildMergedAnalysisReportFields(
   chunks: CodeChunk[],
   chunkResults: ChunkResult[],
   extra: {
-    manualReviewItems: string[];
+    internalDiagnostics: string[];
     dependencies: string[];
     validation: Record<string, unknown>;
   }
@@ -625,8 +626,7 @@ function buildMergedAnalysisReportFields(
   ]).slice(0, 20);
   const optimizationSuggestions = unique([
     ...collectChunkReportField(chunkResults, "suggestions"),
-    ...collectChunkReportField(chunkResults, "optimizationSuggestions"),
-    ...extra.manualReviewItems.map((item) => `复核：${item}`)
+    ...collectChunkReportField(chunkResults, "optimizationSuggestions")
   ]).slice(0, 30);
 
   return {
@@ -931,7 +931,7 @@ function buildRiskFlags(code: string, dataApis: string[], orderApis: string[]) {
   }
 
   if (dataApis.includes("get_fundamentals") || dataApis.includes("get_financial_data")) {
-    flags.push("基本面/财务数据字段和可得日期需要复核，避免未来函数。");
+    flags.push("基本面/财务数据应按公告可得日期读取，避免未来函数。");
   }
 
   if (orderApis.includes("passorder")) {
@@ -945,7 +945,7 @@ function buildRiskFlags(code: string, dataApis: string[], orderApis: string[]) {
   return flags;
 }
 
-function buildManualReviewItems(
+function buildInternalDiagnostics(
   task: Pick<AiTask, "sourcePlatform" | "targetPlatform">,
   code: string,
   detectedPlatform: string,
@@ -957,23 +957,23 @@ function buildManualReviewItems(
   const source = `${task.sourcePlatform ?? detectedPlatform}`.toLowerCase();
 
   if (target.includes("qmt") && !target.includes("xtquant") && !target.includes("内置")) {
-    items.push("目标平台包含 QMT 但未明确内置 Python 或 XtQuant，需人工复核目标运行环境。");
+    items.push("目标平台包含 QMT，但请求未明确内置 Python 或 XtQuant 运行环境。");
   }
 
   if ((source.includes("joinquant") || source.includes("聚宽")) && target.includes("qmt")) {
-    items.push("JoinQuant 到 QMT 的生命周期、调度、代码格式和证券代码后缀需人工复核。");
+    items.push("JoinQuant 到 QMT 涉及生命周期、调度、代码格式和证券代码后缀差异。");
   }
 
   if (dataApis.some((api) => ["get_fundamentals", "query", "valuation", "income", "balance", "indicator"].includes(api))) {
-    items.push("基本面/财务字段、报告期和公告日期可得性需人工复核。");
+    items.push("代码依赖基本面/财务字段、报告期和公告日期可得性。");
   }
 
   if (orderApis.length > 0) {
-    items.push("下单接口、成交回报、持仓字段和最小交易单位需人工复核。");
+    items.push("代码依赖下单接口、成交回报、持仓字段和最小交易单位。");
   }
 
   if (/\b(?:paused|is_st|high_limit|low_limit|limit_up|limit_down)\b/.test(code)) {
-    items.push("停牌、ST、涨跌停等可交易性过滤在目标平台的数据字段需人工复核。");
+    items.push("代码依赖停牌、ST、涨跌停等可交易性字段。");
   }
 
   return unique(items);
@@ -1003,7 +1003,7 @@ function toPublicScanSummary(scan: CodeStructureScan) {
     classes: scan.classes,
     dependencies: scan.dependencies.slice(0, 30),
     riskFlags: scan.riskFlags,
-    manualReviewItems: scan.manualReviewItems
+    internalDiagnostics: scan.internalDiagnostics
   };
 }
 

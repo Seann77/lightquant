@@ -1,0 +1,370 @@
+---
+platform: qmt
+variant: builtin-python
+source_role: primary
+document_type: strategy_api
+title: 4. 系统函数
+section_path:
+  - 迅投知识库 - 内置Python API文档全集
+  - 4. 系统函数
+source_file: api-docs/raw/qmt/innerapi-combined.html
+source_url: file:///Users/a1-6/Documents/Codex/2026-05-29/https-dict-thinktrader-net-innerapi-start/output/html/innerapi-combined.html
+source_anchor: "#doc-system_function"
+source_sha256: 08ffb4fd69f4e96745a5d83d27b6716c0682a20496b6664df00cc79c55670f28
+captured_at: "2026-07-18T11:37:23.247Z"
+converter: turndown
+conversion_status: complete
+conversion_warnings: []
+canonical: true
+alias_of: null
+---
+
+# 4\. 系统函数
+
+<a id="system_function--contextinfo-对象"></a>
+
+### ContextInfo 对象
+
+ContextInfo 是策略运行环境对象，是 init, after\_init, handlebar 等基本方法的入参，里面包括了终端自带的属性和方法。一般情况下不建议对ContextInfo添加自定义属性，ContextInfo会随着bar的切换而重置到上一根bar的结束状态，建议用自建的全局变量来存储。[详细说明请看这里在新窗口打开](builtin-python--doc-question-answer.md#question_answer--系统对象-contextinfo-逐-k-线保存的机制)
+
+<a id="system_function--init-初始化函数"></a>
+
+### init - 初始化函数
+
+初始化函数，只在整个策略开始时调用运行到一次。用于初始订阅行情，订阅账号信息使用。init函数执行完成前部分接口无法使用，如交易日获取函数get\_trading\_dates。
+
+**系统函数 不可被手动调用**
+
+**参数：**
+
+| 名称 | 类型 | 描述 |
+| --- | --- | --- |
+| `ContextInfo` | `object` | 策略运行环境对象，可以用于存储自定义的全局变量 |
+
+**返回：** 无
+
+**示例：**
+
+**在init函数中订阅行情示例：**
+
+<a id="system_function--after-init-初始化后函数"></a>
+
+### after\_init - 初始化后函数
+
+后初始化函数，在初始化函数执行完成后被调用一次。可以用于放置一次性触发的下单，取数据操作代码。
+
+系统会在`init`函数执行完后和执行`handlebar`之前调用`after_init`, 有些`init`里不支持的函数比如[ContextInfo.get\_trading\_dates](https://dict.thinktrader.net/pages/fd9cbd/#_23-%E8%8E%B7%E5%8F%96%E6%8C%87%E5%AE%9A%E4%B8%AA%E8%82%A1-%E5%90%88%E7%BA%A6-%E6%8C%87%E6%95%B0%E7%9A%84-k-%E7%BA%BF-%E4%BA%A4%E6%98%93%E6%97%A5-%E5%88%97%E8%A1%A8-contextinfo-get-trading-dates)可以在`after_init`里调用。
+
+**系统函数 不可被手动调用**
+
+**参数：**
+
+| 名称 | 类型 | 描述 |
+| --- | --- | --- |
+| `ContextInfo` | `object` | 策略运行环境对象，可以用于存储自定义的全局变量 |
+
+**返回：** 无
+
+**示例：**
+
+**after\_init函数中立刻下单示例：**
+
+<a id="system_function--handlebar-行情事件函数"></a>
+
+### handlebar - 行情事件函数
+
+**系统函数 不可被手动调用**
+
+**释义：** 行情事件函数，每根 K 线运行一次；实时行情获取状态下，先每根历史 K 线运行一次，再在每个 tick 数据来后驱动运行一次
+
+历史k线上，按时间顺序每根K线触发一次调用；盘中，每个新到达的TICK数据驱动运行一次。可以作为行情驱动的函数，实现指标计算，回测，实盘下单的效果。
+
+**参数：**
+
+| 名称 | 类型 | 描述 |
+| --- | --- | --- |
+| `ContextInfo` | `object` | 策略运行环境对象，可以用于存储自定义的全局变量 |
+
+**返回：** 无
+
+**示例：**
+
+<a id="system_function--contextinfo-schedule-run-设置定时器"></a>
+
+### ContextInfo.schedule\_run - 设置定时器
+
+说明
+
+1.  该函数是新版设置定时器函数，相比旧版`run_time`，新版`schedule_run`新增了`任务分组`,`任务取消`等多种功能
+
+**原型:**
+
+**参数：**
+
+| 名称 | 类型 | 描述 |
+| --- | --- | --- |
+| `func` | `Callable` | 回调函数，到达定时器预定时间时触发调用，参数为ContextInfo类型，无需返回值，定义示例如下：
+def on\_timer(C:ContextInfo): pass |
+| `time_point` | `Union[datetime.datetime,str]` | 表示预定的第一次触发时间，如果设置定时器时已经过了预定时间，会立即执行func以及后续逻辑；
+当使用str类型时，格式为'yyyymmddHHMMSS'如'20231231235959'，需要满足转换datetime.datetime.strptime('20231231235959','%Y%m%d%H%M%S') |
+| `repeat_times` | `int` | 表示在预定时间触发后按interval间隔再触发多少次，传`-1`表示不限制次数 |
+| `interval` | `datetime.timedelta` | 表示预定时间触发后的后续重复执行的时间间隔 |
+| `name` | `str` | 定时器任务组名，可用于定时器分组，多次设置同名定时任务不会互相覆盖，会计入同一个任务组，按任务组名取消时会全部取消 |
+
+**回调函数参数：** ContextInfo：策略模型全局对象
+
+**返回值：**
+
+`int`类型，表示本次调用后生成的定时任务号，可用于取消本次定时任务，全局唯一不重复
+
+**示例：**
+
+<a id="system_function--contextinfo-cancel-schedule-run-取消由schedule-run产生的定时任务"></a>
+
+### ContextInfo.cancel\_schedule\_run - 取消由schedule\_run产生的定时任务
+
+**原型：**
+
+**参数：**
+
+| 名称 | 类型 | 描述 |
+| --- | --- | --- |
+| `key:` | `Union[seq:int,name:str]` | 类型为int时，表示按任务号取消;类型为str时，表示按任务组取消，会取消组内所有定时任务 |
+
+**返回值：**
+
+`bool`类型，表示是否取消成功，即是否能按key找到目标定时任务
+
+**示例：**
+
+<a id="system_function--contextinfo-run-time-设置定时器"></a>
+
+### ContextInfo.run\_time - 设置定时器
+
+设置定时器函数，可以指定时间间隔，定时触发用户定义的回调函数。适用与在盘中，持续判断交易信号的模型。
+
+**用法：** `ContextInfo.run_time(funcName,period,startTime)` 定时触发指定的 funcName函数, funcName函数由用户定义, 入参为ContextInfo对象。
+
+**参数：**
+
+-   funcName：回调函数名
+-   period：重复调用的时间间隔,'5nSecond'表示每5秒运行1次回调函数,'5nDay'表示每5天运行一次回调函数,'500nMilliSecond'表示每500毫秒运行1次回调函数
+-   startTime：表示定时器第一次启动的时间,如果要定时器立刻启动,可以设置历史的时间
+
+**回调函数参数：** ContextInfo：策略模型全局对象
+
+**示例：**
+
+注意
+
+1.  模型回测时无效
+2.  定时器没有结束方法，会随着策略的结束而结束。
+3.  period有nMilliSecond、nSecond和Day三个周期单元，部分周期下定时器函数在第一次运行之前会先等待一个period
+
+<a id="system_function--stop-停止处理函数"></a>
+
+### stop - 停止处理函数
+
+**系统函数 不可被手动调用**
+
+**释义：** PY策略模型关闭停止前运行到的函数，复杂策略模型，如中间有起线程可通过在该函数内实现停止线程操作。注意, 当前版本stop函数被调用时交易连接已断开, 不能在stop函数中做报单 / 撤单操作.
+
+**参数：**
+
+| 名称 | 类型 | 描述 |
+| --- | --- | --- |
+| `ContextInfo` | `object` | 策略运行环境对象，可以用于存储自定义的全局变量 |
+
+**示例：**
+
+<a id="system_function--contextinfo-is-last-bar-是否为最后一根k线"></a>
+
+### ContextInfo.is\_last\_bar - 是否为最后一根K线
+
+**用法：** ContextInfo.is\_last\_bar()
+
+**释义：** 判定是否为最后一根 K 线
+
+**参数：** 无
+
+**返回：** bool，返回值含义：True 是右侧最新k线 False不是最新k线
+
+> True：是
+>
+> False：否
+
+**示例：**
+
+<a id="system_function--contextinfo-is-new-bar-判定是否为新的-k-线"></a>
+
+### ContextInfo.is\_new\_bar - 判定是否为新的 K 线
+
+**用法：** ContextInfo.is\_new\_bar()
+
+**释义：** 某根 K 线的第一个 tick 数据到来时，判定该 K 线为新的 K 线，其后的tick不会认为是新的 K 线
+
+**参数：** 无
+
+**返回：** bool，返回值含义：
+
+> True：是
+>
+> False：否
+
+**示例：**
+
+<a id="system_function--contextinfo-get-stock-name-根据代码获取名称"></a>
+
+### ContextInfo.get\_stock\_name - 根据代码获取名称
+
+注意
+
+我们计划后续版本抛弃这个函数，不建议继续使用，可以用ContextInfo.get\_instrument\_detail("stockcode")\["InstrumentName"\]来实现同样功能
+
+**用法：** ContextInfo.get\_stock\_name('stockcode')
+
+**释义：** 根据代码获取名称
+
+**参数：** stockcode：股票代码，如'000001.SZ'，缺省值 ' ' 默认为当前图代码
+
+**返回：** string（GBK编码）
+
+**示例：**
+
+<a id="system_function--contextinfo-get-open-date-根据代码返回对应股票的上市时间"></a>
+
+### ContextInfo.get\_open\_date - 根据代码返回对应股票的上市时间
+
+**用法：** ContextInfo.get\_open\_date('stockcode')
+
+**释义：** 根据代码返回对应股票的上市时间
+
+**参数：** stockcode：股票代码，如'000001.SZ'，缺省值 ' ' 默认为当前图代码
+
+**返回：** number
+
+**示例：**
+
+<a id="system_function--contextinfo-set-output-index-property-设定指标绘制的属性"></a>
+
+### ContextInfo.set\_output\_index\_property - 设定指标绘制的属性
+
+**用法：** ContextInfo.set\_output\_index\_property(index\_name,draw\_style=0,color='white',noaxis=False,nodraw=False,noshow=False)
+
+**释义：** 设定指标绘制的属性，会最终覆盖掉指标对应的属性字段
+
+**参数：**
+
+-   index\_name:string,指标名称，不可缺省
+-   draw\_style,同paint函数的drawstyle，可缺省默认为0
+-   color,同paint函数的color，可缺省默认为'white'
+-   noaxis:bool,是否无坐标，可缺省默认为False
+-   nodraw:bool,是否不画线，可缺省默认为False
+-   noshow:bool,是否不展示，可缺省默认为False
+
+**返回：** 无
+
+**示例：**
+
+<a id="system_function--create-sector-创建板块"></a>
+
+### create\_sector - 创建板块
+
+**用法：** create\_sector(parent\_node,sector\_name,overwrite)
+
+**释义：** 创建板块
+
+**参数：**
+
+-   parent\_node：str，父节点，''为'我的'（默认目录）
+-   sector\_name：str，要创建的板块名
+-   overwrite：bool，是否覆盖。如果目标节点已存在，为True时跳过，为False时在sector\_name后增加数字编号，编号为从1开始自增的第一个不重复的值。
+
+**返回：** sector\_name2：实际创建的板块名
+
+**示例：**
+
+<a id="system_function--create-sector-folder-创建板块目录节点"></a>
+
+### create\_sector\_folder - 创建板块目录节点
+
+**用法：** create\_sector\_folder(parent\_node,folder\_name,overwrite)
+
+**释义：** 创建板块目录节点
+
+**参数：**
+
+-   parent\_node：str，父节点，''为'我的'（默认目录）
+-   sector\_name：str，要创建的节点名
+-   overwrite：bool，是否覆盖。如果目标节点已存在，为True时跳过，为False时在folder\_name后增加数字编号，编号为从1开始自增的第一个不重复的值。
+
+**返回：** sector\_name2：实际创建的节点名
+
+**示例：**
+
+<a id="system_function--get-sector-list-获取板块目录信息"></a>
+
+### get\_sector\_list - 获取板块目录信息
+
+**用法：** get\_sector\_list(node)
+
+**释义：** 获取板块目录信息
+
+**参数：**
+
+-   node：str，板块节点名，''为顶层目录
+
+**返回：** info\_list：\[\[s1,s2,...\],\[f1,f2,...\]\]s为板块名，f为目录节点名，例如\[\['我的自选'\],\['新建分类1'\]\]
+
+**示例：**
+
+<a id="system_function--reset-sector-stock-list-设置板块成分股"></a>
+
+### reset\_sector\_stock\_list - 设置板块成分股
+
+**用法：** reset\_sector\_stock\_list(sector,stock\_list)
+
+**释义：** 设置板块成分股
+
+**参数：**
+
+-   sector：板块名
+-   stock\_list：list，品种代码列表，例如\['000001.SZ','600000.SH'\]
+
+**返回：** result：bool，操作成功为True，失败为False
+
+**示例：**
+
+<a id="system_function--remove-stock-from-sector-移除板块成分股"></a>
+
+### remove\_stock\_from\_sector - 移除板块成分股
+
+**用法：** remove\_stock\_from\_sector(sector,stock\_code)
+
+**释义：** 移除板块成分股
+
+**参数：**
+
+-   sector：板块名
+-   stock\_code：品种代码，例如'000001.SZ'
+
+**返回：** result：bool，操作成功为True，失败为False
+
+**示例：**
+
+<a id="system_function--add-stock-to-sector-添加板块成分股"></a>
+
+### add\_stock\_to\_sector - 添加板块成分股
+
+**用法：** add\_stock\_to\_sector(sector,stock\_code)
+
+**释义：** 添加板块成分股
+
+**参数：**
+
+-   sector：板块名
+-   stock\_code：品种代码，例如'000001.SZ'
+
+**返回：** result：bool，操作成功为True，失败为False
+
+**示例：**

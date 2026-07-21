@@ -5,6 +5,7 @@ import { Check, ChevronDown } from "lucide-react";
 
 type PlatformDropdownProps = {
   className?: string;
+  disabled?: boolean;
   label: string;
   onChange: (value: string) => void;
   options: readonly string[];
@@ -12,7 +13,7 @@ type PlatformDropdownProps = {
   value: string;
 };
 
-export function PlatformDropdown({ className = "", label, onChange, options, tone = "default", value }: PlatformDropdownProps) {
+export function PlatformDropdown({ className = "", disabled = false, label, onChange, options, tone = "default", value }: PlatformDropdownProps) {
   const [open, setOpen] = useState(false);
   const selectedIndex = Math.max(0, options.indexOf(value));
   const [activeIndex, setActiveIndex] = useState(selectedIndex);
@@ -21,6 +22,11 @@ export function PlatformDropdown({ className = "", label, onChange, options, ton
   const listboxId = useId();
 
   useEffect(() => {
+    if (disabled) {
+      setOpen(false);
+      return;
+    }
+
     if (!open) {
       return;
     }
@@ -48,7 +54,7 @@ export function PlatformDropdown({ className = "", label, onChange, options, ton
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [open, selectedIndex]);
+  }, [disabled, open, selectedIndex]);
 
   function commitSelection(nextValue: string) {
     onChange(nextValue);
@@ -57,6 +63,9 @@ export function PlatformDropdown({ className = "", label, onChange, options, ton
   }
 
   function handleTriggerKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
+    if (disabled) {
+      return;
+    }
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
       setOpen(true);
@@ -90,6 +99,7 @@ export function PlatformDropdown({ className = "", label, onChange, options, ton
         aria-expanded={open}
         aria-haspopup="listbox"
         className="lq-select-trigger"
+        disabled={disabled}
         onClick={() => setOpen((current) => !current)}
         onKeyDown={handleTriggerKeyDown}
         ref={triggerRef}

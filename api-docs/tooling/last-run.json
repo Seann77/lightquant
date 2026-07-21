@@ -1,0 +1,18 @@
+{
+  "staging_root": "/Users/a1-6/Documents/Codex-Restored-Projects/量化平台策略生成/api-docs/.markdown-staging",
+  "manifest_file": "/Users/a1-6/Documents/Codex-Restored-Projects/量化平台策略生成/api-docs/.markdown-staging/manifests/markdown_pages.jsonl",
+  "source_count": 36,
+  "markdown_count": 197,
+  "joinquant_main_api_similarity": {
+    "compared": true,
+    "equivalent": true,
+    "similarity": 1,
+    "canonical_source": "api-docs/raw/joinquant/api/rendered.html",
+    "alias_source": "api-docs/raw/joinquant/main/rendered.html"
+  },
+  "published": true,
+  "published_at": "2026-07-18T12:22:54.342Z",
+  "backups": [
+    "api-docs/assets.backup-2026-07-18T12-22-54-341Z"
+  ]
+}

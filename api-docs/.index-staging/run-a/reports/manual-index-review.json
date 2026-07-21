@@ -1,0 +1,1942 @@
+[
+  {
+    "canonical_name": "get_history",
+    "checks": [
+      "API name",
+      "record type",
+      "signature",
+      "parameters",
+      "returns",
+      "environments",
+      "source path and anchor",
+      "source role",
+      "false-positive review"
+    ],
+    "environments": [
+      "research",
+      "backtest",
+      "live_trade",
+      "strategy"
+    ],
+    "id": "sym:e776847f0dcb380b",
+    "kind": "platform_api",
+    "markdown_file": "api-docs/normalized/ptrade/guojin/strategy-api--api.md",
+    "parameters": [
+      {
+        "default": null,
+        "description": "K线数量，大于0，返回指定数量的K线行情；必填参数；入参类型：int；",
+        "name": "count",
+        "required": true,
+        "type": null
+      },
+      {
+        "default": "'1d'",
+        "description": "K线周期，现有支持1分钟线(1m)、5分钟线(5m)、15分钟线(15m)、30分钟线(30m)、60分钟线(60m)、120分钟线(120m)、日线(1d)、周线(1w/weekly)、月线(mo/monthly)、季度线(1q/quarter)和年线(1y/yearly)频率的数据；选填参数，默认为'1d'；入参类型：str；",
+        "name": "frequency",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "'close'",
+        "description": "指明数据结果集中所支持输出的行情字段；选填参数，默认为['open','high','low','close','volume','money','price']；入参类型：list[str,str]或str；输出字段包括：",
+        "name": "field",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "None",
+        "description": null,
+        "name": "security_list",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "None",
+        "description": "数据复权选项，支持包括，pre-前复权，post-后复权，dypre-动态前复权，None-不复权；选填参数，默认为None；入参类型：str；",
+        "name": "fq",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "False",
+        "description": "是否包含当前周期，True -包含，False-不包含；选填参数，默认为False；入参类型：bool；",
+        "name": "include",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "'nan'",
+        "description": "行情获取不到某一时刻的分钟数据时，是否用上一分钟的数据进行填充该时刻数据，'pre'-用上一分钟数据填充，'nan'-NaN进行填充(仅交易有效)；选填参数，默认为'nan'；入参类型：str；",
+        "name": "fill",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "False",
+        "description": null,
+        "name": "is_dict",
+        "required": false,
+        "type": null
+      }
+    ],
+    "passed": true,
+    "platform": "ptrade",
+    "record_type": "api_function",
+    "returns": [
+      {
+        "description": "##### 返回",
+        "fields": [],
+        "type": null
+      }
+    ],
+    "signature": "get_history(count, frequency='1d', field='close', security_list=None, fq=None, include=False, fill='nan', is_dict=False)",
+    "source_anchor": "get_history",
+    "source_file": "api-docs/raw/ptrade/guojin/ptradeapi.html",
+    "source_role": "primary",
+    "variant": "guojin"
+  },
+  {
+    "canonical_name": "get_fundamentals",
+    "checks": [
+      "API name",
+      "record type",
+      "signature",
+      "parameters",
+      "returns",
+      "environments",
+      "source path and anchor",
+      "source role",
+      "false-positive review"
+    ],
+    "environments": [
+      "research",
+      "backtest",
+      "live_trade"
+    ],
+    "id": "sym:dd224cfea8eee41e",
+    "kind": "platform_api",
+    "markdown_file": "api-docs/normalized/ptrade/guojin/strategy-api--api.md",
+    "parameters": [
+      {
+        "default": null,
+        "description": "一支股票代码或者多只股票代码组成的list(list[str])",
+        "name": "security",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": null,
+        "description": "财务数据表名，输入具体表名可查询对应表中信息(str)",
+        "name": "table",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": "None",
+        "description": "指明数据结果集中所需输出业务字段，支持多个业务字段输出(list类型)，如fields=\\'settlement_provi', 'client_provi'\\；输出具体字段请参考 财务数据的API接口说明",
+        "name": "fields",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "None",
+        "description": "查询日期，按日期查询模式，返回查询日期之前对应的财务数据，输入形式如'20170620'；支持datetime.date时间格式输入，不能与start_year与end_year同时作用；支持按日期查询模式，不传入date时默认取回测日期的上一个交易日数据(str)；",
+        "name": "date",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "None",
+        "description": null,
+        "name": "start_year",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "None",
+        "description": null,
+        "name": "end_year",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "None",
+        "description": null,
+        "name": "report_types",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "None",
+        "description": null,
+        "name": "merge_type",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "False",
+        "description": null,
+        "name": "is_dataframe",
+        "required": false,
+        "type": null
+      }
+    ],
+    "passed": true,
+    "platform": "ptrade",
+    "record_type": "api_function",
+    "returns": [
+      {
+        "description": "##### 返回",
+        "fields": [],
+        "type": null
+      }
+    ],
+    "signature": "get_fundamentals(security, table, fields = None, date = None, start_year = None, end_year = None, report_types = None, merge_type = None, is_dataframe = False)",
+    "source_anchor": "get_fundamentals",
+    "source_file": "api-docs/raw/ptrade/guojin/ptradeapi.html",
+    "source_role": "primary",
+    "variant": "guojin"
+  },
+  {
+    "canonical_name": "order",
+    "checks": [
+      "API name",
+      "record type",
+      "signature",
+      "parameters",
+      "returns",
+      "environments",
+      "source path and anchor",
+      "source role",
+      "false-positive review"
+    ],
+    "environments": [
+      "backtest",
+      "live_trade"
+    ],
+    "id": "sym:2dbe95b2c3bf0a52",
+    "kind": "platform_api",
+    "markdown_file": "api-docs/normalized/ptrade/guojin/strategy-api--api.md",
+    "parameters": [
+      {
+        "default": null,
+        "description": "股票代码(str)；",
+        "name": "security",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": null,
+        "description": "交易数量，正数表示买入，负数表示卖出(int)；",
+        "name": "amount",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": "None",
+        "description": null,
+        "name": "limit_price",
+        "required": false,
+        "type": null
+      }
+    ],
+    "passed": true,
+    "platform": "ptrade",
+    "record_type": "api_function",
+    "returns": [
+      {
+        "description": "##### 返回",
+        "fields": [],
+        "type": null
+      }
+    ],
+    "signature": "order(security, amount, limit_price=None)",
+    "source_anchor": "order",
+    "source_file": "api-docs/raw/ptrade/guojin/ptradeapi.html",
+    "source_role": "primary",
+    "variant": "guojin"
+  },
+  {
+    "canonical_name": "run_daily",
+    "checks": [
+      "API name",
+      "record type",
+      "signature",
+      "parameters",
+      "returns",
+      "environments",
+      "source path and anchor",
+      "source role",
+      "false-positive review"
+    ],
+    "environments": [
+      "backtest",
+      "live_trade"
+    ],
+    "id": "sym:a6017669bb6d4d40",
+    "kind": "platform_api",
+    "markdown_file": "api-docs/normalized/ptrade/guojin/strategy-api--api.md",
+    "parameters": [
+      {
+        "default": null,
+        "description": "Context对象，存放有当前的账户及持仓信息(Context)；",
+        "name": "context",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": null,
+        "description": "自定义函数名称，此函数必须以context作为参数(Callable[[Context], None])；",
+        "name": "func",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": "'9:31'",
+        "description": "指定周期运行具体触发运行时间点，默认为9:31分(str)，交易场景可设置范围：00:0023:59。",
+        "name": "time",
+        "required": false,
+        "type": null
+      }
+    ],
+    "passed": true,
+    "platform": "ptrade",
+    "record_type": "api_function",
+    "returns": [
+      {
+        "description": "##### 返回",
+        "fields": [],
+        "type": null
+      }
+    ],
+    "signature": "run_daily(context, func, time='9:31')",
+    "source_anchor": "run_daily",
+    "source_file": "api-docs/raw/ptrade/guojin/ptradeapi.html",
+    "source_role": "primary",
+    "variant": "guojin"
+  },
+  {
+    "canonical_name": "get_price",
+    "checks": [
+      "API name",
+      "record type",
+      "signature",
+      "parameters",
+      "returns",
+      "environments",
+      "source path and anchor",
+      "source role",
+      "false-positive review"
+    ],
+    "environments": [
+      "research",
+      "backtest",
+      "live_trade",
+      "strategy"
+    ],
+    "id": "sym:0813a0f04b185414",
+    "kind": "platform_api",
+    "markdown_file": "api-docs/normalized/ptrade/guojin/strategy-api--api.md",
+    "parameters": [
+      {
+        "default": null,
+        "description": "一支股票代码或者一个股票代码的list(list[str]/str)",
+        "name": "security",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": "None",
+        "description": null,
+        "name": "start_date",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "None",
+        "description": null,
+        "name": "end_date",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "'1d'",
+        "description": "单位时间长度，现有支持1分钟线(1m)、5分钟线(5m)、15分钟线(15m)、30分钟线(30m)、60分钟线(60m)、120分钟线(120m)、日线(1d)、周线(1w/weekly)、月线(mo/monthly)、季度线(1q/quarter)和年线(1y/yearly)频率数据(str)；",
+        "name": "frequency",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "None",
+        "description": "指明数据结果集中所支持输出字段(list[str]/str)，输出字段包括 ：",
+        "name": "fields",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "None",
+        "description": "数据复权选项，支持包括，pre-前复权，post-后复权，dypre-动态前复权，None-不复权(str)；",
+        "name": "fq",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "None",
+        "description": "大于0，不能与start_date同时输入，获取end_date前count根的数据，不支持除天('daily'/'1d')、分钟('1m')、5分钟线('5m')、15分钟线('15m')、30分钟线('30m')、60分钟线('60m')、120分钟线('120m')、周('weekly'/'1w')、('monthly'/'mo')、('quarter'/'1q')和('yearly'/'1y')以外的其它频率(int)；",
+        "name": "count",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "False",
+        "description": null,
+        "name": "is_dict",
+        "required": false,
+        "type": null
+      }
+    ],
+    "passed": true,
+    "platform": "ptrade",
+    "record_type": "api_function",
+    "returns": [
+      {
+        "description": "##### 返回",
+        "fields": [],
+        "type": null
+      }
+    ],
+    "signature": "get_price(security, start_date=None, end_date=None, frequency='1d', fields=None, fq=None, count=None, is_dict=False)",
+    "source_anchor": "get_price",
+    "source_file": "api-docs/raw/ptrade/guojin/ptradeapi.html",
+    "source_role": "primary",
+    "variant": "guojin"
+  },
+  {
+    "canonical_name": "get_history",
+    "checks": [
+      "API name",
+      "record type",
+      "signature",
+      "parameters",
+      "returns",
+      "environments",
+      "source path and anchor",
+      "source role",
+      "false-positive review"
+    ],
+    "environments": [
+      "research",
+      "backtest",
+      "live_trade",
+      "strategy"
+    ],
+    "id": "sym:ffebbdb99d9bfa54",
+    "kind": "platform_api",
+    "markdown_file": "api-docs/normalized/ptrade/shenwan/api-data-550d561d.md",
+    "parameters": [
+      {
+        "default": null,
+        "description": "K线数量，大于0，返回指定数量的K线行情，必填字段",
+        "name": "count",
+        "required": true,
+        "type": "int"
+      },
+      {
+        "default": "'1d'",
+        "description": "K线周期，K线周期，现有支持1分钟线(1m)、5分钟线(5m)、15分钟线(15m)、30分钟线(30m)、60分钟线(60m)、120分钟线(120m)、日线(1d)、周线(1w/weekly)、月线(mo/monthly)、季度线(1q/quarter)和年线(1y/yearly)频率的数据，选填参数，默认为'1d'",
+        "name": "frequency",
+        "required": false,
+        "type": "str"
+      },
+      {
+        "default": "None",
+        "description": "行情字段，选填字段，当frequency为'1d'时，默认为['open','high','low','close','volume','money','price']；当frequency不为'1d'时，默认为['open','high','low','close','volume','money','price','is_open','preclose','high_limit','low_limit','unlimited']",
+        "name": "field",
+        "required": false,
+        "type": "str/list[str]"
+      },
+      {
+        "default": "None",
+        "description": "要获取数据的股票列表，选填参数，默认为None，None表示在上下文中的set_universe中选中的所有股票",
+        "name": "security_list",
+        "required": false,
+        "type": "str/list[str]"
+      },
+      {
+        "default": "None",
+        "description": "数据复权选项，支持包括，pre-前复权，post-后复权，dypre-动态前复权，None-不复权，选填字段",
+        "name": "fq",
+        "required": false,
+        "type": "str"
+      },
+      {
+        "default": "False",
+        "description": "是否包含当前周期，True -包含，False-不包含，选填字段",
+        "name": "include",
+        "required": false,
+        "type": "bool"
+      },
+      {
+        "default": "'nan'",
+        "description": "行情获取不到某一时刻的分钟数据时，是否用上一分钟的数据进行填充该时刻数据，'pre'-用上一分钟数据填充，'nan'-NaN进行填充(仅交易有效)；选填参数",
+        "name": "fill",
+        "required": false,
+        "type": "str"
+      },
+      {
+        "default": "False",
+        "description": "返回是否是字典格式，True-是，False-不是；选填参数，返回为字典格式取数速度相对较快",
+        "name": "is_dict",
+        "required": false,
+        "type": "bool"
+      }
+    ],
+    "passed": true,
+    "platform": "ptrade",
+    "record_type": "api_function",
+    "returns": [
+      {
+        "description": "#### 返回",
+        "fields": [],
+        "type": null
+      }
+    ],
+    "signature": "get_history(count, frequency='1d', field=None, security_list=None, fq=None, include=False, fill='nan', is_dict=False)",
+    "source_anchor": "get_history",
+    "source_file": "api-docs/raw/ptrade/shenwan/08_api_data.html",
+    "source_role": "supplementary",
+    "variant": "shenwan"
+  },
+  {
+    "canonical_name": "get_fundamentals",
+    "checks": [
+      "API name",
+      "record type",
+      "signature",
+      "parameters",
+      "returns",
+      "environments",
+      "source path and anchor",
+      "source role",
+      "false-positive review"
+    ],
+    "environments": [
+      "research",
+      "backtest",
+      "live_trade"
+    ],
+    "id": "sym:9078f5b4e4a0313b",
+    "kind": "platform_api",
+    "markdown_file": "api-docs/normalized/ptrade/shenwan/api-data-3929251f.md",
+    "parameters": [
+      {
+        "default": null,
+        "description": "一支股票代码或者多只股票代码组成的list，必填字段",
+        "name": "security",
+        "required": true,
+        "type": "list[str]/str"
+      },
+      {
+        "default": null,
+        "description": "财务数据表名，输入具体表名可查询对应表中信息，必填字段",
+        "name": "table",
+        "required": true,
+        "type": "str"
+      },
+      {
+        "default": "None",
+        "description": "指明数据结果集中所需输出业务字段，支持多个业务字段输出(list类型)，如fields=['settlement_provi', 'client_provi']；输出具体字段请参考财务数据的API接口说明，选填字段",
+        "name": "fields",
+        "required": false,
+        "type": "list[str]/str"
+      },
+      {
+        "default": "None",
+        "description": "查询日期，按日期查询模式，返回查询日期之前对应的财务数据，输入形式如'20170620'；支持datetime.date时间格式输入，不能与start_year与end_year同时作用；支持按日期查询模式，不传入date时默认取回测日期的上一个交易日数据，选填字段",
+        "name": "date",
+        "required": false,
+        "type": "str/datetime.date"
+      },
+      {
+        "default": "None",
+        "description": "查询开始年份，按年份查询模式，返回输入年份范围内对应的财务数据，如'2015'，start_year与end_year必须同时输入，且不能与date同时作用，选填字段",
+        "name": "start_year",
+        "required": false,
+        "type": "str"
+      },
+      {
+        "default": "None",
+        "description": "查询截止年份，按年份查询模式，返回输入年份范围内对应的财务数据，如'2015'，start_year与end_year必须同时输入，且不能与date同时作用，选填字段",
+        "name": "end_year",
+        "required": false,
+        "type": "str"
+      },
+      {
+        "default": "None",
+        "description": "财报类型；如果为年份查询模式(start_year/end_year)，不输入report_types返回当年可查询到的全部类型财报；如果为日期查询模式(date)，不输入report_types返回距离指定日期最近一份财报，选填字段",
+        "name": "report_types",
+        "required": false,
+        "type": "str"
+      },
+      {
+        "default": "None",
+        "description": "数据更新设置；相关财务数据信息会不断进行修正更新，为了避免未来数据影响，可以通过参数获取原始发布或最新发布数据信息；只有部分表包含此字段，选填字段",
+        "name": "merge_type",
+        "required": false,
+        "type": "int"
+      },
+      {
+        "default": "False",
+        "description": "True-返回DataFrame格式;False-返回pandas.Panel格式(默认,仅python3.5的按年份查询模式有效)，选填字段",
+        "name": "is_dataframe",
+        "required": false,
+        "type": "bool"
+      }
+    ],
+    "passed": true,
+    "platform": "ptrade",
+    "record_type": "api_function",
+    "returns": [
+      {
+        "description": "#### 返回",
+        "fields": [],
+        "type": null
+      }
+    ],
+    "signature": "get_fundamentals(security, table, fields=None, date=None, start_year=None, end_year=None, report_types=None, merge_type=None, is_dataframe=False)",
+    "source_anchor": "get_fundamentals",
+    "source_file": "api-docs/raw/ptrade/shenwan/08_api_data.html",
+    "source_role": "supplementary",
+    "variant": "shenwan"
+  },
+  {
+    "canonical_name": "order",
+    "checks": [
+      "API name",
+      "record type",
+      "signature",
+      "parameters",
+      "returns",
+      "environments",
+      "source path and anchor",
+      "source role",
+      "false-positive review"
+    ],
+    "environments": [
+      "backtest",
+      "live_trade"
+    ],
+    "id": "sym:2baa502251b60cb1",
+    "kind": "platform_api",
+    "markdown_file": "api-docs/normalized/ptrade/shenwan/api-stock-291dd586.md",
+    "parameters": [
+      {
+        "default": null,
+        "description": "证券代码，交易市场代码作为后缀，比如600570.XSHG，选填字段",
+        "name": "security",
+        "required": false,
+        "type": "str"
+      },
+      {
+        "default": null,
+        "description": "下单数量，正数表示买入，负数表示卖出，选填字段",
+        "name": "amount",
+        "required": false,
+        "type": "int"
+      },
+      {
+        "default": "None",
+        "description": "买卖限价，选填字段",
+        "name": "limit_price",
+        "required": false,
+        "type": "float|None"
+      }
+    ],
+    "passed": true,
+    "platform": "ptrade",
+    "record_type": "api_function",
+    "returns": [
+      {
+        "description": "#### 返回值",
+        "fields": [],
+        "type": null
+      }
+    ],
+    "signature": "order(security, amount, limit_price=None)",
+    "source_anchor": "order",
+    "source_file": "api-docs/raw/ptrade/shenwan/10_api_stock.html",
+    "source_role": "supplementary",
+    "variant": "shenwan"
+  },
+  {
+    "canonical_name": "run_daily",
+    "checks": [
+      "API name",
+      "record type",
+      "signature",
+      "parameters",
+      "returns",
+      "environments",
+      "source path and anchor",
+      "source role",
+      "false-positive review"
+    ],
+    "environments": [
+      "backtest",
+      "live_trade"
+    ],
+    "id": "sym:d08b8635ec929ffd",
+    "kind": "platform_api",
+    "markdown_file": "api-docs/normalized/ptrade/shenwan/api-system-392b21bd.md",
+    "parameters": [
+      {
+        "default": null,
+        "description": "存放有当前的账户及持仓信息，必传字段；",
+        "name": "context",
+        "required": null,
+        "type": "Context"
+      },
+      {
+        "default": null,
+        "description": "自定义函数名称，此函数有且只有context一个参数，且该字段不能为量化系统内部定义函数，如handle_data等，必传字段；",
+        "name": "func",
+        "required": null,
+        "type": "Callable[[Context], None]"
+      },
+      {
+        "default": "\"9:31\"",
+        "description": "指定周期运行具体触发运行时间点，交易场景可设置范围：00:0023:59，必传字段。",
+        "name": "time",
+        "required": false,
+        "type": "str"
+      }
+    ],
+    "passed": true,
+    "platform": "ptrade",
+    "record_type": "api_function",
+    "returns": [
+      {
+        "description": "#### 返回",
+        "fields": [],
+        "type": null
+      }
+    ],
+    "signature": "run_daily(context, func, time=\"9:31\")",
+    "source_anchor": "run_daily",
+    "source_file": "api-docs/raw/ptrade/shenwan/07_api_system.html",
+    "source_role": "supplementary",
+    "variant": "shenwan"
+  },
+  {
+    "canonical_name": "get_price",
+    "checks": [
+      "API name",
+      "record type",
+      "signature",
+      "parameters",
+      "returns",
+      "environments",
+      "source path and anchor",
+      "source role",
+      "false-positive review"
+    ],
+    "environments": [
+      "research",
+      "backtest",
+      "live_trade",
+      "strategy"
+    ],
+    "id": "sym:ee6c2488cea4f3cd",
+    "kind": "platform_api",
+    "markdown_file": "api-docs/normalized/ptrade/shenwan/api-data-550d561d.md",
+    "parameters": [
+      {
+        "default": null,
+        "description": "一支股票代码或者一个股票代码的list，必填字段",
+        "name": "security",
+        "required": true,
+        "type": "list[str]/str"
+      },
+      {
+        "default": "None",
+        "description": "开始时间，回测中输入请小于回测日期，交易、研究中输入请小于当前日期，且均小于等于end_date。传入格式仅支持：YYYYmmdd、YYYY-mm-dd、YYYY-mm-dd HH:MM、YYYYmmddHHMM，如'20150601'、'2015-06-01'、'2015-06-01 10:00'、'201506011000'，选填字段",
+        "name": "start_date",
+        "required": false,
+        "type": "str"
+      },
+      {
+        "default": "None",
+        "description": "结束时间，回测中输入请小于回测日期，交易、研究中输入请小于当前日期。传入格式仅支持：YYYYmmdd、YYYY-mm-dd、YYYY-mm-dd HH:MM、YYYYmmddHHMM，如'20150601'、'2015-06-01'、'2015-06-01 14:00'、'201506011400'，选填字段",
+        "name": "end_date",
+        "required": false,
+        "type": "str"
+      },
+      {
+        "default": "'1d'",
+        "description": "单位时间长度，现有支持1分钟线(1m)、5分钟线(5m)、15分钟线(15m)、30分钟线(30m)、60分钟线(60m)、120分钟线(120m)、日线(1d)、周线(1w/weekly)、月线(mo/monthly)、季度线(1q/quarter)和年线(1y/yearly)频率数据，选填字段",
+        "name": "frequency",
+        "required": false,
+        "type": "str"
+      },
+      {
+        "default": "None",
+        "description": "指明数据结果集中所支持输出字段，选填字段，当frequency为'1d'时，默认为['open','high','low','close','volume','money','price']；当frequency不为'1d'时，默认为['open','high','low','close','volume','money','price','is_open','preclose','high_limit','low_limit','unlimited']",
+        "name": "fields",
+        "required": false,
+        "type": "list[str]/str"
+      },
+      {
+        "default": "None",
+        "description": "数据复权选项，支持包括，pre-前复权，post-后复权，dypre-动态前复权，None-不复权，选填字段",
+        "name": "fq",
+        "required": false,
+        "type": "str"
+      },
+      {
+        "default": "None",
+        "description": "大于0，不能与start_date同时输入，获取end_date前count根的数据，不支持除天('daily'/'1d')、分钟('1m')、5分钟线('5m')、15分钟线('15m')、30分钟线('30m')、60分钟线('60m')、120分钟线('120m')、周('weekly'/'1w')、('monthly'/'mo')、('quarter'/'1q')和('yearly'/'1y')以外的其它频率，必填字段",
+        "name": "count",
+        "required": true,
+        "type": "str"
+      },
+      {
+        "default": "False",
+        "description": "返回是否是字典格式，True-是，False-不是；选填参数，返回为字典格式取数速度相对较快",
+        "name": "is_dict",
+        "required": false,
+        "type": "bool"
+      }
+    ],
+    "passed": true,
+    "platform": "ptrade",
+    "record_type": "api_function",
+    "returns": [
+      {
+        "description": "#### 返回",
+        "fields": [],
+        "type": null
+      }
+    ],
+    "signature": "get_price(security, start_date=None, end_date=None, frequency='1d', fields=None, fq=None, count=None, is_dict=False)",
+    "source_anchor": "get_price",
+    "source_file": "api-docs/raw/ptrade/shenwan/08_api_data.html",
+    "source_role": "supplementary",
+    "variant": "shenwan"
+  },
+  {
+    "canonical_name": "get_market_data_ex",
+    "checks": [
+      "API name",
+      "record type",
+      "signature",
+      "parameters",
+      "returns",
+      "environments",
+      "source path and anchor",
+      "source role",
+      "false-positive review"
+    ],
+    "environments": [
+      "unknown"
+    ],
+    "id": "sym:4c7e0435be91fba3",
+    "kind": "platform_api",
+    "markdown_file": "api-docs/normalized/qmt/builtin-python/builtin-python--doc-data-function.md",
+    "parameters": [
+      {
+        "default": "[]",
+        "description": null,
+        "name": "fields",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "[]",
+        "description": null,
+        "name": "stock_code",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "'follow'",
+        "description": null,
+        "name": "period",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "''",
+        "description": null,
+        "name": "start_time",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "''",
+        "description": null,
+        "name": "end_time",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "-1",
+        "description": null,
+        "name": "count",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "'follow'",
+        "description": null,
+        "name": "dividend_type",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "True",
+        "description": null,
+        "name": "fill_data",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "True",
+        "description": null,
+        "name": "subscribe",
+        "required": false,
+        "type": null
+      }
+    ],
+    "passed": true,
+    "platform": "qmt",
+    "record_type": "method",
+    "returns": [
+      {
+        "description": "返回值",
+        "fields": [],
+        "type": null
+      }
+    ],
+    "signature": "ContextInfo.get_market_data_ex(\n    fields=[],\n    stock_code=[],\n    period='follow',\n    start_time='',\n    end_time='',\n    count=-1,\n    dividend_type='follow',\n    fill_data=True,\n    subscribe=True)",
+    "source_anchor": "data_function--contextinfo-get-market-data-ex-获取行情数据",
+    "source_file": "api-docs/raw/qmt/innerapi-combined.html",
+    "source_role": "primary",
+    "variant": "builtin-python"
+  },
+  {
+    "canonical_name": "passorder",
+    "checks": [
+      "API name",
+      "record type",
+      "signature",
+      "parameters",
+      "returns",
+      "environments",
+      "source path and anchor",
+      "source role",
+      "false-positive review"
+    ],
+    "environments": [
+      "live_trade"
+    ],
+    "id": "sym:ef5b4a5b92118235",
+    "kind": "platform_api",
+    "markdown_file": "api-docs/normalized/qmt/builtin-python/builtin-python--doc-trading-function.md",
+    "parameters": [
+      {
+        "default": null,
+        "description": null,
+        "name": "opType",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": null,
+        "description": null,
+        "name": "orderType",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": null,
+        "description": null,
+        "name": "accountid",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": null,
+        "description": null,
+        "name": "orderCode",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": null,
+        "description": null,
+        "name": "prType",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": null,
+        "description": null,
+        "name": "price",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": null,
+        "description": null,
+        "name": "volume",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": null,
+        "description": null,
+        "name": "strategyName",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": null,
+        "description": null,
+        "name": "quickTrade",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": null,
+        "description": null,
+        "name": "userOrderId",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": null,
+        "description": null,
+        "name": "ContextInfo",
+        "required": null,
+        "type": null
+      }
+    ],
+    "passed": true,
+    "platform": "qmt",
+    "record_type": "api_function",
+    "returns": [
+      {
+        "description": "无",
+        "fields": [],
+        "type": null
+      }
+    ],
+    "signature": "passorder(\n    opType, orderType, accountid\n    , orderCode, prType, price, volume\n    , strategyName, quickTrade, userOrderId\n    , ContextInfo\n)",
+    "source_anchor": "trading_function--passorder-综合下单函数",
+    "source_file": "api-docs/raw/qmt/innerapi-combined.html",
+    "source_role": "primary",
+    "variant": "builtin-python"
+  },
+  {
+    "canonical_name": "subscribe_quote",
+    "checks": [
+      "API name",
+      "record type",
+      "signature",
+      "parameters",
+      "returns",
+      "environments",
+      "source path and anchor",
+      "source role",
+      "false-positive review"
+    ],
+    "environments": [
+      "unknown"
+    ],
+    "id": "sym:c4fd9924237f4421",
+    "kind": "platform_api",
+    "markdown_file": "api-docs/normalized/qmt/builtin-python/builtin-python--doc-data-function.md",
+    "parameters": [
+      {
+        "default": null,
+        "description": null,
+        "name": "stock_code",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": "'follow'",
+        "description": null,
+        "name": "period",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "'follow'",
+        "description": null,
+        "name": "dividend_type",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "''",
+        "description": null,
+        "name": "result_type",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "None",
+        "description": null,
+        "name": "callback",
+        "required": false,
+        "type": null
+      }
+    ],
+    "passed": true,
+    "platform": "qmt",
+    "record_type": "method",
+    "returns": [
+      {
+        "description": "返回值",
+        "fields": [],
+        "type": null
+      }
+    ],
+    "signature": "ContextInfo.subscribe_quote(\n    stock_code,\n    period='follow',\n    dividend_type='follow',\n    result_type='',\n    callback=None)",
+    "source_anchor": "data_function--contextinfo-subscribe-quote-订阅行情数据",
+    "source_file": "api-docs/raw/qmt/innerapi-combined.html",
+    "source_role": "primary",
+    "variant": "builtin-python"
+  },
+  {
+    "canonical_name": "get_trade_detail_data",
+    "checks": [
+      "API name",
+      "record type",
+      "signature",
+      "parameters",
+      "returns",
+      "environments",
+      "source path and anchor",
+      "source role",
+      "false-positive review"
+    ],
+    "environments": [
+      "unknown"
+    ],
+    "id": "sym:4ddb873bd6ac7978",
+    "kind": "platform_api",
+    "markdown_file": "api-docs/normalized/qmt/builtin-python/builtin-python--doc-trading-function.md",
+    "parameters": [
+      {
+        "default": null,
+        "description": null,
+        "name": "accountID",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": null,
+        "description": null,
+        "name": "strAccountType",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": null,
+        "description": null,
+        "name": "strDatatype",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": null,
+        "description": null,
+        "name": "strategyName",
+        "required": null,
+        "type": null
+      }
+    ],
+    "passed": true,
+    "platform": "qmt",
+    "record_type": "api_function",
+    "returns": [
+      {
+        "description": "list，list 中放的是对应strDatatype的 Python对象，通过 dir(pythonobj) 可返回某个对象的属性列表。",
+        "fields": [],
+        "type": null
+      }
+    ],
+    "signature": "get_trade_detail_data(accountID, strAccountType, strDatatype, strategyName)",
+    "source_anchor": "trading_function--get-trade-detail-data-查询账号资金信息、委托记录等",
+    "source_file": "api-docs/raw/qmt/innerapi-combined.html",
+    "source_role": "primary",
+    "variant": "builtin-python"
+  },
+  {
+    "canonical_name": "schedule_run",
+    "checks": [
+      "API name",
+      "record type",
+      "signature",
+      "parameters",
+      "returns",
+      "environments",
+      "source path and anchor",
+      "source role",
+      "false-positive review"
+    ],
+    "environments": [
+      "unknown"
+    ],
+    "id": "sym:014ba782f93f02b7",
+    "kind": "platform_api",
+    "markdown_file": "api-docs/normalized/qmt/builtin-python/builtin-python--doc-system-function.md",
+    "parameters": [
+      {
+        "default": null,
+        "description": "Callable, # 回调函数，到达定时器预定时间时触发调用，参数为ContextInfo类型，无需返回值",
+        "name": "func",
+        "required": null,
+        "type": "Callable"
+      },
+      {
+        "default": null,
+        "description": "Union[dt.datetime,str], # 表示预定的第一次触发时间，如果设置定时器时已经过了预定时间，会立即执行func以及后续逻辑；当使用str类型时，格式为'yyyymmddHHMMSS'如'20231231235959'，需要满足转换dt.datetime.strptime('20231231235959','%Y%m%d%H%M%S')",
+        "name": "time_point",
+        "required": null,
+        "type": "Union[dt.datetime,str]"
+      },
+      {
+        "default": "0",
+        "description": "int=0, # 表示在预定时间触发后按interval间隔再触发多少次",
+        "name": "repeat_times",
+        "required": false,
+        "type": "int"
+      },
+      {
+        "default": "None",
+        "description": "datetime.timedelta=None, # 表示预定时间触发后的后续重复执行的时间间隔",
+        "name": "interval",
+        "required": false,
+        "type": "datetime.timedelta"
+      },
+      {
+        "default": "''",
+        "description": "str='' # 定时器任务组名，可用于定时器分组，多次设置同名定时任务不会互相覆盖，会计入同一个任务组，按任务组名取消时会全部取消",
+        "name": "name",
+        "required": false,
+        "type": "str"
+      }
+    ],
+    "passed": true,
+    "platform": "qmt",
+    "record_type": "method",
+    "returns": [
+      {
+        "description": "int类型，表示本次调用后生成的定时任务号，可用于取消本次定时任务，全局唯一不重复",
+        "fields": [],
+        "type": null
+      }
+    ],
+    "signature": "ContextInfo.schedule_run(\n    func:Callable, # 回调函数，到达定时器预定时间时触发调用，参数为ContextInfo类型，无需返回值\n    time_point:Union[dt.datetime,str], # 表示预定的第一次触发时间，如果设置定时器时已经过了预定时间，会立即执行func以及后续逻辑；当使用str类型时，格式为'yyyymmddHHMMSS'如'20231231235959'，需要满足转换dt.datetime.strptime('20231231235959','%Y%m%d%H%M%S')\n    repeat_times:int=0, # 表示在预定时间触发后按interval间隔再触发多少次\n    interval:datetime.timedelta=None, # 表示预定时间触发后的后续重复执行的时间间隔\n    name:str='' # 定时器任务组名，可用于定时器分组，多次设置同名定时任务不会互相覆盖，会计入同一个任务组，按任务组名取消时会全部取消\n    )",
+    "source_anchor": "system_function--contextinfo-schedule-run-设置定时器",
+    "source_file": "api-docs/raw/qmt/innerapi-combined.html",
+    "source_role": "primary",
+    "variant": "builtin-python"
+  },
+  {
+    "canonical_name": "initialize",
+    "checks": [
+      "API name",
+      "record type",
+      "signature",
+      "parameters",
+      "returns",
+      "environments",
+      "source path and anchor",
+      "source role",
+      "false-positive review"
+    ],
+    "environments": [
+      "backtest",
+      "simulation"
+    ],
+    "id": "sym:3fe87b9d02405afa",
+    "kind": "platform_api",
+    "markdown_file": "api-docs/normalized/joinquant/api-c071ddc3.md",
+    "parameters": [
+      {
+        "default": null,
+        "description": null,
+        "name": "context",
+        "required": null,
+        "type": null
+      }
+    ],
+    "passed": true,
+    "platform": "joinquant",
+    "record_type": "callback",
+    "returns": [
+      {
+        "description": "None",
+        "fields": [],
+        "type": null
+      }
+    ],
+    "signature": "initialize(context)",
+    "source_anchor": "initialize",
+    "source_file": "api-docs/raw/joinquant/api/rendered.html",
+    "source_role": "primary",
+    "variant": "web-help"
+  },
+  {
+    "canonical_name": "run_daily",
+    "checks": [
+      "API name",
+      "record type",
+      "signature",
+      "parameters",
+      "returns",
+      "environments",
+      "source path and anchor",
+      "source role",
+      "false-positive review"
+    ],
+    "environments": [
+      "backtest",
+      "simulation",
+      "strategy"
+    ],
+    "id": "sym:b1fec72491c96ada",
+    "kind": "platform_api",
+    "markdown_file": "api-docs/normalized/joinquant/api-c071ddc3.md",
+    "parameters": [
+      {
+        "default": null,
+        "description": null,
+        "name": "func",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": "'9:30'",
+        "description": null,
+        "name": "time",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": null,
+        "description": null,
+        "name": "reference_security",
+        "required": null,
+        "type": null
+      }
+    ],
+    "passed": true,
+    "platform": "joinquant",
+    "record_type": "api_function",
+    "returns": [
+      {
+        "description": "None",
+        "fields": [],
+        "type": null
+      }
+    ],
+    "signature": "run_daily(func, time='9:30', reference_security)",
+    "source_anchor": "#策略程序架构♠",
+    "source_file": "api-docs/raw/joinquant/api/rendered.html",
+    "source_role": "primary",
+    "variant": "web-help"
+  },
+  {
+    "canonical_name": "get_price",
+    "checks": [
+      "API name",
+      "record type",
+      "signature",
+      "parameters",
+      "returns",
+      "environments",
+      "source path and anchor",
+      "source role",
+      "false-positive review"
+    ],
+    "environments": [
+      "unknown"
+    ],
+    "id": "sym:1b71c2bb302d9022",
+    "kind": "platform_api",
+    "markdown_file": "api-docs/normalized/joinquant/jqdata-d6c2c44f.md",
+    "parameters": [
+      {
+        "default": null,
+        "description": null,
+        "name": "security",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": "None",
+        "description": null,
+        "name": "start_date",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "None",
+        "description": null,
+        "name": "end_date",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "'daily'",
+        "description": null,
+        "name": "frequency",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "None",
+        "description": null,
+        "name": "fields",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "False",
+        "description": null,
+        "name": "skip_paused",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "'pre'",
+        "description": "对股票/基金的价格字段、成交量字段生效，factor不受影响，只返回后复权因子",
+        "name": "fq",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "None",
+        "description": null,
+        "name": "count",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "True",
+        "description": null,
+        "name": "panel",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "True",
+        "description": null,
+        "name": "fill_paused",
+        "required": false,
+        "type": null
+      }
+    ],
+    "passed": true,
+    "platform": "joinquant",
+    "record_type": "api_function",
+    "returns": [
+      {
+        "description": "返回",
+        "fields": [],
+        "type": null
+      }
+    ],
+    "signature": "get_price(security, start_date=None, end_date=None, frequency='daily', fields=None, skip_paused=False, fq='pre', count=None, panel=True, fill_paused=True)",
+    "source_anchor": "get_price",
+    "source_file": "api-docs/raw/joinquant/JQData/rendered.html",
+    "source_role": "primary",
+    "variant": "web-help"
+  },
+  {
+    "canonical_name": "order_target",
+    "checks": [
+      "API name",
+      "record type",
+      "signature",
+      "parameters",
+      "returns",
+      "environments",
+      "source path and anchor",
+      "source role",
+      "false-positive review"
+    ],
+    "environments": [
+      "unknown"
+    ],
+    "id": "sym:4d4804ebb5269afe",
+    "kind": "platform_api",
+    "markdown_file": "api-docs/normalized/joinquant/api--api--814c0653.md",
+    "parameters": [
+      {
+        "default": null,
+        "description": "标的代码",
+        "name": "security",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": null,
+        "description": "期望的最终数量",
+        "name": "amount",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": "None",
+        "description": "参见OrderStyle, None代表MarketOrder",
+        "name": "style",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "'long'",
+        "description": "'long'/'short'，操作多单还是空单。默认为多单。默认为多单，股票、基金暂不支持开空单。",
+        "name": "side",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "0",
+        "description": "在使用set_subportfolios创建了多个仓位时，指定subportfolio 的序号, 从 0 开始, 比如 0为 指定第一个 subportfolio, 1 为指定第二个 subportfolio，默认为0。",
+        "name": "pindex",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "False",
+        "description": null,
+        "name": "close_today",
+        "required": false,
+        "type": null
+      }
+    ],
+    "passed": true,
+    "platform": "joinquant",
+    "record_type": "api_function",
+    "returns": [
+      {
+        "description": "Order对象或者None, 如果创建委托成功, 则返回Order对象, 失败则返回None",
+        "fields": [],
+        "type": null
+      }
+    ],
+    "signature": "order_target(security, amount, style=None, side='long', pindex=0, close_today=False)",
+    "source_anchor": "order_target",
+    "source_file": "api-docs/raw/joinquant/api/rendered.html",
+    "source_role": "primary",
+    "variant": "web-help"
+  },
+  {
+    "canonical_name": "get_fundamentals",
+    "checks": [
+      "API name",
+      "record type",
+      "signature",
+      "parameters",
+      "returns",
+      "environments",
+      "source path and anchor",
+      "source role",
+      "false-positive review"
+    ],
+    "environments": [
+      "research",
+      "backtest"
+    ],
+    "id": "sym:0dabfff5d738f8fa",
+    "kind": "platform_api",
+    "markdown_file": "api-docs/normalized/joinquant/api--api--814c0653.md",
+    "parameters": [
+      {
+        "default": null,
+        "description": null,
+        "name": "query_object",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": "None",
+        "description": "查询日期, 一个字符串(格式类似'2015-10-15')或者[datetime.date]/[datetime.datetime]对象, 可以是None, 使用默认日期. 这个默认日期在回测和研究模块上有点差别:",
+        "name": "date",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "None",
+        "description": "财报统计的季度或者年份, 一个字符串, 有两种格式:",
+        "name": "statDate",
+        "required": false,
+        "type": null
+      }
+    ],
+    "passed": true,
+    "platform": "joinquant",
+    "record_type": "api_function",
+    "returns": [
+      {
+        "description": "返回一个 [pandas.DataFrame], 每一行对应数据库返回的每一行(可能是几个表的联合查询结果的一行), 列索引是你查询的所有字段 注意：",
+        "fields": [],
+        "type": null
+      }
+    ],
+    "signature": "get_fundamentals(query_object, date=None, statDate=None)",
+    "source_anchor": "get_fundamentals",
+    "source_file": "api-docs/raw/joinquant/api/rendered.html",
+    "source_role": "primary",
+    "variant": "web-help"
+  },
+  {
+    "canonical_name": "before_trading_start",
+    "checks": [
+      "API name",
+      "record type",
+      "signature",
+      "parameters",
+      "returns",
+      "environments",
+      "source path and anchor",
+      "source role",
+      "false-positive review"
+    ],
+    "environments": [
+      "backtest",
+      "live_trade",
+      "strategy"
+    ],
+    "id": "sym:01161f218acceecb",
+    "kind": "callback",
+    "markdown_file": "api-docs/normalized/ptrade/guojin/strategy-api-3408c0e7.md",
+    "parameters": [
+      {
+        "default": null,
+        "description": "Context对象，存放有当前的账户及持仓信息；",
+        "name": "context",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": null,
+        "description": "保留字段暂无数据；",
+        "name": "data",
+        "required": null,
+        "type": null
+      }
+    ],
+    "passed": true,
+    "platform": "ptrade",
+    "record_type": "callback",
+    "returns": [
+      {
+        "description": "##### 返回",
+        "fields": [],
+        "type": null
+      }
+    ],
+    "signature": "before_trading_start(context, data)",
+    "source_anchor": "before_trading_start",
+    "source_file": "api-docs/raw/ptrade/guojin/ptradeapi.html",
+    "source_role": "primary",
+    "variant": "guojin"
+  },
+  {
+    "canonical_name": "after_trading_end",
+    "checks": [
+      "API name",
+      "record type",
+      "signature",
+      "parameters",
+      "returns",
+      "environments",
+      "source path and anchor",
+      "source role",
+      "false-positive review"
+    ],
+    "environments": [
+      "backtest",
+      "live_trade",
+      "strategy"
+    ],
+    "id": "sym:03f47ec2a3c66880",
+    "kind": "callback",
+    "markdown_file": "api-docs/normalized/ptrade/shenwan/help-engine-192b4919.md",
+    "parameters": [
+      {
+        "default": null,
+        "description": "策略上下文，存放有当前的账户及持仓等信息",
+        "name": "context",
+        "required": null,
+        "type": "["
+      },
+      {
+        "default": null,
+        "description": "保留字段暂无数据",
+        "name": "data",
+        "required": null,
+        "type": null
+      }
+    ],
+    "passed": true,
+    "platform": "ptrade",
+    "record_type": "callback",
+    "returns": [],
+    "signature": "after_trading_end(context, data)",
+    "source_anchor": "after_trading_end",
+    "source_file": "api-docs/raw/ptrade/shenwan/03_help_engine.html",
+    "source_role": "supplementary",
+    "variant": "shenwan"
+  },
+  {
+    "canonical_name": "m_strCompactNo",
+    "checks": [
+      "API name",
+      "record type",
+      "signature",
+      "parameters",
+      "returns",
+      "environments",
+      "source path and anchor",
+      "source role",
+      "false-positive review"
+    ],
+    "environments": [
+      "unknown"
+    ],
+    "id": "sym:03357d7cdfca62fe",
+    "kind": "object_or_field",
+    "markdown_file": "api-docs/normalized/qmt/builtin-python/builtin-python--doc-data-structure.md",
+    "parameters": [],
+    "passed": true,
+    "platform": "qmt",
+    "record_type": "field",
+    "returns": [
+      {
+        "description": null,
+        "fields": [],
+        "type": "str"
+      }
+    ],
+    "signature": null,
+    "source_anchor": "data_structure--order-委托对象",
+    "source_file": "api-docs/raw/qmt/innerapi-combined.html",
+    "source_role": "primary",
+    "variant": "builtin-python"
+  },
+  {
+    "canonical_name": "m_dTradedPrice",
+    "checks": [
+      "API name",
+      "record type",
+      "signature",
+      "parameters",
+      "returns",
+      "environments",
+      "source path and anchor",
+      "source role",
+      "false-positive review"
+    ],
+    "environments": [
+      "unknown"
+    ],
+    "id": "sym:04e32f9e2f317a43",
+    "kind": "object_or_field",
+    "markdown_file": "api-docs/normalized/qmt/builtin-python/builtin-python--doc-data-structure.md",
+    "parameters": [],
+    "passed": true,
+    "platform": "qmt",
+    "record_type": "field",
+    "returns": [
+      {
+        "description": null,
+        "fields": [],
+        "type": "float"
+      }
+    ],
+    "signature": null,
+    "source_anchor": "data_structure--order-委托对象",
+    "source_file": "api-docs/raw/qmt/innerapi-combined.html",
+    "source_role": "primary",
+    "variant": "builtin-python"
+  },
+  {
+    "canonical_name": "ZLMM",
+    "checks": [
+      "API name",
+      "record type",
+      "signature",
+      "parameters",
+      "returns",
+      "environments",
+      "source path and anchor",
+      "source role",
+      "false-positive review"
+    ],
+    "environments": [
+      "unknown"
+    ],
+    "id": "sym:004bc839134ec0fb",
+    "kind": "factor_or_indicator",
+    "markdown_file": "api-docs/normalized/joinquant/technicalanalysis-e06bf6d5.md",
+    "parameters": [
+      {
+        "default": null,
+        "description": null,
+        "name": "security_list",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": null,
+        "description": null,
+        "name": "check_date",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": "'1d'",
+        "description": "统计周期，默认为 '1d', 支持如下周期: '1m', '5m', '15m', '30m', '60m', '120m', '1d', '1w', '1M'. '1w' 表示一周, ‘1M' 表示一月",
+        "name": "unit",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "True",
+        "description": null,
+        "name": "include_now",
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "None",
+        "description": null,
+        "name": "fq_ref_date",
+        "required": false,
+        "type": null
+      }
+    ],
+    "passed": true,
+    "platform": "joinquant",
+    "record_type": "indicator",
+    "returns": [
+      {
+        "description": "MMS, MMM和MML 的值",
+        "fields": [],
+        "type": null
+      }
+    ],
+    "signature": "ZLMM(security_list, check_date, unit = '1d', include_now = True, fq_ref_date = None)",
+    "source_anchor": "ZLMM-主力买卖",
+    "source_file": "api-docs/raw/joinquant/technicalanalysis/rendered.html",
+    "source_role": "primary",
+    "variant": "web-help"
+  },
+  {
+    "canonical_name": "alpha_180",
+    "checks": [
+      "API name",
+      "record type",
+      "signature",
+      "parameters",
+      "returns",
+      "environments",
+      "source path and anchor",
+      "source role",
+      "false-positive review"
+    ],
+    "environments": [
+      "unknown"
+    ],
+    "id": "sym:00f67bf6a91e3bab",
+    "kind": "factor_or_indicator",
+    "markdown_file": "api-docs/normalized/joinquant/alpha191--191alphas.md",
+    "parameters": [
+      {
+        "default": null,
+        "description": "股票代码列表",
+        "name": "code",
+        "required": null,
+        "type": null
+      },
+      {
+        "default": "None",
+        "description": null,
+        "name": "end_date",
+        "required": false,
+        "type": null
+      }
+    ],
+    "passed": true,
+    "platform": "joinquant",
+    "record_type": "factor",
+    "returns": [],
+    "signature": "alpha_180(code,end_date=None)",
+    "source_anchor": "alpha_180",
+    "source_file": "api-docs/raw/joinquant/Alpha191/rendered.html",
+    "source_role": "primary",
+    "variant": "web-help"
+  },
+  {
+    "checks": [
+      "parameter table remains with API chunk",
+      "table/fence boundaries balanced",
+      "source traceable"
+    ],
+    "id": "chk:02952e985240aaea",
+    "kind": "complex_parameter_table",
+    "markdown_file": "api-docs/normalized/qmt/builtin-python/builtin-python--doc-data-function.md",
+    "passed": true,
+    "source_anchor": "data_function--contextinfo-subscribe-quote-订阅行情数据"
+  },
+  {
+    "checks": [
+      "parameter table remains with API chunk",
+      "table/fence boundaries balanced",
+      "source traceable"
+    ],
+    "id": "chk:0627c9da82de69fe",
+    "kind": "complex_parameter_table",
+    "markdown_file": "api-docs/normalized/joinquant/jqdata-d6c2c44f.md",
+    "passed": true,
+    "source_anchor": "get_ticks (机构)"
+  },
+  {
+    "canonical_name": "order_value",
+    "checks": [
+      "parameters",
+      "returns",
+      "description"
+    ],
+    "id": "conflict:0070f047c450ecea",
+    "kind": "ptrade_conflict",
+    "passed": true
+  },
+  {
+    "canonical_name": "get_sort_msg",
+    "checks": [
+      "parameters",
+      "returns",
+      "description"
+    ],
+    "id": "conflict:05aa4aa811e65b6a",
+    "kind": "ptrade_conflict",
+    "passed": true
+  },
+  {
+    "checks": [
+      "full excluded-name list absent"
+    ],
+    "id": "negative-names",
+    "kind": "negative_names",
+    "passed": true
+  }
+]

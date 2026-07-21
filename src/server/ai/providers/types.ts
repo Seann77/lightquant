@@ -2,6 +2,7 @@ import type { AiTask, AiTaskResult } from "@/server/domain";
 import type { AiTaskConfig } from "@/server/ai/ai-task-config";
 import type { AiSkill } from "@/server/ai/skills";
 import type { AiTaskProgressUpdate } from "@/server/ai/ai-task-progress";
+import type { ApiDocumentContext } from "@/server/ai/api-document-retrieval";
 
 export type AiProviderResult = Omit<AiTaskResult, "taskId" | "resultType" | "createdAt">;
 
@@ -35,5 +36,6 @@ export type AiProviderInput = {
   config: AiTaskConfig;
   conversationContext?: string;
   attachments?: AiProviderAttachment[];
+  apiDocumentContext: ApiDocumentContext;
   progressReporter?: (update: AiTaskProgressUpdate) => void | Promise<void>;
 };

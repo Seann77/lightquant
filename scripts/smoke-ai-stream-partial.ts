@@ -337,7 +337,27 @@ function createProviderInput(type: "strategy_generation" | "code_conversion" | "
   return {
     task,
     skill: getAiSkill(type),
-    config: getAiTaskConfig(type)
+    config: getAiTaskConfig(type),
+    apiDocumentContext: {
+      text: "API参考资料\n测试文档上下文",
+      metadata: {
+        taskId: task.id,
+        taskType: task.type,
+        sourcePlatform: task.sourcePlatform,
+        targetPlatform: task.targetPlatform,
+        detectedApiNames: [],
+        matchedSymbolCount: 0,
+        matchedChunkCount: 0,
+        normalizedFallbackCount: 0,
+        includedApiNames: [],
+        documentContextCharacterCount: 13,
+        estimatedDocumentTokens: 4,
+        documentCompressionApplied: false,
+        retrievalDurationMs: 0,
+        documentBudgetCharacters: 1000,
+        outputTokenReserve: 1000
+      }
+    }
   };
 }
 

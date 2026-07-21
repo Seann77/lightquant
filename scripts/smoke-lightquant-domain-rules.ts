@@ -26,7 +26,7 @@ console.log(JSON.stringify({
     "PTrade complete strategy generation domain rules",
     "existing strategy modification and error repair priorities",
     "JoinQuant -> QMT conversion and QMT mode boundary",
-    "code conversion uncertain APIs are migration notes, not failure/refund/frontend warnings",
+    "code conversion uses lightweight document evidence without hard blocking",
     "QMT built-in Python / XtQuant / VBA are not mixed",
     "code analysis ordinary-user explanation style",
     "missing fields use 代码中未明确给出",
@@ -48,35 +48,34 @@ function testDomainRuleSource() {
 
 function testStrategyGenerationPrompt() {
   expectIncludes("strategy has domain heading", strategyPrompt, "LightQuant Domain Rules");
-  expectIncludes("PTrade full strategy native boundary", strategyPrompt, "PTrade 代码必须使用 PTrade 原生生命周期");
+  expectIncludes("PTrade full strategy native boundary", strategyPrompt, "PTrade 代码使用 PTrade 原生生命周期");
   expectIncludes("existing strategy intent preserved", strategyPrompt, "始终保留用户策略意图");
-  expectIncludes("existing strategy modification hard failures", strategyPrompt, "修改或修复已有策略时，优先处理硬错误");
-  expectIncludes("error repair includes runtime/API/data/state/order", strategyPrompt, "平台 API 不匹配");
+  expectIncludes("existing strategy modification hard failures", strategyPrompt, "修改或修复已有策略时，优先处理语法、运行时、生命周期");
+  expectIncludes("error repair includes platform APIs", strategyPrompt, "平台 API");
   expectIncludes("error repair includes future data", strategyPrompt, "未来函数");
-  expectIncludes("soft platform constraints", strategyPrompt, "普通平台限制属于软问题");
+  expectIncludes("soft platform constraints", strategyPrompt, "属于普通平台约束");
   expectIncludes("no investment recommendation", strategyPrompt, "不推荐具体股票");
   expectIncludes("no return promise", strategyPrompt, "不承诺收益");
 }
 
 function testCodeConversionPrompt() {
   expectIncludes("conversion has domain heading", conversionPrompt, "LightQuant Domain Rules");
-  expectIncludes("conversion preserves behavior", conversionPrompt, "转换行为语义，不做表面语法替换");
+  expectIncludes("conversion preserves behavior", conversionPrompt, "不做表面函数名替换");
   expectIncludes("JoinQuant to QMT conversion", conversionPrompt, "JoinQuant/PTrade 转 QMT");
-  expectIncludes("QMT mode default", conversionPrompt, "默认转换为 QMT 内置 Python");
-  expectIncludes("QMT modes not mixed", conversionPrompt, "QMT 内置 Python、QMT XtQuant/MiniQMT、QMT VBA 是不同目标");
+  expectIncludes("QMT mode default", conversionPrompt, "未指定 QMT 子模式时按内置 Python 处理");
+  expectIncludes("QMT modes not mixed", conversionPrompt, "QMT 内置 Python、XtQuant/MiniQMT、VBA 不可混用");
   expectIncludes("QMT built-in lifecycle", conversionPrompt, "init(C)");
-  expectIncludes("XtQuant boundary", conversionPrompt, "xtdata/xttrader/XtQuantTrader");
+  expectIncludes("XtQuant boundary", conversionPrompt, "QMT 内置 Python 与 XtQuant 边界");
   expectIncludes("order semantic mapping", conversionPrompt, "不要机械地把 `order_value`");
-  expectIncludes("uncertain API not failure", conversionPrompt, "不要把它当成任务失败");
-  expectIncludes("uncertain API normal code output", conversionPrompt, "正常输出目标平台代码");
-  expectIncludes("uncertain API manual review", conversionPrompt, "需要人工复核");
-  expectIncludes("uncertain API conservative approximation", conversionPrompt, "保守近似");
-  expectIncludes("uncertain API actual interface", conversionPrompt, "目标平台可能需要替换为实际接口");
-  expectIncludes("uncertain API no refund", conversionPrompt, "不触发退款");
-  expectIncludes("uncertain API no copy block", conversionPrompt, "不阻止复制");
-  expectIncludes("uncertain API no frontend warning", conversionPrompt, "不需要前端额外弹出通用质量警告");
-  expectIncludes("Markdown code delivery preserved", conversionPrompt, "流式最终回答使用 Markdown-only");
-  expect("conversion JSON schema is scoped to non-stream", /JSON schema 仅适用于非流式结构化调用/.test(conversionPrompt));
+  expectIncludes("document index is not whitelist", conversionPrompt, "索引没有精确命中不代表平台不支持");
+  expectIncludes("missing docs do not invent APIs", conversionPrompt, "不得编造平台 API");
+  expectIncludes("confirmed docs are implemented directly", conversionPrompt, "事实文档已确认的内容直接按文档实现");
+  expectIncludes("compatibility notes are concrete", conversionPrompt, "兼容说明必须绑定明确事实");
+  expectIncludes("compatibility notes are limited", conversionPrompt, "最多保留 1-3 条具体说明");
+  expectIncludes("Markdown code delivery preserved", conversionPrompt, "使用一个主要 `python` fenced code block");
+  expect("conversion JSON schema is scoped to non-stream", /仅适用于非流式结构化内部调用/.test(conversionPrompt));
+  expect("conversion omits generic manual review phrase", !conversionPrompt.includes("需要人工复核"));
+  expect("conversion omits conservative approximation phrase", !conversionPrompt.includes("保守近似"));
 }
 
 function testCodeAnalysisPrompt() {

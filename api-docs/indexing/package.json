@@ -1,0 +1,17 @@
+{
+  "name": "quant-api-docs-indexing",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build_api_index.mjs",
+    "search": "node search_api_index.mjs",
+    "validate": "node validate_api_index.mjs",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "ajv": "8.17.1",
+    "ajv-formats": "3.0.1",
+    "js-yaml": "4.1.0"
+  }
+}

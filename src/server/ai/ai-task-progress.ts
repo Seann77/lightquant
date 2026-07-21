@@ -226,7 +226,7 @@ function statusMessage(
   }
 
   if (phase === "merging") {
-    return taskType === "code_analysis" ? "正在汇总解析报告。" : "正在合并分段代码、迁移说明和人工复核项。";
+    return taskType === "code_analysis" ? "正在汇总解析报告。" : "正在合并分段代码和必要的兼容说明。";
   }
 
   if (phase === "validating") {

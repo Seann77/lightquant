@@ -131,7 +131,27 @@ function createProviderInput(type: "strategy_generation" | "code_conversion", pr
       updatedAt: new Date().toISOString()
     },
     skill: getAiSkill(type),
-    config: getAiTaskConfig(type)
+    config: getAiTaskConfig(type),
+    apiDocumentContext: {
+      text: "API参考资料\n测试文档上下文",
+      metadata: {
+        taskId: `task-${type}`,
+        taskType: type,
+        sourcePlatform: type === "code_conversion" ? "JoinQuant" : null,
+        targetPlatform: "PTrade",
+        detectedApiNames: [],
+        matchedSymbolCount: 0,
+        matchedChunkCount: 0,
+        normalizedFallbackCount: 0,
+        includedApiNames: [],
+        documentContextCharacterCount: 13,
+        estimatedDocumentTokens: 4,
+        documentCompressionApplied: false,
+        retrievalDurationMs: 0,
+        documentBudgetCharacters: 1000,
+        outputTokenReserve: 1000
+      }
+    }
   };
 }
 

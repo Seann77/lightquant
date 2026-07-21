@@ -280,6 +280,13 @@ export function getTaskElapsedSeconds(input: {
   return Math.max(0, Math.floor((endAtMs - startedAtMs) / 1000));
 }
 
+export function formatElapsedDuration(elapsedSeconds: number) {
+  const safeSeconds = Math.max(0, Math.floor(elapsedSeconds));
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
 export function useStableElapsedSeconds(active: boolean, input: {
   task?: TaskTimerSource | null;
   taskId?: string | null;
@@ -748,11 +755,12 @@ export function restoreWorkbenchConversation(data: AiConversationMessagesData, t
     ?? getLatestTaskDataFromTasks(data.tasks ?? [], taskType, data.conversation);
 
   return {
-    sourcePlatform: input.sourcePlatform ?? data.conversation.sourcePlatform,
-    targetPlatform: input.targetPlatform ?? data.conversation.targetPlatform,
-    prompt: input.prompt,
+    sourcePlatform: taskData?.task.sourcePlatform ?? input.sourcePlatform ?? data.conversation.sourcePlatform,
+    targetPlatform: taskData?.task.targetPlatform ?? input.targetPlatform ?? data.conversation.targetPlatform,
+    prompt: taskData?.task.prompt ?? input.prompt,
+    inputCode: taskData?.task.inputCode ?? null,
     inputCodePreview: input.inputCodePreview,
-    inputFileId: input.inputFileId,
+    inputFileId: taskData?.task.inputFileId ?? input.inputFileId,
     inputFileName: input.inputFileName,
     inputAttachment: input.inputAttachment,
     taskData
@@ -1102,7 +1110,9 @@ export function readTaskSnapshot(value: unknown): AiTaskData["task"] | null {
     targetPlatform: readNullableString(task.targetPlatform),
     costPoints: typeof task.costPoints === "number" ? task.costPoints : 0,
     title: readNullableString(task.title),
+    prompt: readNullableString(task.prompt),
     promptPreview: readNullableString(task.promptPreview),
+    inputCode: readNullableString(task.inputCode),
     errorCode: readNullableString(task.errorCode),
     errorMessage: readNullableString(task.errorMessage),
     inputFileId: readNullableString(task.inputFileId),
@@ -1257,14 +1267,11 @@ export function formatAiTaskResultAsMarkdown(result: NonNullable<AiTaskData["res
   }
 
   return [
-    "## 目标平台代码",
     result.generatedCode?.trim()
       ? `\`\`\`python\n${result.generatedCode.trim()}\n\`\`\``
       : "暂无可直接运行的目标平台代码。",
-    "",
-    "## 迁移说明",
-    result.migrationNotes?.trim() || "请按目标平台 API 逐项复核后再运行。"
-  ].join("\n");
+    result.migrationNotes?.trim() ? `兼容说明：\n${result.migrationNotes.trim()}` : ""
+  ].filter(Boolean).join("\n\n");
 }
 
 function formatReportItemsAsMarkdown(value: unknown) {

@@ -1,0 +1,218 @@
+{
+  "checks": [
+    {
+      "detail": "197 records valid",
+      "name": "documents JSON Schema",
+      "passed": true
+    },
+    {
+      "detail": "1168 records valid",
+      "name": "symbols JSON Schema",
+      "passed": true
+    },
+    {
+      "detail": "1451 records valid",
+      "name": "chunks JSON Schema",
+      "passed": true
+    },
+    {
+      "detail": "0 duplicate ids",
+      "name": "documents id uniqueness",
+      "passed": true
+    },
+    {
+      "detail": "0 duplicate ids",
+      "name": "symbols id uniqueness",
+      "passed": true
+    },
+    {
+      "detail": "0 duplicate ids",
+      "name": "chunks id uniqueness",
+      "passed": true
+    },
+    {
+      "detail": "0 duplicate ids",
+      "name": "aliases id uniqueness",
+      "passed": true
+    },
+    {
+      "detail": "0 duplicate ids",
+      "name": "conflicts id uniqueness",
+      "passed": true
+    },
+    {
+      "detail": "all symbol.document_id must exist",
+      "name": "symbol document references",
+      "passed": true
+    },
+    {
+      "detail": "all document Markdown files exist",
+      "name": "document Markdown references",
+      "passed": true
+    },
+    {
+      "detail": "all chunk.document_id must exist",
+      "name": "chunk document references",
+      "passed": true
+    },
+    {
+      "detail": "all chunk.symbol_ids must exist",
+      "name": "chunk symbol references",
+      "passed": true
+    },
+    {
+      "detail": "every symbol is linked by at least one chunk",
+      "name": "symbol chunk references",
+      "passed": true
+    },
+    {
+      "detail": "all symbol aliases must resolve",
+      "name": "alias references",
+      "passed": true
+    },
+    {
+      "detail": "all conflict symbol ids must resolve",
+      "name": "conflict references",
+      "passed": true
+    },
+    {
+      "detail": "197 canonical Markdown files checked against manifest",
+      "name": "normalized Markdown hashes unchanged",
+      "passed": true
+    },
+    {
+      "detail": "36 raw source files checked against manifest",
+      "name": "raw source hashes unchanged",
+      "passed": true
+    },
+    {
+      "detail": "94 files compared with pre-conversion baseline",
+      "name": "raw tree baseline unchanged",
+      "passed": true
+    },
+    {
+      "detail": "none",
+      "name": "index UTF-8 replacement characters",
+      "passed": true
+    },
+    {
+      "detail": "197/197 canonical Markdown documents",
+      "name": "document count",
+      "passed": true
+    },
+    {
+      "detail": "guojin=100, shenwan=50",
+      "name": "PTrade priorities",
+      "passed": true
+    },
+    {
+      "detail": "all guojin documents primary",
+      "name": "primary roles",
+      "passed": true
+    },
+    {
+      "detail": "no merged PTrade variant",
+      "name": "PTrade variants independent",
+      "passed": true
+    },
+    {
+      "detail": "main source has no document/body index",
+      "name": "JoinQuant main not indexed",
+      "passed": true
+    },
+    {
+      "detail": "all JoinQuant records are web-help primary priority 100",
+      "name": "JoinQuant source role",
+      "passed": true
+    },
+    {
+      "detail": "main -> api alias",
+      "name": "JoinQuant main alias explicit",
+      "passed": true
+    },
+    {
+      "detail": "aliases remain platform-local",
+      "name": "cross-platform aliases absent",
+      "passed": true
+    },
+    {
+      "detail": "none indexed",
+      "name": "false-positive exclusion list",
+      "passed": true
+    },
+    {
+      "detail": "all signatures match canonical names",
+      "name": "signature/name consistency",
+      "passed": true
+    },
+    {
+      "detail": "none",
+      "name": "document symbol duplicates",
+      "passed": true
+    },
+    {
+      "detail": "all records line-traceable",
+      "name": "required symbol evidence",
+      "passed": true
+    },
+    {
+      "detail": "0 low-confidence records",
+      "name": "low confidence review status",
+      "passed": true
+    },
+    {
+      "detail": "all chunks nonempty with exact counts and hashes",
+      "name": "nonempty chunks",
+      "passed": true
+    },
+    {
+      "detail": "no chunk splits inside fences or HTML tables",
+      "name": "chunk code/table boundaries",
+      "passed": true
+    },
+    {
+      "detail": "none within a document",
+      "name": "duplicate chunk bodies",
+      "passed": true
+    },
+    {
+      "detail": "all previous/next chunk ids resolve",
+      "name": "chunk neighbor links",
+      "passed": true
+    },
+    {
+      "detail": "36/36 indexed or aliased",
+      "name": "36 source page coverage",
+      "passed": true
+    },
+    {
+      "detail": "10 passed",
+      "name": "positive factual search cases",
+      "passed": true
+    },
+    {
+      "detail": "19 passed",
+      "name": "negative search cases",
+      "passed": true
+    },
+    {
+      "detail": "9 output files byte-identical",
+      "name": "stable repeated build",
+      "passed": true
+    }
+  ],
+  "failures": [],
+  "manual_review": {
+    "passed": true,
+    "samples": 31
+  },
+  "passed": true,
+  "totals": {
+    "aliases": 391,
+    "chunks": 1451,
+    "conflicts": 174,
+    "documents": 197,
+    "symbols": 1168
+  },
+  "warnings": []
+}

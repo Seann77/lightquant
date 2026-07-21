@@ -1,0 +1,147 @@
+{
+  "generated_at": "2026-07-18T12:16:04.187Z",
+  "staging_root": "/Users/a1-6/Documents/Codex-Restored-Projects/量化平台策略生成/api-docs/.markdown-staging",
+  "automated_pass": false,
+  "manual_review": {
+    "complete": false,
+    "items": [],
+    "notes": [
+      "manual-review.json not yet present"
+    ]
+  },
+  "can_publish": false,
+  "errors": [
+    "table structure validation failed",
+    "image or internal Markdown link validation failed",
+    "one or more sources failed or are missing"
+  ],
+  "warnings": [],
+  "checks": {
+    "raw_hashes": {
+      "expected_files": 94,
+      "actual_files": 94,
+      "changed": []
+    },
+    "source_coverage": {
+      "expected": 36,
+      "handled": 36,
+      "missing": [],
+      "unexpected": []
+    },
+    "markdown_files": {
+      "count": 196,
+      "utf8_errors": 0,
+      "replacement_characters": 0,
+      "mojibake_markers": 0,
+      "empty_files": 0,
+      "unclosed_fences": 0,
+      "front_matter_errors": 0,
+      "duplicate_slugs": []
+    },
+    "navigation": {
+      "files_with_obvious_navigation_residuals": 0
+    },
+    "duplicates": {
+      "exact_duplicate_bodies": []
+    },
+    "code": {
+      "multiline_blocks": 1217,
+      "blocks_with_indentation": 1020
+    },
+    "tables": {
+      "markdown_table_column_errors": 17,
+      "preserved_html_table_structure_errors": 0,
+      "markdown_tables": 572,
+      "preserved_html_tables": 53
+    },
+    "images_and_links": {
+      "missing_relative_images": 0,
+      "broken_markdown_internal_links": 9
+    },
+    "traceability": {
+      "errors": 0
+    },
+    "ptrade_isolation": {
+      "pass": true
+    },
+    "joinquant_categories": {
+      "present": [
+        "factor",
+        "faq",
+        "finance",
+        "market_data",
+        "research_data",
+        "strategy_api"
+      ],
+      "expected": [
+        "strategy_api",
+        "market_data",
+        "factor",
+        "research_data",
+        "finance",
+        "faq"
+      ]
+    },
+    "joinquant_main_api": {
+      "main_status": "alias",
+      "canonical": "api-docs/raw/joinquant/api/rendered.html",
+      "pass": true
+    },
+    "typical_api_search": {
+      "ptrade": {
+        "get_history": true,
+        "get_fundamentals": true,
+        "order": true
+      },
+      "qmt": {
+        "get_market_data_ex": true,
+        "passorder": true
+      },
+      "joinquant": {
+        "initialize": true,
+        "run_daily": true,
+        "get_price": true,
+        "order_target": true,
+        "get_fundamentals": true
+      }
+    },
+    "source_statuses": {
+      "api-docs/raw/ptrade/guojin/ptradeapi.html": "split",
+      "api-docs/raw/ptrade/guojin/财务数据api.html": "split",
+      "api-docs/raw/ptrade/guojin/行业概念分类.html": "split",
+      "api-docs/raw/qmt/innerapi-combined.html": "split",
+      "api-docs/raw/ptrade/shenwan/01_help_introduce.html": "split",
+      "api-docs/raw/ptrade/shenwan/02_help_quickstart.html": "split",
+      "api-docs/raw/ptrade/shenwan/03_help_engine.html": "split",
+      "api-docs/raw/ptrade/shenwan/04_help_third.html": "split",
+      "api-docs/raw/ptrade/shenwan/05_help_backtest_results.html": "split",
+      "api-docs/raw/ptrade/shenwan/06_api_list.html": "converted",
+      "api-docs/raw/ptrade/shenwan/07_api_system.html": "split",
+      "api-docs/raw/ptrade/shenwan/08_api_data.html": "split",
+      "api-docs/raw/ptrade/shenwan/09_api_trade.html": "split",
+      "api-docs/raw/ptrade/shenwan/10_api_stock.html": "split",
+      "api-docs/raw/ptrade/shenwan/11_api_credit.html": "split",
+      "api-docs/raw/ptrade/shenwan/12_api_future.html": "split",
+      "api-docs/raw/ptrade/shenwan/13_api_hks.html": "split",
+      "api-docs/raw/ptrade/shenwan/14_api_factor.html": "converted",
+      "api-docs/raw/ptrade/shenwan/15_demo.html": "split",
+      "api-docs/raw/ptrade/shenwan/16_qa.html": "split",
+      "api-docs/raw/ptrade/shenwan/17_changelog.html": "split",
+      "api-docs/raw/joinquant/main/rendered.html": "alias",
+      "api-docs/raw/joinquant/api/rendered.html": "split",
+      "api-docs/raw/joinquant/Stock/rendered.html": "split",
+      "api-docs/raw/joinquant/fund/rendered.html": "converted",
+      "api-docs/raw/joinquant/Future/rendered.html": "split",
+      "api-docs/raw/joinquant/index/rendered.html": "split",
+      "api-docs/raw/joinquant/plateData/rendered.html": "split",
+      "api-docs/raw/joinquant/factor/rendered.html": "split",
+      "api-docs/raw/joinquant/factor_values/rendered.html": "split",
+      "api-docs/raw/joinquant/technicalanalysis/rendered.html": "split",
+      "api-docs/raw/joinquant/Alpha101/rendered.html": "converted",
+      "api-docs/raw/joinquant/Alpha191/rendered.html": "converted",
+      "api-docs/raw/joinquant/JQData/rendered.html": "failed",
+      "api-docs/raw/joinquant/macroData/rendered.html": "converted",
+      "api-docs/raw/joinquant/faq/rendered.html": "converted"
+    }
+  }
+}

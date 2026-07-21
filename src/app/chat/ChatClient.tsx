@@ -14,8 +14,7 @@ import {
   Paperclip,
   Send,
   Sparkles,
-  Square,
-  Trash2
+  Square
 } from "lucide-react";
 import { getFileUploadFriendlyError, getUploadAccept, getUploadButtonLabel, uploadCodeFile, type UploadedCodeFile } from "@/lib/file-upload";
 import { normalizeStrategyFinalAnswerMarkdown } from "@/lib/ai/strategy-result-format";
@@ -29,6 +28,7 @@ import { PlatformDropdown } from "@/components/ui/PlatformDropdown";
 import { AssistantThinkingMessage, type AssistantThinkingStatus } from "@/components/ai/AssistantThinkingMessage";
 import { MessageAttachmentList, WorkbenchFileUploadStatus } from "@/components/ai/AttachmentPreviewCard";
 import { WorkbenchShell } from "@/components/ai/WorkbenchShell";
+import { WorkbenchTaskStatusBadge } from "@/components/ai/WorkbenchTaskStatusBadge";
 import {
   canCopyConversionTab,
   ConversionCodePreview,
@@ -50,6 +50,7 @@ import {
   createWorkbenchClientRequestId,
   cancelAiTask,
   fetchAiTaskStatus,
+  formatElapsedDuration,
   formatRestoredInputText,
   getConversationActiveTab,
   getCachedClientRequestStartedAt,
@@ -1152,6 +1153,7 @@ function ConvertModeContent() {
   const [uploadError, setUploadError] = useState("");
   const [lastSuccessfulFingerprint, setLastSuccessfulFingerprint] = useState<string | null>(null);
   const [pendingConversionClientRequestId, setPendingConversionClientRequestId] = useState<string | null>(null);
+  const [terminalStatusDirty, setTerminalStatusDirty] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const conversionPreviewRef = useRef<HTMLDivElement>(null);
   const conversionAutoFollowRef = useRef(true);
@@ -1164,6 +1166,9 @@ function ConvertModeContent() {
   const activeConversionTaskStatus = taskData?.task.status ?? null;
   const activeConversionTaskRunning = activeConversionTaskStatus === "PENDING" || activeConversionTaskStatus === "RUNNING";
   const conversionLoading = loading || activeConversionTaskRunning;
+  const conversionCompleted = activeConversionTaskStatus === "SUCCEEDED";
+  const conversionTerminalRetryable = activeConversionTaskStatus === "FAILED" || activeConversionTaskStatus === "CANCELLED";
+  const conversionInputLocked = conversionLoading || conversionCompleted;
   const elapsedSeconds = useStableElapsedSeconds(conversionLoading, {
     task: taskData?.task ?? null,
     taskId: taskData?.task.id ?? null,
@@ -1173,7 +1178,7 @@ function ConvertModeContent() {
   });
 
   const activeConversionConversationId = taskData?.conversation?.id ?? taskData?.task.conversationId ?? conversationIdFromUrl;
-  const finalInputText = getFinalConversionInputText(inputCode);
+  const finalInputText = getFinalConversionInputText(inputCode, inputSource);
   const finalPrompt = prompt.trim();
   const finalTotalInputChars = getConversionTotalInputChars(finalInputText, finalPrompt, sourcePlatform, targetPlatform);
   const conversionCurrentFingerprint = useMemo(() => buildAiTaskFingerprint({
@@ -1218,7 +1223,7 @@ function ConvertModeContent() {
       }
 
       const restoredPrompt = restored.prompt ?? "";
-      const restoredInputCode = formatRestoredInputText(restored.inputCodePreview, restored.inputFileName);
+      const restoredInputCode = restored.inputCode ?? formatRestoredInputText(restored.inputCodePreview, restored.inputFileName);
       const restoredFile = createRestoredUploadedFile(restored);
       const restoredSourcePlatform = restored.sourcePlatform && convertPlatforms.source.includes(restored.sourcePlatform)
         ? restored.sourcePlatform
@@ -1231,19 +1236,20 @@ function ConvertModeContent() {
         sourcePlatform: restoredSourcePlatform,
         targetPlatform: restoredTargetPlatform,
         prompt: restoredPrompt,
-        inputCode: getFinalConversionInputText(restoredInputCode),
+        inputCode: getFinalConversionInputText(restoredInputCode, restored.inputCode ? "manual" : "restored"),
         inputFile: restoredFile
       });
 
       setPrompt(restoredPrompt);
       setInputCode(restoredInputCode);
-      setInputSource("restored");
+      setInputSource(restored.inputCode ? "manual" : "restored");
       setUploadedFile(restoredFile);
       setTaskData(restored.taskData);
       setStreamState(createThinkingStateFromTaskData(restored.taskData, "code_conversion"));
       setActiveTab(getConversationActiveTab(conversationData.conversation, conversionTabs, conversionTabs[0]));
       setLoading(false);
       setCanceling(false);
+      setTerminalStatusDirty(false);
       cancelRequestedRef.current = false;
       pollingConversionTaskIdRef.current = null;
       streamingConversionTaskIdRef.current = null;
@@ -1365,6 +1371,7 @@ function ConvertModeContent() {
     setLoading(false);
     setCanceling(false);
     setPendingConversionClientRequestId(null);
+    setTerminalStatusDirty(false);
     pollingConversionTaskIdRef.current = null;
     streamingConversionTaskIdRef.current = null;
     conversionAutoFollowRef.current = true;
@@ -1390,6 +1397,7 @@ function ConvertModeContent() {
       setUploadedFile(nextFile);
       setInputCode(nextInputText);
       setInputSource("attachment");
+      setTerminalStatusDirty(conversionTerminalRetryable);
 
       if (!nextInputText && !nextFile.mimeType.startsWith("image/")) {
         setUploadError("附件已上传，但没有解析出可转换文本，请重新上传文本文件。");
@@ -1398,6 +1406,7 @@ function ConvertModeContent() {
       setUploadedFile(null);
       setInputCode("");
       setInputSource("manual");
+      setTerminalStatusDirty(conversionTerminalRetryable);
       setUploadError(getFileUploadFriendlyError(uploadErrorValue));
     } finally {
       setUploading(false);
@@ -1443,6 +1452,7 @@ function ConvertModeContent() {
     conversionAutoFollowRef.current = true;
     conversionTabChangedRef.current = false;
     cancelRequestedRef.current = false;
+    setTerminalStatusDirty(false);
     setError("");
     setTaskData(null);
     setStreamState({
@@ -1499,6 +1509,7 @@ function ConvertModeContent() {
       rememberTaskFingerprintOutcome(completed, submittedFingerprint, {
         setLastSuccessfulFingerprint
       });
+      setTerminalStatusDirty(false);
       window.dispatchEvent(new Event("lightquant:credits-updated"));
       window.dispatchEvent(new Event("lightquant:ai-tasks-updated"));
     } catch (submitError) {
@@ -1588,6 +1599,7 @@ function ConvertModeContent() {
   const taskStatus = conversionTaskStatus ?? (conversionLoading ? "RUNNING" : null);
   const canCancelTask = Boolean(taskData?.task.id && (taskStatus === "PENDING" || taskStatus === "RUNNING"));
   const conversionSubmitDisabled = conversionLoading ||
+    conversionCompleted ||
     uploading ||
     Boolean(inputTooLargeMessage) ||
     !finalInputText ||
@@ -1651,11 +1663,17 @@ function ConvertModeContent() {
       <section className="lq-workbench is-compact is-conversion">
         <div className="lq-platform-select-row">
           <div className="lq-platform-select-group">
-            <PlatformSelectCard label="源平台" onChange={setSourcePlatform} options={convertPlatforms.source} value={sourcePlatform} />
-            <button aria-label="转换方向" className="lq-platform-swap" type="button">
+            <PlatformSelectCard disabled={conversionInputLocked} label="源平台" onChange={(value) => {
+              setSourcePlatform(value);
+              setTerminalStatusDirty(conversionTerminalRetryable);
+            }} options={convertPlatforms.source} value={sourcePlatform} />
+            <button aria-label="转换方向" className="lq-platform-swap" disabled={conversionInputLocked} type="button">
               <ArrowRight aria-hidden="true" size={17} />
             </button>
-            <PlatformSelectCard isTarget label="目标平台" onChange={setTargetPlatform} options={convertPlatforms.target} value={targetPlatform} />
+            <PlatformSelectCard disabled={conversionInputLocked} isTarget label="目标平台" onChange={(value) => {
+              setTargetPlatform(value);
+              setTerminalStatusDirty(conversionTerminalRetryable);
+            }} options={convertPlatforms.target} value={targetPlatform} />
           </div>
         </div>
 
@@ -1667,7 +1685,7 @@ function ConvertModeContent() {
                   <Code2 aria-hidden="true" />
                   <span>源代码输入</span>
                 </div>
-                <button className="lq-upload-chip" disabled={uploading} onClick={() => fileInputRef.current?.click()} type="button">
+                <button className="lq-upload-chip" disabled={uploading || conversionInputLocked} onClick={() => fileInputRef.current?.click()} type="button">
                   <FileUp aria-hidden="true" size={16} />
                   {getUploadButtonLabel("code_conversion")}
                 </button>
@@ -1679,8 +1697,10 @@ function ConvertModeContent() {
                 onChange={(event) => {
                   setInputCode(event.target.value);
                   setInputSource("manual");
+                  setTerminalStatusDirty(conversionTerminalRetryable);
                 }}
                 placeholder="请粘贴需要转换的策略代码..."
+                readOnly={conversionInputLocked}
                 value={inputCode}
               />
             </div>
@@ -1693,8 +1713,12 @@ function ConvertModeContent() {
               <textarea
                 className="lq-textarea"
                 id="conversion-requirement"
-                onChange={(event) => setPrompt(event.target.value)}
+                onChange={(event) => {
+                  setPrompt(event.target.value);
+                  setTerminalStatusDirty(conversionTerminalRetryable);
+                }}
                 placeholder="例如：保留原策略的止损逻辑，优先使用目标平台的内置数据获取函数..."
+                readOnly={conversionInputLocked}
                 value={prompt}
               />
             </div>
@@ -1727,11 +1751,19 @@ function ConvertModeContent() {
                 ref={conversionPreviewRef}
               >
                 {conversionFailureInfo.failed ? (
-                  <ConversionFailureState
-                    message={conversionFailureInfo.message}
-                    refundApplied={conversionFailureInfo.refundApplied}
-                    title={conversionFailureInfo.title}
-                  />
+                  <div>
+                    <ConversionFailureState
+                      message={conversionFailureInfo.message}
+                      refundApplied={conversionFailureInfo.refundApplied}
+                      title={conversionFailureInfo.title}
+                    />
+                    {streamState.finalAnswerMarkdown.trim() ? (
+                      <div className="lq-terminal-partial-result">
+                        <strong>本次任务已生成的部分内容（仅供参考）</strong>
+                        <pre>{streamState.finalAnswerMarkdown}</pre>
+                      </div>
+                    ) : null}
+                  </div>
                 ) : isCodeConversionCodeTab(activeTab) ? (
                   <ConversionCodePreview code={targetCode} loading={conversionLoading} />
                 ) : (
@@ -1745,27 +1777,36 @@ function ConvertModeContent() {
 
         <div className="lq-actions">
           <div className="lq-actions-left">
-            <button
-              className="lq-primary-btn"
-              disabled={conversionSubmitDisabled}
-              onClick={() => void handleSubmit()}
-              type="button"
-            >
-              {conversionLoading ? <LoaderCircle aria-hidden="true" className="animate-spin" size={18} /> : <Sparkles aria-hidden="true" size={18} />}
-              {conversionLoading
-                ? `转换中 ${elapsedSeconds}s`
-                : conversionDuplicateCompleted
-                    ? "已完成转换"
-                    : "开始转换"}
-            </button>
-            <button
-              className="lq-secondary-btn"
-              onClick={resetConversionLocalState}
-              type="button"
-            >
-              <Trash2 aria-hidden="true" size={17} />
-              清空内容
-            </button>
+            {conversionLoading ? (
+              <button
+                className="lq-primary-btn"
+                disabled={!canCancelTask || canceling}
+                onClick={() => void handleCancelConversionTask()}
+                type="button"
+              >
+                {canceling ? <LoaderCircle aria-hidden="true" className="animate-spin" size={18} /> : <Square aria-hidden="true" size={15} />}
+                停止
+              </button>
+            ) : (
+              <button
+                className="lq-primary-btn"
+                disabled={conversionSubmitDisabled}
+                onClick={() => void handleSubmit()}
+                type="button"
+              >
+                <Sparkles aria-hidden="true" size={18} />
+                {conversionCompleted ? "已完成转换" : conversionTerminalRetryable ? "重新转换" : "开始转换"}
+              </button>
+            )}
+            {taskStatus === "PENDING" || taskStatus === "RUNNING" ? (
+              <WorkbenchTaskStatusBadge elapsedSeconds={elapsedSeconds} status="running" />
+            ) : taskStatus === "SUCCEEDED" ? (
+              <WorkbenchTaskStatusBadge elapsedSeconds={elapsedSeconds} status="completed" />
+            ) : taskStatus === "CANCELLED" ? (
+              <WorkbenchTaskStatusBadge dirty={terminalStatusDirty} elapsedSeconds={elapsedSeconds} status="cancelled" />
+            ) : taskStatus === "FAILED" ? (
+              <WorkbenchTaskStatusBadge dirty={terminalStatusDirty} elapsedSeconds={elapsedSeconds} status="failed" />
+            ) : null}
           </div>
         </div>
       </section>
@@ -1981,18 +2022,6 @@ function TaskBillingBadge({ label, waived }: { label: string; waived: boolean })
   );
 }
 
-function formatElapsedDuration(elapsedSeconds: number) {
-  const safeSeconds = Math.max(0, Math.floor(elapsedSeconds));
-
-  if (safeSeconds < 60) {
-    return `${safeSeconds}s`;
-  }
-
-  const minutes = Math.floor(safeSeconds / 60);
-  const seconds = safeSeconds % 60;
-  return `${minutes}m ${seconds}s`;
-}
-
 function getStrategyJobElapsedSeconds(job: StrategyJob, activeElapsedSeconds: number) {
   if (getDisplayJobActive(job)) {
     return activeElapsedSeconds;
@@ -2088,8 +2117,8 @@ function ErrorPanel({ message }: { message: string }) {
   return <div className="lq-error-panel">{message}</div>;
 }
 
-function PlatformSelectCard({ isTarget = false, label, onChange, options, value }: { isTarget?: boolean; label: string; onChange: (value: string) => void; options: string[]; value: string }) {
-  return <PlatformDropdown label={label} onChange={onChange} options={options} tone={isTarget ? "target" : "default"} value={value} />;
+function PlatformSelectCard({ disabled = false, isTarget = false, label, onChange, options, value }: { disabled?: boolean; isTarget?: boolean; label: string; onChange: (value: string) => void; options: string[]; value: string }) {
+  return <PlatformDropdown disabled={disabled} label={label} onChange={onChange} options={options} tone={isTarget ? "target" : "default"} value={value} />;
 }
 
 function rememberTaskFingerprintOutcome(
@@ -2390,7 +2419,7 @@ function createThinkingStateFromTaskData(data: AiTaskData | null | undefined, ta
     return {
       status: "failed",
       visibleThinking,
-      finalAnswerMarkdown: "",
+      finalAnswerMarkdown,
       error: data.task.errorMessage ?? null,
       taskId: data.task.id
     };
@@ -2413,8 +2442,8 @@ function createThinkingStateFromTaskData(data: AiTaskData | null | undefined, ta
   };
 }
 
-function getFinalConversionInputText(inputCode: string) {
-  return inputCode.trim();
+function getFinalConversionInputText(inputCode: string, inputSource: "manual" | "attachment" | "restored") {
+  return inputSource === "restored" ? "" : inputCode.trim();
 }
 
 function getConversionTotalInputChars(inputCode: string, prompt: string, sourcePlatform: string, targetPlatform: string) {

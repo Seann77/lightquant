@@ -1,0 +1,302 @@
+- generic [ref=e3]:
+  - link "跳转到内容" [ref=e4] [cursor=pointer]:
+    - /url: "#VPContent"
+  - banner:
+    - generic:
+      - generic:
+        - generic:
+          - link "量化帮助手册" [ref=e6] [cursor=pointer]:
+            - /url: /qthelp/
+          - generic [ref=e8]:
+            - button "Search" [ref=e11] [cursor=pointer]:
+              - generic [ref=e15]:
+                - generic [ref=e16]: ⌘
+                - generic [ref=e17]: K
+            - navigation "Main Navigation" [ref=e18]:
+              - link "指南" [ref=e20] [cursor=pointer]:
+                - /url: /qthelp/help/introduce.html
+              - link "策略示例" [ref=e22] [cursor=pointer]:
+                - /url: /qthelp/demo.html
+              - link "常见问题" [ref=e24] [cursor=pointer]:
+                - /url: /qthelp/qa.html
+              - button "历史版本" [ref=e27] [cursor=pointer]
+            - switch "切换到深色模式" [ref=e32] [cursor=pointer]
+  - complementary [ref=e37]:
+    - navigation "Sidebar Navigation" [ref=e39]:
+      - generic [ref=e42]:
+        - button [ref=e43]:
+          - heading "简介" [level=2] [ref=e45]
+        - generic [ref=e46]:
+          - link [ref=e50] [cursor=pointer]:
+            - /url: /qthelp/help/introduce.html
+            - paragraph [ref=e51]: 使用说明
+          - link [ref=e55] [cursor=pointer]:
+            - /url: /qthelp/help/quickstart.html
+            - paragraph [ref=e56]: 开始写策略
+          - link [ref=e60] [cursor=pointer]:
+            - /url: /qthelp/help/engine.html
+            - paragraph [ref=e61]: 策略引擎简介
+          - link [ref=e65] [cursor=pointer]:
+            - /url: /qthelp/help/third.html
+            - paragraph [ref=e66]: 支持的三方库
+          - link [ref=e70] [cursor=pointer]:
+            - /url: /qthelp/help/backtest_results.html
+            - paragraph [ref=e71]: 策略绩效评价说明
+      - generic [ref=e73]:
+        - button [ref=e74]:
+          - heading "策略API接口" [level=2] [ref=e76]
+        - generic [ref=e77]:
+          - link [ref=e81] [cursor=pointer]:
+            - /url: /qthelp/api/list.html
+            - paragraph [ref=e82]: 接口列表
+          - link [ref=e86] [cursor=pointer]:
+            - /url: /qthelp/api/system.html
+            - paragraph [ref=e87]: 系统接口
+          - link [ref=e91] [cursor=pointer]:
+            - /url: /qthelp/api/data.html
+            - paragraph [ref=e92]: 数据接口
+          - link [ref=e96] [cursor=pointer]:
+            - /url: /qthelp/api/trade.html
+            - paragraph [ref=e97]: 业务公共接口
+          - link [ref=e101] [cursor=pointer]:
+            - /url: /qthelp/api/stock.html
+            - paragraph [ref=e102]: 现货专用接口
+          - link [ref=e106] [cursor=pointer]:
+            - /url: /qthelp/api/credit.html
+            - paragraph [ref=e107]: 融资融券专用接口
+          - link [ref=e111] [cursor=pointer]:
+            - /url: /qthelp/api/future.html
+            - paragraph [ref=e112]: 期货专用接口
+          - link [ref=e116] [cursor=pointer]:
+            - /url: /qthelp/api/hks.html
+            - paragraph [ref=e117]: 港股通专用接口
+          - link [ref=e121] [cursor=pointer]:
+            - /url: /qthelp/api/factor.html
+            - paragraph [ref=e122]: 技术指标接口
+      - generic [ref=e125]:
+        - link [ref=e129] [cursor=pointer]:
+          - /url: /qthelp/demo.html
+          - paragraph [ref=e130]: 策略示例
+        - link [ref=e134] [cursor=pointer]:
+          - /url: /qthelp/qa.html
+          - paragraph [ref=e135]: 常见问题
+        - link [ref=e139] [cursor=pointer]:
+          - /url: /qthelp/changelog.html
+          - paragraph [ref=e140]: 更新日志
+  - generic [ref=e143]:
+    - navigation [ref=e149]:
+      - generic [ref=e150]:
+        - heading "页面导航" [level=2] [ref=e152]
+        - list [ref=e153]:
+          - listitem [ref=e154]:
+            - link "新建策略" [ref=e155] [cursor=pointer]:
+              - /url: "#新建策略"
+          - listitem [ref=e156]:
+            - link "新建回测" [ref=e157] [cursor=pointer]:
+              - /url: "#新建回测"
+          - listitem [ref=e158]:
+            - link "新建交易" [ref=e159] [cursor=pointer]:
+              - /url: "#新建交易"
+          - listitem [ref=e160]:
+            - link "策略运行周期" [ref=e161] [cursor=pointer]:
+              - /url: "#策略运行周期"
+          - listitem [ref=e162]:
+            - link "策略运行时间" [ref=e163] [cursor=pointer]:
+              - /url: "#策略运行时间"
+          - listitem [ref=e164]:
+            - link "交易策略委托下单时间" [ref=e165] [cursor=pointer]:
+              - /url: "#交易策略委托下单时间"
+          - listitem [ref=e166]:
+            - link "回测支持业务类型" [ref=e167] [cursor=pointer]:
+              - /url: "#回测支持业务类型"
+          - listitem [ref=e168]:
+            - link "交易支持业务类型" [ref=e169] [cursor=pointer]:
+              - /url: "#交易支持业务类型"
+          - listitem [ref=e170]:
+            - link "交易标的对应最小价差" [ref=e171] [cursor=pointer]:
+              - /url: "#交易标的对应最小价差"
+    - generic [ref=e174]:
+      - main [ref=e175]:
+        - generic [ref=e177]:
+          - heading [level=1] [ref=e178]:
+            - text: 使用说明
+            - link "Permalink to \"使用说明\"" [ref=e179] [cursor=pointer]:
+              - /url: "#使用说明"
+              - text: "#"
+          - heading [level=2] [ref=e180]:
+            - text: 新建策略
+            - link "Permalink to \"新建策略\"" [ref=e181] [cursor=pointer]:
+              - /url: "#新建策略"
+              - text: "#"
+          - paragraph [ref=e182]: 开始回测和交易前需要先新建策略，点击下图中左上角标识进行策略添加。可以选择不同的业务类型（比如股票），然后给策略设定一个名称，添加成功后可以在默认策略模板基础上进行策略编写。
+          - paragraph [ref=e183]
+          - heading [level=2] [ref=e184]:
+            - text: 新建回测
+            - link "Permalink to \"新建回测\"" [ref=e185] [cursor=pointer]:
+              - /url: "#新建回测"
+              - text: "#"
+          - paragraph [ref=e186]: 策略添加完成后就可以开始进行回测操作了。回测之前需要对开始时间、结束时间、回测资金、回测基准、回测频率几个要素进行设定，设定完毕后点击保存。然后再点击回测按键，系统就会开始运行回测，回测的评价指标、收益曲线、日志都会在界面中展现。
+          - paragraph [ref=e187]
+          - heading [level=2] [ref=e188]:
+            - text: 新建交易
+            - link "Permalink to \"新建交易\"" [ref=e189] [cursor=pointer]:
+              - /url: "#新建交易"
+              - text: "#"
+          - paragraph [ref=e190]: 交易界面点击新增按键进行新增交易操作，策略方案中的对象为所有策略列表中的策略，给本次交易设定名称并点击确定后系统就开始运行交易了。
+          - paragraph [ref=e191]
+          - paragraph [ref=e192]:
+            - text: 交易开始运行后，可以实时看到总资产和可用资金情况，同时可以在交易列表查询
+            - link "交易状态" [ref=e193] [cursor=pointer]:
+              - /url: /qthelp/help/engine.html#trade_status
+            - text: 。
+          - paragraph [ref=e194]
+          - paragraph [ref=e195]: 交易开始运行后，可以点击交易详情，查看策略评价指标、交易明细、持仓明细、交易日志。
+          - paragraph [ref=e196]
+          - heading [level=2] [ref=e197]:
+            - text: 策略运行周期
+            - link "Permalink to \"策略运行周期\"" [ref=e198] [cursor=pointer]:
+              - /url: "#策略运行周期"
+              - text: "#"
+          - paragraph [ref=e199]:
+            - text: 回测支持日线级别、分钟级别运行，详见
+            - link "handle_data" [ref=e200] [cursor=pointer]:
+              - /url: /qthelp/help/engine.html#handle_data
+            - text: 方法。
+          - paragraph [ref=e201]:
+            - text: 交易支持日线级别、分钟级别、tick 级别运行，日线级别和分钟级别详见
+            - link "handle_data" [ref=e202] [cursor=pointer]:
+              - /url: /qthelp/help/engine.html#handle_data
+            - text: 方法，tick 级别运行详见
+            - link "run_interval" [ref=e203] [cursor=pointer]:
+              - /url: /qthelp/api/system.html#run_interval
+            - text: 和
+            - link "tick_data" [ref=e204] [cursor=pointer]:
+              - /url: /qthelp/help/engine.html#tick_data
+            - text: 方法。
+          - paragraph [ref=e205]: 频率：日线级别
+          - paragraph [ref=e206]:
+            - text: 当选择日线频率时，回测和交易都是每天运行一次，运行时间详见
+            - link "handle_data" [ref=e207] [cursor=pointer]:
+              - /url: /qthelp/help/engine.html#handle_data
+            - text: 方法。
+          - paragraph [ref=e208]: 频率：分钟级别
+          - paragraph [ref=e209]: 当选择分钟频率时，回测和交易都是每分钟运行一次，运行时间为每根分钟 K 线结束。
+          - paragraph [ref=e210]: 频率：tick 级别
+          - paragraph [ref=e211]: 当选择 tick 频率时，交易最小频率可以达到 3 秒运行一次。
+          - heading [level=2] [ref=e212]:
+            - text: 策略运行时间
+            - link "Permalink to \"策略运行时间\"" [ref=e213] [cursor=pointer]:
+              - /url: "#策略运行时间"
+              - text: "#"
+          - paragraph [ref=e214]: "盘前运行:"
+          - paragraph [ref=e215]:
+            - text: 9:30 分钟之前为盘前运行时间，交易环境支持运行在
+            - link "run_daily" [ref=e216] [cursor=pointer]:
+              - /url: /qthelp/api/system.html#run_daily
+            - text: 中指定交易时间(如 time='09:15')运行的函数；回测环境和交易环境支持运行
+            - link "before_trading_start" [ref=e217] [cursor=pointer]:
+              - /url: /qthelp/help/engine.html#before_trading_start
+            - text: 函数
+          - paragraph [ref=e218]: "盘中运行:"
+          - paragraph [ref=e219]:
+            - text: 9:31(股票回测)/9:30(股票交易)~15:00(股票回测)/14:59(股票交易)、9:30(港股通交易)~16:09(港股通交易)分为盘中运行时间，分钟级别回测环境和交易环境支持运行在
+            - link "run_daily" [ref=e220] [cursor=pointer]:
+              - /url: /qthelp/api/system.html#run_daily
+            - text: 中指定交易时间(如 time='14:30')运行的函数；回测环境和交易环境支持运行
+            - link "handle_data" [ref=e221] [cursor=pointer]:
+              - /url: /qthelp/help/engine.html#handle_data
+            - text: 函数；交易环境支持运行
+            - link "run_interval" [ref=e222] [cursor=pointer]:
+              - /url: /qthelp/api/system.html#run_interval
+            - text: 函数
+          - paragraph [ref=e223]: "盘后运行:"
+          - paragraph [ref=e224]:
+            - text: 15:30(股票)/16:30(港股通)分为盘后运行时间，回测环境和交易环境支持运行
+            - link "after_trading_end" [ref=e225] [cursor=pointer]:
+              - /url: /qthelp/help/engine.html#after_trading_end
+            - text: 函数(该函数为定时运行)；15:00(股票)/16:10(港股通)之后交易环境支持运行在
+            - link "run_daily" [ref=e226] [cursor=pointer]:
+              - /url: /qthelp/api/system.html#run_daily
+            - text: 中指定交易时间(如 time='15:10')运行的函数，
+          - heading [level=2] [ref=e227]:
+            - text: 交易策略委托下单时间
+            - link "Permalink to \"交易策略委托下单时间\"" [ref=e228] [cursor=pointer]:
+              - /url: "#交易策略委托下单时间"
+              - text: "#"
+          - paragraph [ref=e229]: 使用 order 系列接口进行股票委托下单，将直接报单到柜台。
+          - heading [level=2] [ref=e230]:
+            - text: 回测支持业务类型
+            - link "Permalink to \"回测支持业务类型\"" [ref=e231] [cursor=pointer]:
+              - /url: "#回测支持业务类型"
+              - text: "#"
+          - paragraph [ref=e232]: "目前所支持的业务类型:"
+          - list [ref=e233]:
+            - listitem [ref=e234]:
+              - paragraph [ref=e235]: 普通股票买卖(单位：股)。
+            - listitem [ref=e236]:
+              - paragraph [ref=e237]: 可转债买卖(单位：张，T+0)。
+            - listitem [ref=e238]:
+              - paragraph [ref=e239]: 融资融券担保品买卖(单位：股)。
+            - listitem [ref=e240]:
+              - paragraph [ref=e241]: 期货投机类型交易(单位：手，T+0)。
+            - listitem [ref=e242]:
+              - paragraph [ref=e243]: LOF 基金买卖(单位：股)。
+            - listitem [ref=e244]:
+              - paragraph [ref=e245]: ETF 基金买卖(单位：股)。
+          - heading [level=2] [ref=e246]:
+            - text: 交易支持业务类型
+            - link "Permalink to \"交易支持业务类型\"" [ref=e247] [cursor=pointer]:
+              - /url: "#交易支持业务类型"
+              - text: "#"
+          - paragraph [ref=e248]: "目前所支持的业务类型:"
+          - list [ref=e249]:
+            - listitem [ref=e250]:
+              - paragraph [ref=e251]: 普通股票买卖(单位：股)。
+            - listitem [ref=e252]:
+              - paragraph [ref=e253]: 可转债买卖(具体单位请咨询券商，T+0)。
+            - listitem [ref=e254]:
+              - paragraph [ref=e255]: 融资融券交易(单位：股)。
+            - listitem [ref=e256]:
+              - paragraph [ref=e257]: ETF 申赎、套利(单位：份)。
+            - listitem [ref=e258]:
+              - paragraph [ref=e259]: 国债逆回购(单位：份)。
+            - listitem [ref=e260]:
+              - paragraph [ref=e261]: 期货投机类型交易(单位：手，T+0)。
+            - listitem [ref=e262]:
+              - paragraph [ref=e263]: LOF 基金买卖(单位：股)。
+            - listitem [ref=e264]:
+              - paragraph [ref=e265]: ETF 基金买卖(单位：股)。
+            - listitem [ref=e266]:
+              - paragraph [ref=e267]: 港股通买卖(单位：股)。
+          - heading [level=2] [ref=e268]:
+            - text: 交易标的对应最小价差
+            - link "Permalink to \"交易标的对应最小价差\"" [ref=e269] [cursor=pointer]:
+              - /url: "#交易标的对应最小价差"
+              - text: "#"
+          - list [ref=e270]:
+            - listitem [ref=e271]:
+              - paragraph [ref=e272]: 股票买卖(最小价差：0.01)。
+            - listitem [ref=e273]:
+              - paragraph [ref=e274]: 可转债买卖(最小价差：0.001)。
+            - listitem [ref=e275]:
+              - paragraph [ref=e276]: LOF买卖(最小价差：0.001)。
+            - listitem [ref=e277]:
+              - paragraph [ref=e278]: ETF买卖(最小价差：0.001)。
+            - listitem [ref=e279]:
+              - paragraph [ref=e280]: 国债逆回购(最小价差：0.005)。
+            - listitem [ref=e281]:
+              - paragraph [ref=e282]: 股指期货投机类型交易(最小价差：0.2)。
+            - listitem [ref=e283]:
+              - paragraph [ref=e284]: 国债期货投机类型交易(最小价差：0.005)。
+            - listitem [ref=e285]:
+              - paragraph [ref=e286]:
+                - text: 港股通买卖(最小价差：通过
+                - link "get_hks_price_gap" [ref=e287] [cursor=pointer]:
+                  - /url: /qthelp/api/hks.html#get_hks_price_gap
+                - text: 接口查询)。
+      - contentinfo [ref=e288]:
+        - navigation "Pager" [ref=e289]:
+          - link "下一页 开始写策略" [ref=e293] [cursor=pointer]:
+            - /url: /qthelp/help/quickstart.html
+            - generic [ref=e294]: 下一页
+            - generic [ref=e295]: 开始写策略

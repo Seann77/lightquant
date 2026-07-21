@@ -51,7 +51,9 @@ export type AiTaskData = {
     targetPlatform?: string | null;
     costPoints: number;
     title?: string | null;
+    prompt?: string | null;
     promptPreview?: string | null;
+    inputCode?: string | null;
     errorCode?: string | null;
     errorMessage?: string | null;
     inputFileId?: string | null;
@@ -202,6 +204,7 @@ export type RestoredWorkbenchSnapshot = {
   sourcePlatform: string | null;
   targetPlatform: string | null;
   prompt: string | null;
+  inputCode: string | null;
   inputCodePreview: string | null;
   inputFileId: string | null;
   inputFileName: string | null;

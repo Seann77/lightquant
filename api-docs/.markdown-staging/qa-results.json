@@ -1,0 +1,218 @@
+{
+  "generated_at": "2026-07-18T12:22:54.340Z",
+  "staging_root": "/Users/a1-6/Documents/Codex-Restored-Projects/量化平台策略生成/api-docs/.markdown-staging",
+  "automated_pass": true,
+  "manual_review": {
+    "complete": true,
+    "reviewed_on": "2026-07-18",
+    "items": [
+      {
+        "name": "PTrade国金主API",
+        "pass": true,
+        "evidence": "get_history：标题、签名、使用场景、限制、参数和来源锚点与 ptradeapi.html 对应。"
+      },
+      {
+        "name": "PTrade国金财务数据",
+        "pass": true,
+        "evidence": "valuation：get_fundamentals 签名、date 说明、限制和字段表保持原文。"
+      },
+      {
+        "name": "PTrade申万数据接口",
+        "pass": true,
+        "evidence": "get_history：独立保存在 shenwan 目录，签名和首个代码块逐字匹配。"
+      },
+      {
+        "name": "PTrade申万交易接口",
+        "pass": true,
+        "evidence": "order_tick：参数、默认值、返回值及示例代码与申万原文匹配。"
+      },
+      {
+        "name": "QMT行情API",
+        "pass": true,
+        "evidence": "get_market_data_ex：运行限制、原型、参数表和原型代码逐字匹配。"
+      },
+      {
+        "name": "QMT下单API",
+        "pass": true,
+        "evidence": "passorder：调用方法、参数说明、注意事项和代码块逐字匹配。"
+      },
+      {
+        "name": "JoinQuant策略API",
+        "pass": true,
+        "evidence": "initialize：原 label 提升为 H3，签名、参数、注意、返回与示例保持原文。"
+      },
+      {
+        "name": "JoinQuant Stock",
+        "pass": true,
+        "evidence": "get_fundamentals：保存在 Stock 来源章节，签名逐字匹配，参数与链接保留。"
+      },
+      {
+        "name": "JoinQuant JQData",
+        "pass": true,
+        "evidence": "get_query_count：签名、返回字段、简单表格、图片和示例逐字对应。"
+      },
+      {
+        "name": "JoinQuant技术指标",
+        "pass": true,
+        "evidence": "MACD：函数签名、参数、返回类型及示例内容与原文一致。"
+      },
+      {
+        "name": "简单表格",
+        "pass": true,
+        "evidence": "QMT 行情字段表保持 3 列：字段名、数据类型、解释。"
+      },
+      {
+        "name": "复杂表格",
+        "pass": true,
+        "evidence": "JQData rowspan/colspan 表保留为 HTML；原文与输出均为 28 行、72 个单元格。"
+      },
+      {
+        "name": "长Python代码示例",
+        "pass": true,
+        "evidence": "QMT 完整示例抽样 25023 字符、33 行，忽略围栏终止换行后逐字匹配，缩进保留。"
+      }
+    ],
+    "notes": [
+      "所有抽样均检查标题、正文、参数/返回、代码、表格、导航残留和 Front Matter 来源追溯。",
+      "JQData 原文中一个带引号的畸形 Markdown 风格链接保持原样，并由 QA warning 登记。"
+    ]
+  },
+  "can_publish": true,
+  "errors": [],
+  "warnings": [
+    "1 malformed Markdown-style links already present as source text were preserved"
+  ],
+  "checks": {
+    "raw_hashes": {
+      "expected_files": 94,
+      "actual_files": 94,
+      "changed": []
+    },
+    "source_coverage": {
+      "expected": 36,
+      "handled": 36,
+      "missing": [],
+      "unexpected": []
+    },
+    "markdown_files": {
+      "count": 197,
+      "utf8_errors": 0,
+      "replacement_characters": 0,
+      "mojibake_markers": 0,
+      "empty_files": 0,
+      "unclosed_fences": 0,
+      "front_matter_errors": 0,
+      "duplicate_slugs": []
+    },
+    "navigation": {
+      "files_with_obvious_navigation_residuals": 0
+    },
+    "duplicates": {
+      "exact_duplicate_bodies": []
+    },
+    "code": {
+      "multiline_blocks": 1219,
+      "blocks_with_indentation": 1020
+    },
+    "tables": {
+      "markdown_table_column_errors": 0,
+      "markdown_table_error_details": [],
+      "preserved_html_table_structure_errors": 0,
+      "preserved_html_table_error_details": [],
+      "markdown_tables": 572,
+      "preserved_html_tables": 56
+    },
+    "images_and_links": {
+      "missing_relative_images": 0,
+      "missing_relative_image_details": [],
+      "broken_markdown_internal_links": 0,
+      "broken_markdown_internal_link_details": [],
+      "malformed_source_markdown_links": 1
+    },
+    "traceability": {
+      "errors": 0
+    },
+    "ptrade_isolation": {
+      "pass": true
+    },
+    "joinquant_categories": {
+      "present": [
+        "factor",
+        "faq",
+        "finance",
+        "market_data",
+        "research_data",
+        "strategy_api"
+      ],
+      "expected": [
+        "strategy_api",
+        "market_data",
+        "factor",
+        "research_data",
+        "finance",
+        "faq"
+      ]
+    },
+    "joinquant_main_api": {
+      "main_status": "alias",
+      "canonical": "api-docs/raw/joinquant/api/rendered.html",
+      "pass": true
+    },
+    "typical_api_search": {
+      "ptrade": {
+        "get_history": true,
+        "get_fundamentals": true,
+        "order": true
+      },
+      "qmt": {
+        "get_market_data_ex": true,
+        "passorder": true
+      },
+      "joinquant": {
+        "initialize": true,
+        "run_daily": true,
+        "get_price": true,
+        "order_target": true,
+        "get_fundamentals": true
+      }
+    },
+    "source_statuses": {
+      "api-docs/raw/ptrade/guojin/ptradeapi.html": "split",
+      "api-docs/raw/ptrade/guojin/财务数据api.html": "split",
+      "api-docs/raw/ptrade/guojin/行业概念分类.html": "split",
+      "api-docs/raw/qmt/innerapi-combined.html": "split",
+      "api-docs/raw/ptrade/shenwan/01_help_introduce.html": "split",
+      "api-docs/raw/ptrade/shenwan/02_help_quickstart.html": "split",
+      "api-docs/raw/ptrade/shenwan/03_help_engine.html": "split",
+      "api-docs/raw/ptrade/shenwan/04_help_third.html": "split",
+      "api-docs/raw/ptrade/shenwan/05_help_backtest_results.html": "split",
+      "api-docs/raw/ptrade/shenwan/06_api_list.html": "converted",
+      "api-docs/raw/ptrade/shenwan/07_api_system.html": "split",
+      "api-docs/raw/ptrade/shenwan/08_api_data.html": "split",
+      "api-docs/raw/ptrade/shenwan/09_api_trade.html": "split",
+      "api-docs/raw/ptrade/shenwan/10_api_stock.html": "split",
+      "api-docs/raw/ptrade/shenwan/11_api_credit.html": "split",
+      "api-docs/raw/ptrade/shenwan/12_api_future.html": "split",
+      "api-docs/raw/ptrade/shenwan/13_api_hks.html": "split",
+      "api-docs/raw/ptrade/shenwan/14_api_factor.html": "converted",
+      "api-docs/raw/ptrade/shenwan/15_demo.html": "split",
+      "api-docs/raw/ptrade/shenwan/16_qa.html": "split",
+      "api-docs/raw/ptrade/shenwan/17_changelog.html": "split",
+      "api-docs/raw/joinquant/main/rendered.html": "alias",
+      "api-docs/raw/joinquant/api/rendered.html": "split",
+      "api-docs/raw/joinquant/Stock/rendered.html": "split",
+      "api-docs/raw/joinquant/fund/rendered.html": "converted",
+      "api-docs/raw/joinquant/Future/rendered.html": "split",
+      "api-docs/raw/joinquant/index/rendered.html": "split",
+      "api-docs/raw/joinquant/plateData/rendered.html": "split",
+      "api-docs/raw/joinquant/factor/rendered.html": "split",
+      "api-docs/raw/joinquant/factor_values/rendered.html": "split",
+      "api-docs/raw/joinquant/technicalanalysis/rendered.html": "split",
+      "api-docs/raw/joinquant/Alpha101/rendered.html": "converted",
+      "api-docs/raw/joinquant/Alpha191/rendered.html": "converted",
+      "api-docs/raw/joinquant/JQData/rendered.html": "split",
+      "api-docs/raw/joinquant/macroData/rendered.html": "converted",
+      "api-docs/raw/joinquant/faq/rendered.html": "converted"
+    }
+  }
+}

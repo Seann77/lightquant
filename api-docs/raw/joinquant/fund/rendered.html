@@ -1,0 +1,2770 @@
+<!DOCTYPE html><html><head> <meta charset="UTF-8"> <title>场内基金数据 - JoinQuant</title> <meta charset="utf-8"> <meta name="keywords" content="joinquant,聚宽,量化,宽客,quant,量化交易,量化平台,量化投资,量化策略,程序化交易,量化交易平台,python,金融工程,level2,level1"> <meta name="description" content="聚宽（JoinQuant）量化交易平台是为量化爱好者（宽客）量身打造的云平台，我们为您提供精准的回测功能、高速实盘交易接口、易用的API文档、由易入难的策略库，便于您快速实现、使用自己的量化交易策略。"> <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no"> <link type="text/css" href="https://cdn.joinquant.com/third/bootstrap/css/bootstrap.min.css" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/third/bootstrap/css/bootstrap-dialog.min.css" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/third/awesome/font-awesome.min.css" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/third/jquery-ui/ui.jqgrid.css?v=17679309750001783575403239" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/third/jquery-ui/jqGrid.overrides.css?v=17679309750001783575403239" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/third/jquery-ui/jquery-ui.min.css?v=17679309750001783575403239" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/common/css/common.css?v=17679309750001783575403239" rel="stylesheet"> <link rel="stylesheet" href="https://cdn.joinquant.com/third/silviomoreto-bootstrap-select/dist/css/bootstrap-select.css" type="text/css"> <link type="text/css" href="https://cdn.joinquant.com/third/backtotop/css/style.css?v=17679309750001783575403239" rel="stylesheet"> <link rel="stylesheet" href="https://cdn.joinquant.com/themes/jq/static/common/css/jq-common.css?v=17679309750001783575403239"> <link type="text/css" href="https://cdn.joinquant.com/themes/jq/static/default/css/iconfont.css" rel="stylesheet"> <link rel="stylesheet" href="https://cdn.joinquant.com/themes/jq/static/dist/asset/general/backtotop.bundle.css?v=17679309750001783575403239"> <link rel="icon" href="https://cdn.joinquant.com/common/img/favicon-16-16.png?v=2" type="image/x-icon"> <link rel="stylesheet" type="text/css" href="https://cdn.joinquant.com/themes/jq/static/user/css/loginDialog.css?v=17679309750001783575403239"> <link rel="stylesheet" type="text/css" href="https://cdn.joinquant.com/default/css/slide.css?v=17679309750001783575403239"> <link rel="stylesheet" type="text/css" href="https://cdn.joinquant.com/themes/jq/static/default/css/flexslider.css?v=17679309750001783575403239"> <link type="text/css" href="https://cdn.joinquant.com/themes/jq/static/default/css/style.css?v=17679309750001783575403239" rel="stylesheet"> <style>.tips.isfirst{background-position:calc(50% + 58px) 0}</style> <style>span.new{background:rgba(0,0,0,0)}.side-bar .top .name.user-alias img{width:16px;height:16px;float:none;margin-right:0}.kk_footer .wp20.last img{position:relative;top:-2px}.kk_footer .wp20.last .item>a{position:relative;left:-5px}</style> <style>header#kk_nav .nav .dropdown-menu a{display:block;padding:5px 35px;font-size:13px}.sanjiao.display{display:none}@media(max-width:320px){header#kk_nav .nav a{padding:11px 20px}}@media(min-width:768px){.sanjiao.display{display:block}.dropdown-menu{left:-90px;overflow-y:visible}#kk_nav .nav .dropdown-menu a{color:#333}.sanjiao:after,.sanjiao:before{left:80%}}.last>a,.nav.navbar-nav .help-mobile{padding-bottom:8px!important;outline:0}#kk_nav{position:fixed;width:100%;height:50px;z-index:100}.kk_main>.kk_body{top:50px}.mobile .top_50{top:0}span.new{background:rgba(0,0,0,0)}.side-bar .top .name.user-alias img{width:16px;height:16px;float:none;margin-right:0}.kk_footer .wp20.last img{position:relative;top:-2px}.kk_footer .wp20.last .item>a{position:relative;left:-5px}.kk_main{min-height:auto}</style> <link rel="stylesheet" type="text/css" href="https://cdn.joinquant.com/std/dist/asset/jq-plugin.css?v=17679309750001783575403239"> <link rel="stylesheet" type="text/css" href="https://cdn.joinquant.com/std/dist/asset/general/login-dialog.bundle.css?v=17679309750001783575403239">  <link type="text/css" href="https://cdn.joinquant.com/third/amaze/css/amazeui.min.css" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/third/amaze/css/amazeui.tree.min.css" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/third/markdown/default2.css?v=17679309750001783575403239" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/std/dist/modules/help/api/help.bundle.css?v=17679309750001783575403239" rel="stylesheet"> <style type="text/css">.MathJax_Hover_Frame {border-radius: .25em; -webkit-border-radius: .25em; -moz-border-radius: .25em; -khtml-border-radius: .25em; box-shadow: 0px 0px 15px #83A; -webkit-box-shadow: 0px 0px 15px #83A; -moz-box-shadow: 0px 0px 15px #83A; -khtml-box-shadow: 0px 0px 15px #83A; border: 1px solid #A6D ! important; display: inline-block; position: absolute}
+.MathJax_Menu_Button .MathJax_Hover_Arrow {position: absolute; cursor: pointer; display: inline-block; border: 2px solid #AAA; border-radius: 4px; -webkit-border-radius: 4px; -moz-border-radius: 4px; -khtml-border-radius: 4px; font-family: 'Courier New',Courier; font-size: 9px; color: #F0F0F0}
+.MathJax_Menu_Button .MathJax_Hover_Arrow span {display: block; background-color: #AAA; border: 1px solid; border-radius: 3px; line-height: 0; padding: 4px}
+.MathJax_Hover_Arrow:hover {color: white!important; border: 2px solid #CCC!important}
+.MathJax_Hover_Arrow:hover span {background-color: #CCC!important}
+</style><style type="text/css">#MathJax_About {position: fixed; left: 50%; width: auto; text-align: center; border: 3px outset; padding: 1em 2em; background-color: #DDDDDD; color: black; cursor: default; font-family: message-box; font-size: 120%; font-style: normal; text-indent: 0; text-transform: none; line-height: normal; letter-spacing: normal; word-spacing: normal; word-wrap: normal; white-space: nowrap; float: none; z-index: 201; border-radius: 15px; -webkit-border-radius: 15px; -moz-border-radius: 15px; -khtml-border-radius: 15px; box-shadow: 0px 10px 20px #808080; -webkit-box-shadow: 0px 10px 20px #808080; -moz-box-shadow: 0px 10px 20px #808080; -khtml-box-shadow: 0px 10px 20px #808080; filter: progid:DXImageTransform.Microsoft.dropshadow(OffX=2, OffY=2, Color='gray', Positive='true')}
+#MathJax_About.MathJax_MousePost {outline: none}
+.MathJax_Menu {position: absolute; background-color: white; color: black; width: auto; padding: 5px 0px; border: 1px solid #CCCCCC; margin: 0; cursor: default; font: menu; text-align: left; text-indent: 0; text-transform: none; line-height: normal; letter-spacing: normal; word-spacing: normal; word-wrap: normal; white-space: nowrap; float: none; z-index: 201; border-radius: 5px; -webkit-border-radius: 5px; -moz-border-radius: 5px; -khtml-border-radius: 5px; box-shadow: 0px 10px 20px #808080; -webkit-box-shadow: 0px 10px 20px #808080; -moz-box-shadow: 0px 10px 20px #808080; -khtml-box-shadow: 0px 10px 20px #808080; filter: progid:DXImageTransform.Microsoft.dropshadow(OffX=2, OffY=2, Color='gray', Positive='true')}
+.MathJax_MenuItem {padding: 1px 2em; background: transparent}
+.MathJax_MenuArrow {position: absolute; right: .5em; padding-top: .25em; color: #666666; font-size: .75em}
+.MathJax_MenuActive .MathJax_MenuArrow {color: white}
+.MathJax_MenuArrow.RTL {left: .5em; right: auto}
+.MathJax_MenuCheck {position: absolute; left: .7em}
+.MathJax_MenuCheck.RTL {right: .7em; left: auto}
+.MathJax_MenuRadioCheck {position: absolute; left: .7em}
+.MathJax_MenuRadioCheck.RTL {right: .7em; left: auto}
+.MathJax_MenuLabel {padding: 1px 2em 3px 1.33em; font-style: italic}
+.MathJax_MenuRule {border-top: 1px solid #DDDDDD; margin: 4px 3px}
+.MathJax_MenuDisabled {color: GrayText}
+.MathJax_MenuActive {background-color: #606872; color: white}
+.MathJax_MenuDisabled:focus, .MathJax_MenuLabel:focus {background-color: #E8E8E8}
+.MathJax_ContextMenu:focus {outline: none}
+.MathJax_ContextMenu .MathJax_MenuItem:focus {outline: none}
+#MathJax_AboutClose {top: .2em; right: .2em}
+.MathJax_Menu .MathJax_MenuClose {top: -10px; left: -10px}
+.MathJax_MenuClose {position: absolute; cursor: pointer; display: inline-block; border: 2px solid #AAA; border-radius: 18px; -webkit-border-radius: 18px; -moz-border-radius: 18px; -khtml-border-radius: 18px; font-family: 'Courier New',Courier; font-size: 24px; color: #F0F0F0}
+.MathJax_MenuClose span {display: block; background-color: #AAA; border: 1.5px solid; border-radius: 18px; -webkit-border-radius: 18px; -moz-border-radius: 18px; -khtml-border-radius: 18px; line-height: 0; padding: 8px 0 6px}
+.MathJax_MenuClose:hover {color: white!important; border: 2px solid #CCC!important}
+.MathJax_MenuClose:hover span {background-color: #CCC!important}
+.MathJax_MenuClose:hover:focus {outline: none}
+</style><style type="text/css">.MathJax_Preview .MJXf-math {color: inherit!important}
+</style><style type="text/css">.MJX_Assistive_MathML {position: absolute!important; top: 0; left: 0; clip: rect(1px, 1px, 1px, 1px); padding: 1px 0 0 0!important; border: 0!important; height: 1px!important; width: 1px!important; overflow: hidden!important; display: block!important; -webkit-touch-callout: none; -webkit-user-select: none; -khtml-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none}
+.MJX_Assistive_MathML.MJX_Assistive_MathML_Block {width: 100%!important}
+</style><style type="text/css">#MathJax_Zoom {position: absolute; background-color: #F0F0F0; overflow: auto; display: block; z-index: 301; padding: .5em; border: 1px solid black; margin: 0; font-weight: normal; font-style: normal; text-align: left; text-indent: 0; text-transform: none; line-height: normal; letter-spacing: normal; word-spacing: normal; word-wrap: normal; white-space: nowrap; float: none; -webkit-box-sizing: content-box; -moz-box-sizing: content-box; box-sizing: content-box; box-shadow: 5px 5px 15px #AAAAAA; -webkit-box-shadow: 5px 5px 15px #AAAAAA; -moz-box-shadow: 5px 5px 15px #AAAAAA; -khtml-box-shadow: 5px 5px 15px #AAAAAA; filter: progid:DXImageTransform.Microsoft.dropshadow(OffX=2, OffY=2, Color='gray', Positive='true')}
+#MathJax_ZoomOverlay {position: absolute; left: 0; top: 0; z-index: 300; display: inline-block; width: 100%; height: 100%; border: 0; padding: 0; margin: 0; background-color: white; opacity: 0; filter: alpha(opacity=0)}
+#MathJax_ZoomFrame {position: relative; display: inline-block; height: 0; width: 0}
+#MathJax_ZoomEventTrap {position: absolute; left: 0; top: 0; z-index: 302; display: inline-block; border: 0; padding: 0; margin: 0; background-color: white; opacity: 0; filter: alpha(opacity=0)}
+</style><style type="text/css">.MathJax_Preview {color: #888}
+#MathJax_Message {position: fixed; left: 1em; bottom: 1.5em; background-color: #E6E6E6; border: 1px solid #959595; margin: 0px; padding: 2px 8px; z-index: 102; color: black; font-size: 80%; width: auto; white-space: nowrap}
+#MathJax_MSIE_Frame {position: absolute; top: 0; left: 0; width: 0px; z-index: 101; border: 0px; margin: 0px; padding: 0px}
+.MathJax_Error {color: #CC0000; font-style: italic}
+</style><style type="text/css">.MJXp-script {font-size: .8em}
+.MJXp-right {-webkit-transform-origin: right; -moz-transform-origin: right; -ms-transform-origin: right; -o-transform-origin: right; transform-origin: right}
+.MJXp-bold {font-weight: bold}
+.MJXp-italic {font-style: italic}
+.MJXp-scr {font-family: MathJax_Script,'Times New Roman',Times,STIXGeneral,serif}
+.MJXp-frak {font-family: MathJax_Fraktur,'Times New Roman',Times,STIXGeneral,serif}
+.MJXp-sf {font-family: MathJax_SansSerif,'Times New Roman',Times,STIXGeneral,serif}
+.MJXp-cal {font-family: MathJax_Caligraphic,'Times New Roman',Times,STIXGeneral,serif}
+.MJXp-mono {font-family: MathJax_Typewriter,'Times New Roman',Times,STIXGeneral,serif}
+.MJXp-largeop {font-size: 150%}
+.MJXp-largeop.MJXp-int {vertical-align: -.2em}
+.MJXp-math {display: inline-block; line-height: 1.2; text-indent: 0; font-family: 'Times New Roman',Times,STIXGeneral,serif; white-space: nowrap; border-collapse: collapse}
+.MJXp-display {display: block; text-align: center; margin: 1em 0}
+.MJXp-math span {display: inline-block}
+.MJXp-box {display: block!important; text-align: center}
+.MJXp-box:after {content: " "}
+.MJXp-rule {display: block!important; margin-top: .1em}
+.MJXp-char {display: block!important}
+.MJXp-mo {margin: 0 .15em}
+.MJXp-mfrac {margin: 0 .125em; vertical-align: .25em}
+.MJXp-denom {display: inline-table!important; width: 100%}
+.MJXp-denom > * {display: table-row!important}
+.MJXp-surd {vertical-align: top}
+.MJXp-surd > * {display: block!important}
+.MJXp-script-box > *  {display: table!important; height: 50%}
+.MJXp-script-box > * > * {display: table-cell!important; vertical-align: top}
+.MJXp-script-box > *:last-child > * {vertical-align: bottom}
+.MJXp-script-box > * > * > * {display: block!important}
+.MJXp-mphantom {visibility: hidden}
+.MJXp-munderover, .MJXp-munder {display: inline-table!important}
+.MJXp-over {display: inline-block!important; text-align: center}
+.MJXp-over > * {display: block!important}
+.MJXp-munderover > *, .MJXp-munder > * {display: table-row!important}
+.MJXp-mtable {vertical-align: .25em; margin: 0 .125em}
+.MJXp-mtable > * {display: inline-table!important; vertical-align: middle}
+.MJXp-mtr {display: table-row!important}
+.MJXp-mtd {display: table-cell!important; text-align: center; padding: .5em 0 0 .5em}
+.MJXp-mtr > .MJXp-mtd:first-child {padding-left: 0}
+.MJXp-mtr:first-child > .MJXp-mtd {padding-top: 0}
+.MJXp-mlabeledtr {display: table-row!important}
+.MJXp-mlabeledtr > .MJXp-mtd:first-child {padding-left: 0}
+.MJXp-mlabeledtr:first-child > .MJXp-mtd {padding-top: 0}
+.MJXp-merror {background-color: #FFFF88; color: #CC0000; border: 1px solid #CC0000; padding: 1px 3px; font-style: normal; font-size: 90%}
+.MJXp-scale0 {-webkit-transform: scaleX(.0); -moz-transform: scaleX(.0); -ms-transform: scaleX(.0); -o-transform: scaleX(.0); transform: scaleX(.0)}
+.MJXp-scale1 {-webkit-transform: scaleX(.1); -moz-transform: scaleX(.1); -ms-transform: scaleX(.1); -o-transform: scaleX(.1); transform: scaleX(.1)}
+.MJXp-scale2 {-webkit-transform: scaleX(.2); -moz-transform: scaleX(.2); -ms-transform: scaleX(.2); -o-transform: scaleX(.2); transform: scaleX(.2)}
+.MJXp-scale3 {-webkit-transform: scaleX(.3); -moz-transform: scaleX(.3); -ms-transform: scaleX(.3); -o-transform: scaleX(.3); transform: scaleX(.3)}
+.MJXp-scale4 {-webkit-transform: scaleX(.4); -moz-transform: scaleX(.4); -ms-transform: scaleX(.4); -o-transform: scaleX(.4); transform: scaleX(.4)}
+.MJXp-scale5 {-webkit-transform: scaleX(.5); -moz-transform: scaleX(.5); -ms-transform: scaleX(.5); -o-transform: scaleX(.5); transform: scaleX(.5)}
+.MJXp-scale6 {-webkit-transform: scaleX(.6); -moz-transform: scaleX(.6); -ms-transform: scaleX(.6); -o-transform: scaleX(.6); transform: scaleX(.6)}
+.MJXp-scale7 {-webkit-transform: scaleX(.7); -moz-transform: scaleX(.7); -ms-transform: scaleX(.7); -o-transform: scaleX(.7); transform: scaleX(.7)}
+.MJXp-scale8 {-webkit-transform: scaleX(.8); -moz-transform: scaleX(.8); -ms-transform: scaleX(.8); -o-transform: scaleX(.8); transform: scaleX(.8)}
+.MJXp-scale9 {-webkit-transform: scaleX(.9); -moz-transform: scaleX(.9); -ms-transform: scaleX(.9); -o-transform: scaleX(.9); transform: scaleX(.9)}
+.MathJax_PHTML .noError {vertical-align: ; font-size: 90%; text-align: left; color: black; padding: 1px 3px; border: 1px solid}
+</style><style type="text/css">#YSF-BTN-HOLDER{position: fixed;max-width:300px;max-height:300px;right: 30px; bottom: 24px; cursor: pointer; overflow: visible; filter: alpha(opacity=100);opacity:1;z-index: 9990} #YSF-BTN-HOLDER:hover{filter: alpha(opacity=95);opacity:.95} #YSF-BTN-HOLDER img{ display: block;overflow: hidden; } #YSF-BTN-CIRCLE{display: none;position: absolute;right: -5px;top: -6px;width: auto;min-width: 12px;height: 20px;padding: 0 4px;background-color: #f00;font-size: 12px;line-height: 20px;color: #fff;text-align: center;white-space: nowrap;font-family: sans-serif;border-radius: 10px;z-index:1;} #YSF-BTN-BUBBLE{display: none;position: absolute;left: -274px;bottom:-15px;width: 278px;height: 80px;box-sizing: border-box;padding: 14px 22px;filter: alpha(opacity=100);opacity:1;background: url(//res.qiyukf.net/sdk/res/img/sdk/bg_floatMsg2x.png)  no-repeat;background:url(//res.qiyukf.net/sdk/res/img/sdk/bg_floatMsg.png); background-size: 278px 80px; z-index: 1;} #YSF-BTN-HOLDER.layer-6{bottom:0;} #YSF-BTN-HOLDER.layer-1 #YSF-BTN-BUBBLE{top:0} #YSF-BTN-HOLDER.layer-6 #YSF-BTN-BUBBLE{bottom:-6px;} #YSF-BTN-BUBBLE:hover{filter: alpha(opacity=95);opacity:.95} #YSF-BTN-CONTENT{height:45px;padding: 0;white-space: normal;word-break: break-all;text-align: left;font-size: 14px;line-height: 1.6;color: #222;overflow: hidden;z-index: 0;} #YSF-BTN-ARROW{ display: none; } #YSF-BTN-CLOSE{position: absolute; width:15px; height:15px;right: 4px;top: -3px; filter: alpha(opacity=90); opacity:.9; cursor: pointer; background: url(//res.qiyukf.net/sdk/res/img/sdk/btn-close.png) no-repeat;z-index: 1} #YSF-BTN-CLOSE:hover{filter: alpha(opacity=100); opacity: 1;} #YSF-PANEL-CORPINFO.ysf-chat-layeropen{ width: 511px; height: 500px; border-radius: 8px; box-shadow: 0 0 20px 0 rgba(0, 0, 0, .15);} #YSF-PANEL-CORPINFO{ position: fixed; bottom: 0px; right: 20px; width: 0; height: 0; z-index: 99999; } #YSF-PANEL-INFO.ysf-chat-layeropen{ width: 360px; height: 500px; border-radius: 8px; filter: alpha(opacity=100);opacity:1; box-shadow: 0 0 20px 0 rgba(0, 0, 0, .15);} #YSF-PANEL-INFO{ position: fixed; bottom: 0px; right: 20px; width: 0px; height: 0px; filter: alpha(opacity=0);opacity:0;z-index: 99999;} #YSF-PANEL-INFO .u-btn{background-color: none;} #YSF-CUSTOM-ENTRY{background-color: #F96868;} #YSF-CUSTOM-ENTRY-0{position: relative;width:auto;background-color: none;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-1{position: relative;width:auto;background-color: none;border-radius: 14px; box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-2{position: relative;width:auto;background-color: none;border-radius: 8px;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-3{position: relative;width:auto;background-color: none;border-radius: 50%;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-4{position: relative;width:auto;background-color: none;border-radius: 50%;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-5{position: relative;width:auto;background-color: none;border-radius: 8px;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-6{position: relative;width:auto;background-color: none;border-radius: 8px;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-7{position: relative;width:auto;background-color: none;border-radius: 50%;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-8{position: relative;width:auto;background-color: none;border-radius: 8px;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-0 img{max-width: 300px;max-height: 300px;} #YSF-CUSTOM-ENTRY-1 img{width:28px;height:auto;} #YSF-CUSTOM-ENTRY-2 img{width:58px;height:auto;} #YSF-CUSTOM-ENTRY-3 img{width:60px;height:auto;} #YSF-CUSTOM-ENTRY-4 img{width:60px;height:auto;} #YSF-CUSTOM-ENTRY-5 img{width:60px;height:auto;} #YSF-CUSTOM-ENTRY-6 img{width:58px;height:auto;} #YSF-CUSTOM-ENTRY-7 img{width:60px;height:auto;} #YSF-CUSTOM-ENTRY-8 img{width:60px;height:auto;} #YSF-IFRAME-LAYER{ border:0; outline:none; } .ysf-online-invite-wrap{z-index:10001;position:fixed;_position:absolute;top:50%;left:50%;} .ysf-online-invite{position:relative;top:-50%;left:-50%;cursor:pointer;border-radius: 16px;box-shadow: 0 10px 30px 0 rgba(47,56,111,0.15);} .ysf-online-invite img{display:block;width:250px;} .ysf-online-invite .ysf-online-invite-img{width:100%;height:100%} .ysf-online-invite .text{position:absolute;top:-11px;left:0;right:0;overflow:hidden;margin: 36px 20px 0 67px;line-height:140%;color:#526069;font-size:14px;font-family:"Microsoft YaHei","微软雅黑",tahoma,arial,simsun,"宋体";text-align:left;white-space:normal;word-wrap:break-word;} .ysf-online-invite .close{position:absolute;top:12px;right:12px;width:16px;height:16px;background:url("https://ysf.nosdn.127.net/operation/4602027f7e6a0109ac433863d7d0acdf") no-repeat;cursor:pointer;background-size: cover;} #YSF-PANEL-MOBILE{ background: rgba(46,47,49,0.7); position: fixed; bottom: 0px; right: 0px; width: 100%; height: 0px; transition-property: height,bottom; transition-duration: 0.3s; transition-timing-function: ease; transition-delay: 0s; z-index: 99999; } #YSF-PANEL-MOBILE.ysf-chat-layeropen{ width: 100%; height: 100%; transition-property:height,bottom; transition-duration: 0.3s; transition-timing-function: ease; transition-delay: 0s; } #YSF-IFRAME-LAYER.ysf-chat-mobile-layeropen{ height: 90% !important; transition-property: height,bottom; transition-duration: 0.3s; transition-timing-function: ease; transition-delay: 0s; } #YSF-IFRAME-LAYER.ysf-chat-mobile-layeropen.ysf-chat-mobile-invite-layer{ height: 33% !important; } #YSF-IFRAME-LAYER{ position: absolute; bottom: 0px;left: 0; right: 0px; width: 0px; height: 0px; transition-property: height,bottom; transition-duration: 0.3s; transition-timing-function: ease; transition-delay: 0s; z-index: 9999; } .YSF-PANEL-BODY-FIXED{ position: fixed !important; left: 0; right: 0;} .YSF-INVITE-LAYER-WRAPPER {cursor: pointer; position: relative; border: 1px solid #eaf0f6; background: #fff;box-shadow: 0 5px 20px rgba(0,0,0,0.1); border-radius: 4px; width: 220px; padding: 16px; box-sizing: border-box; margin-bottom: 12px; background: #FFFFFF;box-shadow: 0 6px 20px 0 rgba(40,53,75,0.17);border-radius: 8px;} .YSF-INVITE-LAYER-HEADER {display: flex;align-items: center;justify-content: space-between;margin-bottom: 8px;} .YSF-INVITE-LAYER-HEADER-LEFT {display: flex;flex: 1;align-items: center;} .YSF-INVITE-LAYER-RICHTEXT { height: 44px; max-width: 168px; word-break: break-all; overflow: hidden; text-overflow: ellipsis; font-size: 14px; color: #333333; line-height: 22px; text-align: left; } .YSF-INVITE-LAYER-RICHTEXT p { margin: 0;} #YSF-BTN-HOLDER .YSF-INVITE-LAYER-AVATAR { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; } .YSF-INVITE-LAYER-KEFU-NAME { font-size: 12px; color: #999999; margin-left: 4px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; } #YSF-ONLINE-INVITE-LAYER-CLOSE{ width:12px; height:12px; background:url("https://ysf.nosdn.127.net/operation/0e5ee37a71d33e05b74d1a5aa3cdd99a") no-repeat; background-size: cover; cursor:pointer; } #YSF-INVITE-LAYER-WRAPPER-ENTRY { position: relative; float: right; } .YSF-LAYER-ENTRY-CIRCLE { width: auto; min-width: 12px; height: 20px; padding: 0 4px; border-radius: 10px; color: #FFFFFF; background-color: #f00; font-size: 12px; line-height: 20px; white-space: nowrap; z-index:1; background: url("https://ysf.nosdn.127.net/operation/997228b687d805f7a5d6244865615ec9") no-repeat; background-size: cover; position: absolute; top: 6px; right: -8px; } .YSF-INVITE-IMG {background-color: none;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);float: right;} .YSF_INVITE-IMG-0{max-width: 300px; height:auto;} .YSF_INVITE-IMG-1{width:28px; height:auto; border-radius: 14px;} .YSF_INVITE-IMG-2{width:58px; height:auto; border-radius: 8px;} .YSF_INVITE-IMG-3{width:60px; height:auto; border-radius: 50%;} .YSF_INVITE-IMG-4{width:60px; height:auto; border-radius: 50%;} .YSF_INVITE-IMG-5{width:60px; height:auto; border-radius: 8px;} .YSF_INVITE-IMG-6{width:58px; height:auto; border-radius: 8px;} .YSF_INVITE-IMG-7{width:60px; height:auto; border-radius: 50%;} .YSF_INVITE-IMG-8{width:60px; height:auto; border-radius: 8px;} #YSF-BTN-HOLDER .portrait_icon{width: 24px;height: 24px;vertical-align: middle;display: inline-block;}</style></head> <body><div id="MathJax_Message" style="display: none;"></div> <div class="kk_main in_wrap"> <input type="hidden" id="imagePath" value="https://image.joinquant.com"> <input type="hidden" id="cdnPath" value="https://cdn.joinquant.com"> <input type="hidden" id="filePath" value="https://file.joinquant.com"> <input type="hidden" id="version" value="17679309750001783575403239"> <header id="kk_nav" class="kk_nav navbar narbar-static-top"> <div class="kk_nav_container js-jq-header"><div class="navbar-header clear" style="position:relative;z-index:1">  <a href="/" title="joinQuant" class="navbar-brand fleft headerLogBg">  </a>  </div> <nav id="kk_navbar" class="kk_navbar collapse navbar-collapse relative" aria-expanded="false"> <ul class="nav navbar-nav">  <li> <a href="/" class="">   首页   </a>      </li>  <li> <a href="javascript:void(0)" class="">   量化研究平台   </a>    <div class="submenu">  <a href="/research" class="item"> 研究环境   </a>  <a href="/algorithm/index/list" class="item"> 策略回测   </a>  <a href="/algorithm/trade/list?process=1" class="item"> 模拟列表   </a>  <a href="/view/factorlib/list" class="item"> 因子看板   </a>  <a href="/help/api/help?name=api" class="item"> 平台API文档   </a>  <a href="https://www.joinquant.com/data" class="item"> 平台数据字典   </a>  <a href="/post/4589" class="item"> 新手指引   </a>  <a href="https://www.joinquant.com/view/vip/charge" class="item"> 平台会员   </a>  </div>    </li>  <li> <a href="/community/new" class="">   聚宽社区   </a>    <div class="submenu">  <a href="https://www.joinquant.com/view/community/list?listType=5" class="item"> 精选文章   </a>  </div>    </li>  <li> <a href="javascript:void(0)" class="">   帮助   </a>    <div class="submenu">  <a href="/faq" class="item"> 常见问题   </a>  <a href="/view/algorithm/pythonConversion?utm_source=Nav" class="item"> Python 2 to 3   </a>  <a href="https://www.joinquant.com/help/api/help#faq:%E5%AE%9E%E7%9B%98%E8%AF%B4%E6%98%8E" class="item"> 实盘说明   </a>  <a href="/study" class="item"> 量化课堂   </a>  <a href="/help/api/help?name=factor" class="item"> 因子分析   </a>  </div>    </li>  <li> <a href="javascript:void(0)" class="">   JQData本地数据   </a>    <div class="submenu">  <a href="https://www.joinquant.com/default/index/sdk?utm_campaign=JQData%E7%94%B3%E8%AF%B7&amp;utm_medium=%E7%BD%91%E9%A1%B5&amp;utm_source=%E8%81%9A%E5%AE%BD&amp;gio_link_id=xRxqAjP5" class="item"> 申请试用   </a>  <a href="https://www.joinquant.com/help/api/doc?name=JQDatadoc" class="item"> Python版API   </a>  <a href="https://www.joinquant.com/help/api/doc?name=logon&amp;id=9830" class="item"> 试用及购买   </a>  </div>    </li>  <li> <a href="javascript:void(0)" class="">   平台会员   </a>    <div class="submenu">  <a href="https://www.joinquant.com/view/vip/charge" class="item"> 平台会员   </a>  <a href="https://www.joinquant.com/view/credits/list" class="item"> 积分商城   </a>  </div>    </li>  <li> <a href="/user/login/index?type=login" class="">   登录   </a>      </li>  <li> <a href="/user/register/index?type=register" class="">   注册   </a>      </li>  <div class="hidden" id="userInfoForCs" _userid="" _alias="" _mob=""></div> </ul> </nav></div> </header> <div class="kk_body"> <div class="in_body"> </div></div></div> <div class="js-app" style="min-height:450px"> <div class="jq-l-help-api" id="help"> <div class="help-api-search"> <div class="search-input"> <input type="text" placeholder="搜索你想要的数据，如股票分钟数据、十大股东等(Enter搜索)" id="searchInput" autocomplete="off"> <svg class="enter-icon" viewBox="0 0 1024 1024" title="Enter搜索"> <path d="M639.199519 894.900713 253.016039 894.900713l0 0-96.577592 0c-5.27412 0-9.983375-1.539053-14.378475-3.768837-9.168824 1.098008-18.714224-1.381463-25.746384-8.413624l-44.143383-44.175105c-12.18246-12.183484-12.18246-31.933293 0-44.145429l208.851679-273.122471c12.18246-12.17939 31.962969-12.17939 44.145429 0l44.145429 44.146453c12.17939 12.211113 12.17939 31.994692 0 44.173059L249.498936 766.299777l335.880817 0c98.149391-5.276167 176.393429-83.266425 181.228551-181.035146L766.608304 348.34264c0-17.772782 14.377452-32.149211 32.151257-32.149211l64.98813 0c17.772782 0 32.150234 14.376429 32.150234 32.149211l0 33.593096 0 225.27472 0 32.496112C895.897925 780.64653 780.985756 894.900713 639.199519 894.900713z"> </path> </svg> </div> <div class="search-result"> <span id="searchBack">返回</span> <ul class="search-list" id="searchListBody"></ul> </div> </div> <div class="help-api-left"> <div> <ul class="am-tree am-tree-folder-select" role="tree" id="jq-api-tree" style="overflow:initial"> <li class="am-tree-branch am-hide" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder"></span>
+        <span class="am-tree-label"></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li>
+  <li class="am-tree-item am-hide" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item"></span>
+      <span class="am-tree-label"></span>
+    </button>
+  </li> <li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="aboutData" href="#name:aboutData">关于聚宽数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="Stock" href="#name:Stock">股票数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="plateData" href="#name:plateData">行业概念数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="index" href="#name:index">指数数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="macroData" href="#name:macroData">宏观经济数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="Future" href="#name:Future">期货数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="Option" href="#name:Option">期权数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch am-tree-open" data-template="treebranch" role="treeitem" aria-expanded="true">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-minus-square-o"></span>
+        <span class="am-tree-label"><a data-name="fund" href="#name:fund">场内基金数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children am-tree-folder-select" role="group"> <li class="am-tree-branch am-hide" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder"></span>
+        <span class="am-tree-label"></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li>
+  <li class="am-tree-item am-hide" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item"></span>
+      <span class="am-tree-label"></span>
+    </button>
+  </li> <li class="am-tree-branch am-tree-open" data-template="treebranch" role="treeitem" aria-expanded="true" id="first" aria-labelledby="first-label">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-minus-square-o"></span>
+        <span class="am-tree-label" id="first-label"><a href="#获取基金数据">获取基金数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"><li class="am-tree-branch am-tree-open" data-template="treebranch" role="treeitem" aria-expanded="true">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-minus-square-o"></span>
+        <span class="am-tree-label"><a href="#基金概况：上市退市时间、代码、名称、累计单位净值等">基金概况：上市退市时间、代码、名称、累计/单位净值等</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#获取单支基金数据">获取单支基金数据</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#获取所有基金数据">获取所有基金数据</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#基金累计单位净值">基金累计/单位净值</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#场内基金份额数据">场内基金份额数据</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#获取场内基金tick数据">获取场内基金tick数据</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#获取etf跟踪指数信息">获取etf跟踪指数信息</a></span>
+    </button>
+  </li></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch am-tree-open" data-template="treebranch" role="treeitem" aria-expanded="true">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-minus-square-o"></span>
+        <span class="am-tree-label"><a href="#基金列表">基金列表</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#LOF列表">LOF列表</a></span>
+    </button>
+  </li></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="OTCfund" href="#name:OTCfund">场外基金数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="technicalanalysis" href="#name:technicalanalysis">技术分析指标</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="Alpha101" href="#name:Alpha101">Alphas101</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="Alpha191" href="#name:Alpha191">Alphas191</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="factor_values" href="#name:factor_values">聚宽因子库</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="Public" href="#name:Public">舆情数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="bond" href="#name:bond">债券数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li></ul> </div> </div> <div class="help-api-right"> <div id="jq-api-subcontent" class="hidden"></div> <div id="jq-api-content"><h2 id="获取基金数据">获取基金数据</h2>
+<p>我们目前包含100多种ETF、20多种LOF、200多种分级A/B基金完整的行情、净值数据. 详情见<a href="https://www.joinquant.com/help/api/help?name=fund#%E5%9F%BA%E9%87%91%E5%88%97%E8%A1%A8">基金列表</a></p>
+<p>更多API的可参考<a href="https://www.joinquant.com/api">官方API文档</a></p>
+<h3 id="基金概况：上市退市时间、代码、名称、累计单位净值等">基金概况：上市退市时间、代码、名称、累计/单位净值等</h3>
+
+<h4 id="获取单支基金数据">获取单支基金数据</h4>
+<p>获取单支基金的信息.</p>
+<p><strong>调用方法</strong></p>
+<pre><code class="hljs stylus"><span class="hljs-function"><span class="hljs-title">get_security_info</span><span class="hljs-params">(code)</span></span>
+</code></pre>
+<p><strong>参数</strong></p>
+<ul>
+<li>code: 基金代码</li>
+</ul>
+<p><strong>返回值</strong></p>
+<p>- 一个对象, 有如下属性: </p>
+<ul>
+<li>display_name # 中文名称</li>
+<li>name # 缩写简称</li>
+<li>start_date # 上市日期, [datetime.date] 类型</li>
+<li>end_date # 退市日期， [datetime.date] 类型, 如果没有退市则为2200-01-01</li>
+<li>type # 类型 etf(ETF基金)，fja（分级A），fjb（分级B）,fjm(分级母基金），lof(场内交易开发基金），mmf(场内交易货币基金）</li>
+<li>parent # 分级基金的母基金代码</li>
+</ul>
+<p><strong>示例</strong></p>
+<pre><code class="hljs stylus"><span class="hljs-function"><span class="hljs-title">get_security_info</span><span class="hljs-params">(<span class="hljs-string">'159901.XSHE'</span>)</span></span><span class="hljs-selector-class">.start_date</span> #获取深<span class="hljs-number">100</span>ETF的上市日期
+</code></pre>
+<h4 id="获取所有基金数据">获取所有基金数据</h4>
+<p>获取平台支持的所有基金数据</p>
+<p><strong>调用方法</strong></p>
+<pre><code class="hljs stylus"><span class="hljs-function"><span class="hljs-title">get_all_securities</span><span class="hljs-params">([<span class="hljs-string">'fund'</span>])</span></span>
+</code></pre>
+<p>这里请在使用时注意防止未来函数。</p>
+<p><strong>返回</strong><br>
+- display_name # 中文名称<br>
+- name # 缩写简称<br>
+- start_date # 上市日期<br>
+- end_date # 退市日期，如果没有退市则为2200-01-01<br>
+- type # 类型， etf(ETF基金)，fja（分级A），fjb（分级B）,fjm(分级母基金），lof(场内交易开发基金），mmf(场内交易货币基金）
+[pandas.DataFrame], 比如:<code>get_all_securities(['fund'])[:2]</code>返回:</p>
+<table>
+<thead>
+<tr>
+<th>display_name</th>
+<th>name</th>
+<th>start_date</th>
+<th>end_date</th>
+<th>type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>150008.XSHE</td>
+<td>国投瑞银沪深300指数分级-A</td>
+<td>RHXK</td>
+<td>2009-11-19</td>
+<td>2200-01-01</td>
+</tr>
+<tr>
+<td>150009.XSHE</td>
+<td>国投瑞银沪深300指数分级-B</td>
+<td>RHYJ</td>
+<td>2009-11-19</td>
+<td>2200-01-01</td>
+</tr>
+</tbody>
+</table>
+<p><strong>示例</strong></p>
+<pre><code class="hljs prolog">def initialize(context):
+  #获得基金列表
+  df = get_all_securities([<span class="hljs-string">'fund'</span>])
+  #获得etf基金列表
+  etfs = df[df[<span class="hljs-string">'type'</span>]==<span class="hljs-string">'etf'</span>]
+  #获得lof基金列表
+  lofs = df[df[<span class="hljs-string">'type'</span>]==<span class="hljs-string">'lof'</span>]
+  #获得分级<span class="hljs-symbol">A</span>基金列表
+  lofs = df[df[<span class="hljs-string">'type'</span>]==<span class="hljs-string">'fja'</span>]
+  #获得分级<span class="hljs-symbol">B</span>基金列表
+  lofs = df[df[<span class="hljs-string">'type'</span>]==<span class="hljs-string">'fjb'</span>]
+</code></pre>
+<h4 id="基金累计单位净值">基金累计/单位净值</h4>
+<p>得到基金在一段时间的如下的数据:</p>
+<ul>
+<li>acc_net_value: 基金累计净值</li>
+<li>unit_net_value: 基金单位净值</li>
+</ul>
+<p><strong>调用方法</strong></p>
+<pre><code class="hljs routeros">get_extras(info, security_list, <span class="hljs-attribute">start_date</span>=<span class="hljs-string">'2015-01-01'</span>, <span class="hljs-attribute">end_date</span>=<span class="hljs-string">'2015-12-31'</span>, <span class="hljs-attribute">df</span>=<span class="hljs-literal">True</span>,count=None):
+</code></pre>
+<p><strong>参数</strong></p>
+<ul>
+<li>info: [‘acc_net_value’, ‘unit_net_value’] 中的一个</li>
+<li>security_list: 基金列表</li>
+<li>start_date/end_date: 开始结束日期, 同[get_price]</li>
+<li>df: 返回[pandas.DataFrame]对象还是一个dict, 同[history]</li>
+<li>count:限定返回条数</li>
+</ul>
+<p><strong>返回值</strong></p>
+<ul>
+<li>df=True:<br>
+[pandas.DataFrame]对象, 列索引是基金代号, 行索引是[datetime.datetime], 比如<code>get_extras('acc_net_value', ['510300.XSHG', '510050.XSHG'], start_date='2015-12-01', end_date='2015-12-03')</code>返回:</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>510300.XSHG</th>
+<th>510050.XSHG</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2015-12-01 00:00:00</td>
+<td>1.395</td>
+</tr>
+<tr>
+<td>2015-12-02 00:00:00</td>
+<td>1.4432</td>
+</tr>
+<tr>
+<td>2015-12-03 00:00:00</td>
+<td>1.4535</td>
+</tr>
+</tbody>
+</table>
+<p>- df=False<br>
+一个dict, key是基金代号, value是[numpy.ndarray], 比如
+<code>get_extras('acc_net_value', ['510300.XSHG', '510050.XSHG'], start_date='2015-12-01', end_date='2015-12-03', df=False)</code>
+返回:<br>
+<code>{ u'510050.XSHG': array([ 3.119, 3.251, 3.254]), u'510300.XSHG': array([ 1.395 , 1.4432, 1.4535]) }</code></p>
+<h4 id="场内基金份额数据">场内基金份额数据</h4>
+<pre><code class="python language-python hljs"><span class="hljs-keyword">from</span> jqdata <span class="hljs-keyword">import</span> *
+finance.run_query(query(finance.FUND_SHARE_DAILY).filter(finance.FUND_SHARE_DAILY.date==<span class="hljs-string">'2019-05-23'</span>).limit(n))
+</code></pre>
+<p>描述：记录每日场内基金份额数据</p>
+<p><strong>参数：</strong></p>
+<ul>
+<li><strong>query(finance.FUND_SHARE_DAILY)</strong>：表示从finance.FUND_SHARE_DAILY这张表中查询每日场内基金份额数据，还可以指定所要查询的字段名，格式如下：query(库名.表名.字段名1，库名.表名.字段名2），多个字段用逗号分隔进行提取；query函数的更多用法详见：<a href="https://www.joinquant.com/view/community/detail/16411">query简易教程</a></li>
+<li><strong>finance.FUND_SHARE_DAILY</strong>：收录了每日场内基金份额数据，表结构和字段信息如下：</li>
+</ul>
+<p><strong>字段设计</strong>：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left;">名称</th>
+<th style="text-align:left;">类型</th>
+<th style="text-align:left;">描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">code</td>
+<td style="text-align:left;">varchar(12)</td>
+<td style="text-align:left;">基金代码</td>
+</tr>
+<tr>
+<td style="text-align:left;">name</td>
+<td style="text-align:left;">varchar(50）</td>
+<td style="text-align:left;">基金简称</td>
+</tr>
+<tr>
+<td style="text-align:left;">exchange_code</td>
+<td style="text-align:left;">varchar(12)</td>
+<td style="text-align:left;">交易市场编码，XSHG-上海证券交易所；XSHE-深圳证券交易所</td>
+</tr>
+<tr>
+<td style="text-align:left;">date</td>
+<td style="text-align:left;">date</td>
+<td style="text-align:left;">日期</td>
+</tr>
+<tr>
+<td style="text-align:left;">shares</td>
+<td style="text-align:left;">bigint</td>
+<td style="text-align:left;">基金份额（份）</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>filter(finance.FUND_SHARE_DAILY.date==date)</strong>：指定筛选条件，通过finance.FUND_SHARE_DAILY.date==date可以指定你想要查询的日期；除此之外，还可以对表中其他字段指定筛选条件；多个筛选条件用英文逗号分隔。</li>
+<li><strong>limit(n)</strong>：限制返回的数据条数，n指定返回条数。</li>
+</ul>
+<p><strong>返回结果：</strong></p>
+<ul>
+<li>返回一个 dataframe，每一行对应数据表中的一条数据， 列索引是您所查询的字段名称</li>
+</ul>
+<p><strong>注意：</strong></p>
+<ol>
+<li><strong>为了防止返回数据量过大, 我们每次最多返回4000行</strong></li>
+<li>不能进行连表查询，即同时查询多张表的数据</li>
+</ol>
+<p><strong>示例：</strong></p>
+<pre><code class="python language-python hljs"><span class="hljs-comment">#查询2019-05-23的场内基金份额数据。</span>
+<span class="hljs-keyword">from</span> jqdata <span class="hljs-keyword">import</span> *
+df=finance.run_query(query(finance.FUND_SHARE_DAILY).filter(finance.FUND_SHARE_DAILY.date==<span class="hljs-string">'2019-05-23'</span>).limit(<span class="hljs-number">10</span>))
+df
+
+    id  code    name    exchange_code   date    shares
+<span class="hljs-number">0</span>    <span class="hljs-number">960881</span>  <span class="hljs-number">150008.</span>XSHE 瑞和小康    XSHE    <span class="hljs-number">2019</span><span class="hljs-number">-05</span><span class="hljs-number">-23</span>  <span class="hljs-number">17749200</span>
+<span class="hljs-number">1</span>    <span class="hljs-number">960882</span>  <span class="hljs-number">150009.</span>XSHE 瑞和远见    XSHE    <span class="hljs-number">2019</span><span class="hljs-number">-05</span><span class="hljs-number">-23</span>  <span class="hljs-number">17749200</span>
+<span class="hljs-number">2</span>    <span class="hljs-number">960883</span>  <span class="hljs-number">150012.</span>XSHE 中证<span class="hljs-number">100</span>A  XSHE    <span class="hljs-number">2019</span><span class="hljs-number">-05</span><span class="hljs-number">-23</span>  <span class="hljs-number">36139500</span>
+<span class="hljs-number">3</span>    <span class="hljs-number">960884</span>  <span class="hljs-number">150013.</span>XSHE 中证<span class="hljs-number">100</span>B  XSHE    <span class="hljs-number">2019</span><span class="hljs-number">-05</span><span class="hljs-number">-23</span>  <span class="hljs-number">54209300</span>
+<span class="hljs-number">4</span>    <span class="hljs-number">960885</span>  <span class="hljs-number">150016.</span>XSHE 合润A XSHE    <span class="hljs-number">2019</span><span class="hljs-number">-05</span><span class="hljs-number">-23</span>  <span class="hljs-number">38111200</span>
+<span class="hljs-number">5</span>    <span class="hljs-number">960886</span>  <span class="hljs-number">150017.</span>XSHE 合润B XSHE    <span class="hljs-number">2019</span><span class="hljs-number">-05</span><span class="hljs-number">-23</span>  <span class="hljs-number">57166800</span>
+<span class="hljs-number">6</span>    <span class="hljs-number">960887</span>  <span class="hljs-number">150018.</span>XSHE 银华稳进    XSHE    <span class="hljs-number">2019</span><span class="hljs-number">-05</span><span class="hljs-number">-23</span>  <span class="hljs-number">3081515900</span>
+<span class="hljs-number">7</span>    <span class="hljs-number">960888</span>  <span class="hljs-number">150019.</span>XSHE 银华锐进    XSHE    <span class="hljs-number">2019</span><span class="hljs-number">-05</span><span class="hljs-number">-23</span>  <span class="hljs-number">3081515900</span>
+<span class="hljs-number">8</span>    <span class="hljs-number">960889</span>  <span class="hljs-number">150022.</span>XSHE 深成指A    XSHE    <span class="hljs-number">2019</span><span class="hljs-number">-05</span><span class="hljs-number">-23</span>  <span class="hljs-number">2472644500</span>
+<span class="hljs-number">9</span>    <span class="hljs-number">960890</span>  <span class="hljs-number">150023.</span>XSHE 深成指B    XSHE    <span class="hljs-number">2019</span><span class="hljs-number">-05</span><span class="hljs-number">-23</span>  <span class="hljs-number">2472644500</span>
+</code></pre>
+<h4 id="获取场内基金tick数据">获取场内基金tick数据</h4>
+<pre><code class="python language-python hljs">get_ticks(security,end_dt,start_dt,count, fields, skip)
+</code></pre>
+<p><strong>获取场内基金tick数据， 支持 2019-01-01 至今的tick数据，提供买五卖五盘口数据。（每3秒一次快照）</strong></p>
+<p><strong>参数</strong>：</p>
+<ul>
+<li>security: 场内基金代码，如'510050.XSHG'</li>
+<li>end_dt: 结束日期，格式为'YYYY-MM-DD HH:MM:SS'</li>
+<li>start_dt: 开始日期，格式为'YYYY-MM-DD HH:MM:SS'</li>
+<li>count: 取出指定时间区间内前N条的tick数据。</li>
+<li>fields: 选择要获取的行情数据字段，默认为None，返回结果如下场内基金tick返回结果。</li>
+<li>skip:默认为True，过滤掉无成交变化的tick数据；当指定skip=False时，返回的tick数据会保留从2019年1月1日以来无成交有盘口变化的tick数据。</li>
+<li><strong>场内基金tick返回结果</strong></li>
+</ul>
+<table>
+<thead>
+<tr>
+<th style="text-align:left;">字段名</th>
+<th style="text-align:left;">说明</th>
+<th style="text-align:left;">字段类型</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">time</td>
+<td style="text-align:left;">时间</td>
+<td style="text-align:left;">datetime</td>
+</tr>
+<tr>
+<td style="text-align:left;">current</td>
+<td style="text-align:left;">当前价</td>
+<td style="text-align:left;">float</td>
+</tr>
+<tr>
+<td style="text-align:left;">high</td>
+<td style="text-align:left;">当日最高价</td>
+<td style="text-align:left;">float</td>
+</tr>
+<tr>
+<td style="text-align:left;">low</td>
+<td style="text-align:left;">当日最低价</td>
+<td style="text-align:left;">float</td>
+</tr>
+<tr>
+<td style="text-align:left;">volume</td>
+<td style="text-align:left;">累计成交量（股）</td>
+<td style="text-align:left;">float</td>
+</tr>
+<tr>
+<td style="text-align:left;">money</td>
+<td style="text-align:left;">累计成交额</td>
+<td style="text-align:left;">float</td>
+</tr>
+<tr>
+<td style="text-align:left;">a1_v~a5_v</td>
+<td style="text-align:left;">五档卖量</td>
+<td style="text-align:left;">float</td>
+</tr>
+<tr>
+<td style="text-align:left;">a1_p~a5_p</td>
+<td style="text-align:left;">五档卖价</td>
+<td style="text-align:left;">float</td>
+</tr>
+<tr>
+<td style="text-align:left;">b1_v~b5_v</td>
+<td style="text-align:left;">五档买量</td>
+<td style="text-align:left;">float</td>
+</tr>
+<tr>
+<td style="text-align:left;">b1_p~b5_p</td>
+<td style="text-align:left;">五档买价</td>
+<td style="text-align:left;">float</td>
+</tr>
+</tbody>
+</table>
+<p><strong>获取场内基金tick数据示例</strong>：</p>
+<pre><code class="python language-python hljs"><span class="hljs-comment">#获取50ETF基金2019-10-16的tick数据</span>
+df=get_ticks(<span class="hljs-string">'510050.XSHG'</span>,<span class="hljs-string">'2019-10-16 15:30:00'</span>,<span class="hljs-string">'2019-10-16 09:00:00'</span>)
+df
+
+array([(<span class="hljs-number">20191016092500.39</span>, <span class="hljs-number">3.064</span>, <span class="hljs-number">3.064</span>, <span class="hljs-number">3.064</span>, <span class="hljs-number">2327900.0</span>, <span class="hljs-number">7132686.0</span>),
+       (<span class="hljs-number">20191016093000.55</span>, <span class="hljs-number">3.064</span>, <span class="hljs-number">3.065</span>, <span class="hljs-number">3.063</span>, <span class="hljs-number">2491600.0</span>, <span class="hljs-number">7634304.0</span>),
+       (<span class="hljs-number">20191016093003.53</span>, <span class="hljs-number">3.064</span>, <span class="hljs-number">3.065</span>, <span class="hljs-number">3.063</span>, <span class="hljs-number">3177815.0</span>, <span class="hljs-number">9737131.0</span>),
+       ...,
+       (<span class="hljs-number">20191016145952.35</span>, <span class="hljs-number">3.051</span>, <span class="hljs-number">3.094</span>, <span class="hljs-number">3.045</span>, <span class="hljs-number">410043611.0</span>, <span class="hljs-number">1257385115.0</span>),
+       (<span class="hljs-number">20191016145956.09</span>, <span class="hljs-number">3.05</span>, <span class="hljs-number">3.094</span>, <span class="hljs-number">3.045</span>, <span class="hljs-number">410194711.0</span>, <span class="hljs-number">1257846102.0</span>),
+       (<span class="hljs-number">20191016145958.37</span>, <span class="hljs-number">3.051</span>, <span class="hljs-number">3.094</span>, <span class="hljs-number">3.045</span>, <span class="hljs-number">410241811.0</span>, <span class="hljs-number">1257989802.0</span>)],
+      dtype=(numpy.record, [(<span class="hljs-string">'time'</span>, <span class="hljs-string">'&lt;f8'</span>), (<span class="hljs-string">'current'</span>, <span class="hljs-string">'&lt;f8'</span>), (<span class="hljs-string">'high'</span>, <span class="hljs-string">'&lt;f8'</span>), (<span class="hljs-string">'low'</span>, <span class="hljs-string">'&lt;f8'</span>), (<span class="hljs-string">'volume'</span>, <span class="hljs-string">'&lt;f8'</span>), (<span class="hljs-string">'money'</span>, <span class="hljs-string">'&lt;f8'</span>)]))
+</code></pre>
+<h4 id="获取etf跟踪指数信息">获取etf跟踪指数信息</h4>
+<pre><code class="hljs reasonml">from jqdata import<span class="hljs-operator"> *
+</span>finance.run<span class="hljs-constructor">_query(<span class="hljs-params">query</span>(<span class="hljs-params">finance</span>.FUND_INVEST_TARGET)</span>.filter(finance.<span class="hljs-module-access"><span class="hljs-module"><span class="hljs-identifier">FUND_INVEST_TARGET</span>.</span></span>code== '<span class="hljs-number">510190.</span>XSHG'))
+</code></pre>
+<ul>
+<li><strong>query(finance.FUND_INVEST_TARGET)</strong>：表示从finance.FUND_INVEST_TARGET这张表中查询etf跟踪指数信息，还可以指定所要查询的字段名，格式如下：query(库名.表名.字段名1，库名.表名.字段名2），多个字段用逗号分隔进行提取；query函数的更多用法详见：<a href="https://www.joinquant.com/view/community/detail/16411">query简易教程</a></li>
+<li><strong>finance.FUND_INVEST_TARGET</strong>：收录了ETF基金跟踪的指数信息，表结构和字段信息如下：</li>
+</ul>
+<p><strong>字段设计</strong>：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left;">名称</th>
+<th style="text-align:left;">类型</th>
+<th style="text-align:left;">描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">code</td>
+<td style="text-align:left;">varchar(12)</td>
+<td style="text-align:left;">基金代码</td>
+</tr>
+<tr>
+<td style="text-align:left;">name</td>
+<td style="text-align:left;">varchar(50）</td>
+<td style="text-align:left;">基金简称</td>
+</tr>
+<tr>
+<td style="text-align:left;">pub_date</td>
+<td style="text-align:left;">DATE</td>
+<td style="text-align:left;">公告日期</td>
+</tr>
+<tr>
+<td style="text-align:left;">start_date</td>
+<td style="text-align:left;">DATE</td>
+<td style="text-align:left;">生效日期</td>
+</tr>
+<tr>
+<td style="text-align:left;">end_date</td>
+<td style="text-align:left;">DATE</td>
+<td style="text-align:left;">失效日期(未失效则为空)</td>
+</tr>
+<tr>
+<td style="text-align:left;">traced_index_name</td>
+<td style="text-align:left;">varchar(100)</td>
+<td style="text-align:left;">跟踪指数名称</td>
+</tr>
+<tr>
+<td style="text-align:left;">traced_index_code</td>
+<td style="text-align:left;">varchar(12)</td>
+<td style="text-align:left;">跟踪指数代码(不支持的指数填充为空</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>filter(finance.FUND_INVEST_TARGET.code==code)</strong>：指定筛选条件，通过finance.FUND_INVEST_TARGET.code==code可以指定你想要查询的基金标的；除此之外，还可以对表中其他字段指定筛选条件；多个筛选条件用英文逗号分隔。</li>
+<li><strong>limit(n)</strong>：限制返回的数据条数，n指定返回条数。</li>
+</ul>
+<p><strong>返回结果：</strong></p>
+<ul>
+<li>返回一个 dataframe，每一行对应数据表中的一条数据， 列索引是您所查询的字段名称</li>
+</ul>
+<p><strong>注意：</strong></p>
+<ol>
+<li><strong>为了防止返回数据量过大, 我们每次最多返回4000行</strong></li>
+<li>不能进行连表查询，即同时查询多张表的数据</li>
+</ol>
+<p><strong>示例：</strong></p>
+<pre><code class="python language-python hljs"><span class="hljs-comment"># 查询510190追踪的指数信息</span>
+<span class="hljs-keyword">from</span> jqdata <span class="hljs-keyword">import</span> *
+q = query(finance.FUND_INVEST_TARGET).filter(finance.FUND_INVEST_TARGET.code== <span class="hljs-string">'510190.XSHG'</span>)
+df = finance.run_query(q)
+print(df)
+&gt;&gt;&gt;
+
+    id         code   name    pub_date  start_date    end_date traced_index_name traced_index_code
+<span class="hljs-number">0</span>  <span class="hljs-number">930</span>  <span class="hljs-number">510190.</span>XSHG  上证<span class="hljs-number">50</span>基  <span class="hljs-number">2010</span><span class="hljs-number">-10</span><span class="hljs-number">-20</span>  <span class="hljs-number">2010</span><span class="hljs-number">-10</span><span class="hljs-number">-25</span>  <span class="hljs-number">2023</span><span class="hljs-number">-02</span><span class="hljs-number">-23</span>      上证龙头(<span class="hljs-number">000065</span>)       <span class="hljs-number">000065.</span>XSHG
+<span class="hljs-number">1</span>  <span class="hljs-number">742</span>  <span class="hljs-number">510190.</span>XSHG  上证<span class="hljs-number">50</span>基  <span class="hljs-number">2023</span><span class="hljs-number">-02</span><span class="hljs-number">-23</span>  <span class="hljs-number">2023</span><span class="hljs-number">-02</span><span class="hljs-number">-23</span>        <span class="hljs-keyword">None</span>      上证<span class="hljs-number">50</span>(<span class="hljs-number">000016</span>)       <span class="hljs-number">000016.</span>XSHG
+</code></pre>
+<h3 id="基金列表">基金列表</h3>
+<p>我们目前提供了所有上市交易的场内基金数据(含已退市)，包含ETF、LOF、分级AB(已全部退市)、货币基金及reits基金</p>
+<pre><code class="python language-python hljs">df = get_all_securities(<span class="hljs-string">"fund"</span>)  <span class="hljs-comment">#获取所有场内基金</span>
+df[df[<span class="hljs-string">'type'</span>] == <span class="hljs-string">'reits'</span> ]  <span class="hljs-comment"># 获取所有reits基金</span>
+df[df.display_name.str.contains(<span class="hljs-string">"指|增"</span>)] <span class="hljs-comment">#获取名称中含"指"或"增" 的场内基金</span>
+df[df.display_name.str.contains(<span class="hljs-string">"指"</span>)&amp;df.display_name.str.contains(<span class="hljs-string">"增"</span>)] <span class="hljs-comment">#获取名称中含"指"和"增" 的场内基金</span>
+</code></pre>
+<h4 id="LOF列表">LOF列表</h4>
+<table>
+<thead>
+<tr>
+<th>code</th>
+<th>display_name</th>
+<th>start_date</th>
+<th>type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>160105.XSHE</td>
+<td>南方积配</td>
+<td>2004/12/20</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160106.XSHE</td>
+<td>南方高增</td>
+<td>2005/9/21</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160119.XSHE</td>
+<td>南方500</td>
+<td>2009/11/11</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160123.XSHE</td>
+<td>南方10年国债A</td>
+<td>2011/7/25</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160125.XSHE</td>
+<td>南方香港</td>
+<td>2011/11/1</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160128.XSHE</td>
+<td>南方金利</td>
+<td>2012/7/16</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160130.XSHE</td>
+<td>南方永利</td>
+<td>2013/6/6</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160131.XSHE</td>
+<td>南方聚利</td>
+<td>2014/1/21</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160133.XSHE</td>
+<td>南方天元</td>
+<td>2014/8/25</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160138.XSHE</td>
+<td>国企精明</td>
+<td>2017/5/17</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160140.XSHE</td>
+<td>美国REIT</td>
+<td>2017/11/24</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160142.XSHE</td>
+<td>南方配售</td>
+<td>2019/3/29</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160211.XSHE</td>
+<td>国泰小盘</td>
+<td>2010/1/7</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160212.XSHE</td>
+<td>国泰估值</td>
+<td>2013/2/27</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160215.XSHE</td>
+<td>国泰价值</td>
+<td>2010/9/13</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160216.XSHE</td>
+<td>国泰商品</td>
+<td>2015/4/7</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160220.XSHE</td>
+<td>国泰民益</td>
+<td>2014/1/16</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160223.XSHE</td>
+<td>创业板基</td>
+<td>2016/11/28</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160225.XSHE</td>
+<td>新汽车</td>
+<td>2016/7/20</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160311.XSHE</td>
+<td>华夏蓝筹</td>
+<td>2007/5/28</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160314.XSHE</td>
+<td>华夏行业</td>
+<td>2008/1/14</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160322.XSHE</td>
+<td>港股精选</td>
+<td>2017/7/24</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160323.XSHE</td>
+<td>华夏磐泰</td>
+<td>2017/3/15</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160324.XSHE</td>
+<td>华夏磐晟</td>
+<td>2017/8/8</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160415.XSHE</td>
+<td>华安量化</td>
+<td>2011/10/18</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160416.XSHE</td>
+<td>石油基金</td>
+<td>2012/5/2</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160421.XSHE</td>
+<td>华安智增</td>
+<td>2016/12/19</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160422.XSHE</td>
+<td>华安创业板50ETF联接</td>
+<td>2017/5/26</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160505.XSHE</td>
+<td>博时主题</td>
+<td>2005/2/22</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160512.XSHE</td>
+<td>博时卓越</td>
+<td>2011/6/30</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160513.XSHE</td>
+<td>稳健债A</td>
+<td>2014/7/1</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160515.XSHE</td>
+<td>安丰18</td>
+<td>2013/10/17</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160518.XSHE</td>
+<td>博时睿远</td>
+<td>2016/7/11</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160519.XSHE</td>
+<td>博时睿利</td>
+<td>2016/8/23</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160520.XSHE</td>
+<td>弘盈A</td>
+<td>2016/10/26</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160522.XSHE</td>
+<td>博时睿益</td>
+<td>2016/11/16</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160607.XSHE</td>
+<td>鹏华价值</td>
+<td>2006/9/18</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160610.XSHE</td>
+<td>鹏华动力</td>
+<td>2007/3/9</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160611.XSHE</td>
+<td>鹏华治理</td>
+<td>2007/7/18</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160613.XSHE</td>
+<td>鹏华创新</td>
+<td>2008/11/10</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160615.XSHE</td>
+<td>鹏华300</td>
+<td>2009/5/8</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160616.XSHE</td>
+<td>鹏华500</td>
+<td>2010/4/28</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160617.XSHE</td>
+<td>鹏华丰润</td>
+<td>2010/12/16</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160618.XSHE</td>
+<td>鹏华丰泽</td>
+<td>2014/12/25</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160621.XSHE</td>
+<td>鹏华丰和</td>
+<td>2013/1/9</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160622.XSHE</td>
+<td>鹏华丰利</td>
+<td>2016/5/24</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160635.XSHE</td>
+<td>医药基金</td>
+<td>2016/8/1</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160642.XSHE</td>
+<td>鹏华增瑞</td>
+<td>2016/9/29</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160643.XSHE</td>
+<td>空天一体</td>
+<td>2017/6/20</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160644.XSHE</td>
+<td>互联网QD</td>
+<td>2017/12/29</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160706.XSHE</td>
+<td>嘉实300</td>
+<td>2005/10/17</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160716.XSHE</td>
+<td>嘉实50</td>
+<td>2010/2/10</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160717.XSHE</td>
+<td>恒生H股</td>
+<td>2010/10/28</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160719.XSHE</td>
+<td>嘉实黄金</td>
+<td>2012/2/10</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160720.XSHE</td>
+<td>中期企债</td>
+<td>2013/4/1</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160722.XSHE</td>
+<td>嘉实惠泽</td>
+<td>2016/12/9</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160723.XSHE</td>
+<td>嘉实原油</td>
+<td>2017/5/5</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160726.XSHE</td>
+<td>嘉实瑞享</td>
+<td>2019/4/12</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160805.XSHE</td>
+<td>长盛同智</td>
+<td>2007/2/16</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160806.XSHE</td>
+<td>长盛同庆</td>
+<td>2015/8/6</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160807.XSHE</td>
+<td>长盛300</td>
+<td>2010/9/6</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160809.XSHE</td>
+<td>长盛同辉</td>
+<td>2017/12/5</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160810.XSHE</td>
+<td>长盛同丰</td>
+<td>2014/7/11</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160812.XSHE</td>
+<td>长盛同益</td>
+<td>2014/6/4</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160813.XSHE</td>
+<td>长盛同盛</td>
+<td>2014/12/26</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160910.XSHE</td>
+<td>大成创新</td>
+<td>2007/10/25</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160915.XSHE</td>
+<td>大成景丰</td>
+<td>2013/12/2</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160916.XSHE</td>
+<td>优选LOF</td>
+<td>2012/12/28</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160918.XSHE</td>
+<td>大成小盘</td>
+<td>2014/4/30</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160919.XSHE</td>
+<td>大成产业</td>
+<td>2015/1/9</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160921.XSHE</td>
+<td>多策略</td>
+<td>2016/11/21</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160922.XSHE</td>
+<td>恒生中小</td>
+<td>2016/12/12</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160924.XSHE</td>
+<td>恒指LOF</td>
+<td>2017/8/28</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>160925.XSHE</td>
+<td>中华300</td>
+<td>2019/3/29</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161005.XSHE</td>
+<td>富国天惠</td>
+<td>2006/2/16</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161010.XSHE</td>
+<td>富国天丰</td>
+<td>2008/12/8</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161015.XSHE</td>
+<td>富国天盈</td>
+<td>2014/6/4</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161017.XSHE</td>
+<td>富国500</td>
+<td>2011/10/21</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161029.XSHE</td>
+<td>银行FG</td>
+<td>2019/6/17</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161033.XSHE</td>
+<td>智能汽车</td>
+<td>2016/2/29</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161035.XSHE</td>
+<td>医药增强</td>
+<td>2016/11/25</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161037.XSHE</td>
+<td>高端制造</td>
+<td>2017/5/11</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161038.XSHE</td>
+<td>成长量化</td>
+<td>2017/8/18</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161039.XSHE</td>
+<td>富国1000</td>
+<td>2018/6/20</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161115.XSHE</td>
+<td>易基岁丰</td>
+<td>2010/12/3</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161116.XSHE</td>
+<td>易基黄金</td>
+<td>2011/11/8</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161117.XSHE</td>
+<td>易基永旭</td>
+<td>2012/7/18</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161119.XSHE</td>
+<td>易基综债</td>
+<td>2013/1/9</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161124.XSHE</td>
+<td>香港小盘</td>
+<td>2016/11/10</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161125.XSHE</td>
+<td>标普500</td>
+<td>2016/12/14</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161126.XSHE</td>
+<td>标普医药</td>
+<td>2016/12/14</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161127.XSHE</td>
+<td>标普生物</td>
+<td>2016/12/27</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161128.XSHE</td>
+<td>标普科技</td>
+<td>2016/12/27</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161129.XSHE</td>
+<td>原油基金</td>
+<td>2017/2/15</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161130.XSHE</td>
+<td>纳指LOF</td>
+<td>2017/7/14</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161131.XSHE</td>
+<td>易基配售</td>
+<td>2019/3/29</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161210.XSHE</td>
+<td>国投新兴</td>
+<td>2010/7/1</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161213.XSHE</td>
+<td>国投消费</td>
+<td>2011/1/20</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161216.XSHE</td>
+<td>双债A</td>
+<td>2011/5/20</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161217.XSHE</td>
+<td>国投资源</td>
+<td>2011/8/29</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161219.XSHE</td>
+<td>国投产业</td>
+<td>2012/1/16</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161222.XSHE</td>
+<td>国投瑞利</td>
+<td>2015/5/4</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161224.XSHE</td>
+<td>国投丝路</td>
+<td>2015/5/6</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161225.XSHE</td>
+<td>国投瑞盈</td>
+<td>2015/8/14</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161226.XSHE</td>
+<td>白银基金</td>
+<td>2015/8/17</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161227.XSHE</td>
+<td>深证100</td>
+<td>2015/8/28</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161229.XSHE</td>
+<td>国投中国</td>
+<td>2016/1/4</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161230.XSHE</td>
+<td>丰利A类</td>
+<td>2016/2/25</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161232.XSHE</td>
+<td>国投瑞盛</td>
+<td>2016/8/19</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161233.XSHE</td>
+<td>国投瑞泰</td>
+<td>2017/2/27</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161505.XSHE</td>
+<td>银河通利</td>
+<td>2014/5/23</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161607.XSHE</td>
+<td>融通巨潮</td>
+<td>2005/6/16</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161610.XSHE</td>
+<td>融通领先</td>
+<td>2007/7/18</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161614.XSHE</td>
+<td>融通添利</td>
+<td>2012/4/6</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161626.XSHE</td>
+<td>融通通福</td>
+<td>2017/1/10</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161630.XSHE</td>
+<td>融通农业</td>
+<td>2017/2/15</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161631.XSHE</td>
+<td>人工智能</td>
+<td>2017/4/19</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161706.XSHE</td>
+<td>招商成长</td>
+<td>2005/12/9</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161713.XSHE</td>
+<td>招商信用</td>
+<td>2010/7/30</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161714.XSHE</td>
+<td>招商金砖</td>
+<td>2011/5/11</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161715.XSHE</td>
+<td>大宗商品</td>
+<td>2017/7/14</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161716.XSHE</td>
+<td>招商双债</td>
+<td>2015/3/16</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161722.XSHE</td>
+<td>招商丰泰</td>
+<td>2015/7/22</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161727.XSHE</td>
+<td>招商增荣</td>
+<td>2016/7/7</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161728.XSHE</td>
+<td>招商配售</td>
+<td>2019/3/29</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161810.XSHE</td>
+<td>银华内需</td>
+<td>2009/10/16</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161813.XSHE</td>
+<td>银华信用</td>
+<td>2010/7/9</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161815.XSHE</td>
+<td>银华通胀</td>
+<td>2010/12/20</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161820.XSHE</td>
+<td>银华纯债</td>
+<td>2012/9/5</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161821.XSHE</td>
+<td>银华50A</td>
+<td>2013/1/18</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161823.XSHE</td>
+<td>银华永兴</td>
+<td>2016/2/17</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161831.XSHE</td>
+<td>恒生中企</td>
+<td>2015/4/13</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161834.XSHE</td>
+<td>银华鑫锐</td>
+<td>2016/9/23</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161835.XSHE</td>
+<td>银华惠丰</td>
+<td>2017/6/19</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161903.XSHE</td>
+<td>万家优选</td>
+<td>2005/8/15</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161907.XSHE</td>
+<td>万家红利</td>
+<td>2011/6/15</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161908.XSHE</td>
+<td>万家添利</td>
+<td>2014/6/16</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>161912.XSHE</td>
+<td>社会责任</td>
+<td>2019/6/14</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>162006.XSHE</td>
+<td>长城久富</td>
+<td>2007/5/18</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>162105.XSHE</td>
+<td>持久增利</td>
+<td>2015/3/20</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>162108.XSHE</td>
+<td>元盛债券</td>
+<td>2015/5/20</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>162207.XSHE</td>
+<td>泰达效率</td>
+<td>2006/7/21</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>162215.XSHE</td>
+<td>泰达聚利</td>
+<td>2016/5/25</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>162307.XSHE</td>
+<td>海富100</td>
+<td>2010/1/8</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>162308.XSHE</td>
+<td>海富增利</td>
+<td>2014/9/16</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>162411.XSHE</td>
+<td>华宝油气</td>
+<td>2012/6/8</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>162414.XSHE</td>
+<td>新机遇</td>
+<td>2015/7/1</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>162415.XSHE</td>
+<td>美国消费</td>
+<td>2016/4/6</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>162416.XSHE</td>
+<td>香港本地</td>
+<td>2018/4/18</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>162510.XSHE</td>
+<td>国安双力</td>
+<td>2015/5/20</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>162605.XSHE</td>
+<td>景顺鼎益</td>
+<td>2005/5/25</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>162607.XSHE</td>
+<td>景顺资源</td>
+<td>2006/4/7</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>162703.XSHE</td>
+<td>广发小盘</td>
+<td>2005/4/29</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>162711.XSHE</td>
+<td>广发500L</td>
+<td>2010/1/8</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>162712.XSHE</td>
+<td>广发聚利</td>
+<td>2011/10/27</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>162715.XSHE</td>
+<td>广发聚源</td>
+<td>2013/7/10</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>162717.XSHE</td>
+<td>再融资</td>
+<td>2016/12/29</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>162718.XSHE</td>
+<td>广发鑫瑞</td>
+<td>2017/3/24</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>162719.XSHE</td>
+<td>广发石油</td>
+<td>2017/3/17</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>163001.XSHE</td>
+<td>长信医疗</td>
+<td>2010/4/16</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>163003.XSHE</td>
+<td>长信利鑫</td>
+<td>2016/7/22</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>163005.XSHE</td>
+<td>长信利众</td>
+<td>2016/3/16</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>163110.XSHE</td>
+<td>申万量化</td>
+<td>2011/8/1</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>163111.XSHE</td>
+<td>申万中小</td>
+<td>2017/5/26</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>163119.XSHE</td>
+<td>申万健康</td>
+<td>2016/11/1</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>163208.XSHE</td>
+<td>诺安油气</td>
+<td>2015/2/17</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>163302.XSHE</td>
+<td>大摩资源</td>
+<td>2007/7/5</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>163402.XSHE</td>
+<td>兴全趋势</td>
+<td>2006/1/19</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>163407.XSHE</td>
+<td>兴全300</td>
+<td>2011/1/19</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>163409.XSHE</td>
+<td>兴全绿色</td>
+<td>2011/7/7</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>163412.XSHE</td>
+<td>兴全轻资</td>
+<td>2012/5/31</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>163415.XSHE</td>
+<td>兴全模式</td>
+<td>2013/2/1</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>163503.XSHE</td>
+<td>天治核心</td>
+<td>2007/7/30</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>163801.XSHE</td>
+<td>中银中国</td>
+<td>2005/2/23</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>163819.XSHE</td>
+<td>中银信用</td>
+<td>2012/7/18</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>163821.XSHE</td>
+<td>中银300E</td>
+<td>2012/7/13</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>163824.XSHE</td>
+<td>中银盛利</td>
+<td>2013/11/4</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>163827.XSHE</td>
+<td>中银产债</td>
+<td>2014/12/18</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>163907.XSHE</td>
+<td>中海惠裕</td>
+<td>2016/3/3</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>164105.XSHE</td>
+<td>华富强债</td>
+<td>2010/10/11</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>164206.XSHE</td>
+<td>天弘添利</td>
+<td>2015/12/15</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>164208.XSHE</td>
+<td>天弘丰利</td>
+<td>2014/12/3</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>164210.XSHE</td>
+<td>天弘同利</td>
+<td>2016/9/30</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>164302.XSHE</td>
+<td>新华惠鑫</td>
+<td>2017/2/24</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>164403.XSHE</td>
+<td>农业精选</td>
+<td>2016/8/15</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>164509.XSHE</td>
+<td>国富恒利</td>
+<td>2017/4/7</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>164606.XSHE</td>
+<td>信用增利</td>
+<td>2011/12/12</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>164701.XSHE</td>
+<td>添富贵金</td>
+<td>2012/3/1</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>164702.XSHE</td>
+<td>添富季红</td>
+<td>2012/10/25</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>164703.XSHE</td>
+<td>添富纯债</td>
+<td>2016/12/2</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>164705.XSHE</td>
+<td>添富恒生</td>
+<td>2015/4/13</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>164808.XSHE</td>
+<td>工银四季</td>
+<td>2011/3/28</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>164812.XSHE</td>
+<td>政府债基</td>
+<td>2016/3/29</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>164814.XSHE</td>
+<td>工银双债</td>
+<td>2013/12/23</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>164815.XSHE</td>
+<td>原油LOF</td>
+<td>2013/6/18</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>164823.XSHE</td>
+<td>深成LOF</td>
+<td>2017/10/13</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>164824.XSHE</td>
+<td>印度基金</td>
+<td>2018/8/1</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>164902.XSHE</td>
+<td>交银添利</td>
+<td>2011/4/20</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>164906.XSHE</td>
+<td>中国互联</td>
+<td>2015/7/10</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>165309.XSHE</td>
+<td>建信300</td>
+<td>2009/11/30</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>165311.XSHE</td>
+<td>建信信用</td>
+<td>2011/9/9</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>165313.XSHE</td>
+<td>建信优势</td>
+<td>2013/4/3</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>165317.XSHE</td>
+<td>建信丰裕</td>
+<td>2017/10/13</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>165508.XSHE</td>
+<td>信诚深度</td>
+<td>2010/9/20</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>165509.XSHE</td>
+<td>信诚增强</td>
+<td>2010/11/8</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>165510.XSHE</td>
+<td>信诚四国</td>
+<td>2011/1/20</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>165512.XSHE</td>
+<td>信诚机遇</td>
+<td>2011/9/16</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>165513.XSHE</td>
+<td>信诚商品</td>
+<td>2012/1/13</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>165516.XSHE</td>
+<td>信诚周期</td>
+<td>2012/11/5</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>165517.XSHE</td>
+<td>信诚双盈</td>
+<td>2015/4/23</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>165525.XSHE</td>
+<td>基建工程</td>
+<td>2016/12/9</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>165528.XSHE</td>
+<td>信诚鼎利</td>
+<td>2016/8/31</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>165705.XSHE</td>
+<td>诺德双翼</td>
+<td>2015/3/20</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>165806.XSHE</td>
+<td>东吴100</td>
+<td>2012/4/27</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>165807.XSHE</td>
+<td>东吴鼎利</td>
+<td>2016/5/20</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>166001.XSHE</td>
+<td>中欧趋势</td>
+<td>2007/4/23</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>166006.XSHE</td>
+<td>中欧成长</td>
+<td>2010/3/26</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>166007.XSHE</td>
+<td>中欧互通精选混合A</td>
+<td>2010/8/16</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>166008.XSHE</td>
+<td>中欧强债</td>
+<td>2011/2/18</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>166009.XSHE</td>
+<td>中欧动力</td>
+<td>2011/4/29</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>166011.XSHE</td>
+<td>中欧盛世</td>
+<td>2015/4/21</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>166012.XSHE</td>
+<td>中欧信用</td>
+<td>2016/1/8</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>166016.XSHE</td>
+<td>中欧纯债</td>
+<td>2016/3/1</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>166023.XSHE</td>
+<td>中欧瑞丰</td>
+<td>2017/9/15</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>166024.XSHE</td>
+<td>中欧恒利</td>
+<td>2017/12/6</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>166025.XSHE</td>
+<td>中欧远见</td>
+<td>2019/5/27</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>166105.XSHE</td>
+<td>信达鑫安</td>
+<td>2015/6/4</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>166401.XSHE</td>
+<td>增利C</td>
+<td>2015/1/8</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>166402.XSHE</td>
+<td>沪港深F</td>
+<td>2017/6/9</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>166902.XSHE</td>
+<td>民生增利</td>
+<td>2013/1/30</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>166904.XSHE</td>
+<td>民生添利</td>
+<td>2013/10/29</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>167001.XSHE</td>
+<td>平安鼎泰</td>
+<td>2016/10/18</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>167002.XSHE</td>
+<td>平安鼎越</td>
+<td>2016/12/19</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>167003.XSHE</td>
+<td>平安鼎弘</td>
+<td>2017/6/6</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>167501.XSHE</td>
+<td>安信宝利</td>
+<td>2015/8/7</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>167901.XSHE</td>
+<td>华宸300</td>
+<td>2013/6/3</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>168002.XSHE</td>
+<td>国寿精选</td>
+<td>2017/10/23</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>168101.XSHE</td>
+<td>九泰锐智</td>
+<td>2015/9/15</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>168102.XSHE</td>
+<td>九泰锐富</td>
+<td>2016/5/4</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>168103.XSHE</td>
+<td>九泰锐益</td>
+<td>2016/11/23</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>168104.XSHE</td>
+<td>九泰锐丰</td>
+<td>2016/12/15</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>168105.XSHE</td>
+<td>九泰泰富</td>
+<td>2017/1/10</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>168106.XSHE</td>
+<td>盈华A</td>
+<td>2017/6/16</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>168108.XSHE</td>
+<td>九泰锐诚</td>
+<td>2017/7/11</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>168301.XSHE</td>
+<td>东海祥龙</td>
+<td>2017/2/27</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>169101.XSHE</td>
+<td>东证睿丰</td>
+<td>2015/3/6</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>169102.XSHE</td>
+<td>东证睿阳</td>
+<td>2015/7/31</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>169103.XSHE</td>
+<td>东证睿轩</td>
+<td>2016/8/15</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>169104.XSHE</td>
+<td>东证睿满</td>
+<td>2017/2/21</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>169105.XSHE</td>
+<td>东证睿华</td>
+<td>2017/2/21</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>169201.XSHE</td>
+<td>浙商鼎盈</td>
+<td>2017/3/16</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>169301.XSHE</td>
+<td>财通500</td>
+<td>2019/7/31</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>184801.XSHE</td>
+<td>鹏华前海</td>
+<td>2015/9/30</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501000.XSHG</td>
+<td>国金鑫新灵活配置(LOF)</td>
+<td>2015/7/14</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501001.XSHG</td>
+<td>财通精选</td>
+<td>2015/9/25</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501002.XSHG</td>
+<td>能源互联</td>
+<td>2016/2/1</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501003.XSHG</td>
+<td>长信优选</td>
+<td>2017/5/5</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501005.XSHG</td>
+<td>精准医疗</td>
+<td>2016/3/21</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501006.XSHG</td>
+<td>精准医C</td>
+<td>2016/3/21</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501007.XSHG</td>
+<td>互联医疗</td>
+<td>2017/2/20</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501008.XSHG</td>
+<td>互联医C</td>
+<td>2017/2/20</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501009.XSHG</td>
+<td>生物科技</td>
+<td>2017/2/20</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501010.XSHG</td>
+<td>生物科C</td>
+<td>2017/2/20</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501011.XSHG</td>
+<td>中药基金</td>
+<td>2017/2/20</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501012.XSHG</td>
+<td>中药C</td>
+<td>2017/2/20</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501015.XSHG</td>
+<td>财通升级</td>
+<td>2016/6/6</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501016.XSHG</td>
+<td>券商基金</td>
+<td>2017/5/19</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501017.XSHG</td>
+<td>国泰融丰</td>
+<td>2016/8/26</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501018.XSHG</td>
+<td>南方原油</td>
+<td>2016/6/28</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501019.XSHG</td>
+<td>军工基金</td>
+<td>2017/4/21</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501020.XSHG</td>
+<td>国企改</td>
+<td>2017/4/21</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501021.XSHG</td>
+<td>香港中小</td>
+<td>2016/7/6</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501022.XSHG</td>
+<td>银华鑫盛</td>
+<td>2016/11/10</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501023.XSHG</td>
+<td>港中小企</td>
+<td>2016/10/24</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501025.XSHG</td>
+<td>香港银行</td>
+<td>2016/11/24</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501026.XSHG</td>
+<td>财通福享</td>
+<td>2016/12/15</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501027.XSHG</td>
+<td>国泰融信</td>
+<td>2017/6/1</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501028.XSHG</td>
+<td>财通福瑞</td>
+<td>2017/2/20</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501029.XSHG</td>
+<td>红利基金</td>
+<td>2017/2/13</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501030.XSHG</td>
+<td>环境治理</td>
+<td>2017/2/20</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501031.XSHG</td>
+<td>环境C</td>
+<td>2017/2/20</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501032.XSHG</td>
+<td>福盛定增</td>
+<td>2017/4/21</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501035.XSHG</td>
+<td>创金睿选</td>
+<td>2017/9/18</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501036.XSHG</td>
+<td>中证500A</td>
+<td>2017/10/9</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501037.XSHG</td>
+<td>中证500C</td>
+<td>2017/10/9</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501038.XSHG</td>
+<td>银华明择</td>
+<td>2017/11/24</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501040.XSHG</td>
+<td>添富睿C</td>
+<td>2018/1/12</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501043.XSHG</td>
+<td>沪深300A</td>
+<td>2017/10/9</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501045.XSHG</td>
+<td>沪深300C</td>
+<td>2017/10/9</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501046.XSHG</td>
+<td>财通福鑫</td>
+<td>2017/12/1</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501047.XSHG</td>
+<td>全指证券</td>
+<td>2018/1/18</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501048.XSHG</td>
+<td>证券C</td>
+<td>2018/1/18</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501050.XSHG</td>
+<td>50AH</td>
+<td>2016/11/28</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501051.XSHG</td>
+<td>圆信汇利</td>
+<td>2018/1/31</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501057.XSHG</td>
+<td>新能源车</td>
+<td>2018/6/20</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501058.XSHG</td>
+<td>新能车C</td>
+<td>2018/6/20</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501059.XSHG</td>
+<td>国企红利</td>
+<td>2018/7/26</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501060.XSHG</td>
+<td>金选300A</td>
+<td>2018/9/25</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501061.XSHG</td>
+<td>金选300C</td>
+<td>2018/9/25</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501062.XSHG</td>
+<td>南方瑞合</td>
+<td>2018/12/5</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501065.XSHG</td>
+<td>经典成长</td>
+<td>2019/5/8</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501067.XSHG</td>
+<td>富时AH50</td>
+<td>2019/1/4</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501068.XSHG</td>
+<td>AH50C</td>
+<td>2019/1/4</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501069.XSHG</td>
+<td>质量基金</td>
+<td>2019/3/5</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501072.XSHG</td>
+<td>红利增强</td>
+<td>2019/7/2</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501106.XSHG</td>
+<td>十年国开</td>
+<td>2017/12/13</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501186.XSHG</td>
+<td>华夏配售</td>
+<td>2019/3/29</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501188.XSHG</td>
+<td>添富配售</td>
+<td>2019/3/29</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501189.XSHG</td>
+<td>嘉实配售</td>
+<td>2019/3/29</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501300.XSHG</td>
+<td>美元债</td>
+<td>2017/2/16</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501301.XSHG</td>
+<td>香港大盘</td>
+<td>2017/5/8</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501302.XSHG</td>
+<td>恒生联接</td>
+<td>2017/8/15</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501303.XSHG</td>
+<td>恒生中型</td>
+<td>2017/10/25</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501305.XSHG</td>
+<td>港股高息</td>
+<td>2018/1/18</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501306.XSHG</td>
+<td>港股高C</td>
+<td>2018/1/18</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501307.XSHG</td>
+<td>银河高股</td>
+<td>2018/4/25</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501309.XSHG</td>
+<td>港股通</td>
+<td>2018/12/10</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501310.XSHG</td>
+<td>价值基金</td>
+<td>2018/11/22</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>501311.XSHG</td>
+<td>新经济HK</td>
+<td>2019/2/14</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>502000.XSHG</td>
+<td>500等权</td>
+<td>2015/4/27</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>502003.XSHG</td>
+<td>军工分级</td>
+<td>2015/7/15</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>502006.XSHG</td>
+<td>国企改革</td>
+<td>2015/6/25</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>502010.XSHG</td>
+<td>证券分级</td>
+<td>2015/7/15</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>502013.XSHG</td>
+<td>一带一路</td>
+<td>2015/6/9</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>502016.XSHG</td>
+<td>带路分级</td>
+<td>2016/2/1</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>502020.XSHG</td>
+<td>国金50</td>
+<td>2015/6/5</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>502023.XSHG</td>
+<td>钢铁分级</td>
+<td>2015/8/24</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>502026.XSHG</td>
+<td>新丝路</td>
+<td>2015/8/24</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>502030.XSHG</td>
+<td>高铁分级</td>
+<td>2015/8/7</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>502036.XSHG</td>
+<td>互联金融</td>
+<td>2015/7/7</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>502040.XSHG</td>
+<td>上50分级</td>
+<td>2015/8/24</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>502048.XSHG</td>
+<td>50分级</td>
+<td>2015/4/27</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>502053.XSHG</td>
+<td>券商分级</td>
+<td>2015/8/24</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>502056.XSHG</td>
+<td>医疗分级</td>
+<td>2015/7/31</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>505888.XSHG</td>
+<td>嘉实元和</td>
+<td>2015/3/16</td>
+<td>lof</td>
+</tr>
+<tr>
+<td>511670.XSHG</td>
+<td>华泰天金</td>
+<td>2017/8/28</td>
+<td>lof</td>
+</tr>
+</tbody>
+</table></div> </div> </div> <script type="text/template" id="treeTemp"> <li class="am-tree-branch am-hide" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder"></span>
+        <span class="am-tree-label"></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader" role="alert"><span class="doc-loading"></span></div>
+  </li>
+  <li class="am-tree-item am-hide" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item"></span>
+      <span class="am-tree-label"></span>
+    </button>
+  </li> </script></div> <div id="leftsead" class="jq-leftsead" draggable="true"> <ul><li class="qiyukf__entry backtotop-popover "> <div class="popover-content" style="width:85px;margin-left:-95px;margin-top:5px">在线客服</div> </li> <li class="backtotop__progress hidden"> <span class="backtotop__progress-count hidden"></span> <div class="backtotop__record-container hidden"></div> </li> <li class="newUser backtotop__newUser hidden backtotop__scroll"> <a href="/post/24debe6786302edc2febfc09b1312a6c" target="_blank"></a> </li> <li class="toTop backtotop__toTop hidden backtotop__scroll" id="top_btn"></li> </ul> <input type="hidden" class="timeStamp" value="17679309750001783575403239"> <input type="hidden" class="js-cdn-path" value="https://cdn.joinquant.com"> </div> <script src="https://cdn.joinquant.com/std/dist/asset/vendor.js?v=17679309750001783575403239"></script> <script>window.tokenData={name:"token",value:"0ad4654c3dda59912760b3c29a2a8a450afa6cdc242964c0b22d23887d47cb088f2b361ed205593eeaae48116734ed65"},$.ajaxSetup({data:{token:window.tokenData.value}})</script> <script src="https://cdn.joinquant.com/std/dist/asset/jq-plugin.js?v=17679309750001783575403239"></script> <script src="https://cdn.joinquant.com/std/dist/asset/general/login-dialog.bundle.js?v=17679309750001783575403239"></script> <script src="https://cdn.joinquant.com/std/dist/asset/general/message.bundle.js?v=17679309750001783575403239"></script> <script src="https://cdn.joinquant.com/std/dist/asset/general/wechat-share.bundle.js?v=17679309750001783575403239"></script> <input type="hidden" id="valid-code__token"><script src="https://cdn.joinquant.com/themes/jq/static/dist/asset/general/include.bundle.js?v=17679309750001783575403239"></script> <script src="https://cdn.joinquant.com/themes/jq/static/dist/asset/general/backtotop.bundle.js?v=17679309750001783575403239"></script> <script>!function(c,e,d,n,t){c[d]=c[d]||function(){(c[d].a=c[d].a||[]).push(arguments)},(t=e.createElement("script")).async=!0,t.src="https://qiyukf.com/script/d65beefd7552d92ee02344b3cc6173de.js",e.body.appendChild(t)}(window,document,"ysf")</script><script async="" src="https://qiyukf.com/script/d65beefd7552d92ee02344b3cc6173de.js"></script> <script charset="UTF-8" src="https://cdn.joinquant.com/std/third/MathJax-master/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script> <script charset="UTF-8" src="https://cdn.joinquant.com/std/dist/modules/help/api/help.bundle.js?v=17679309750001783575403239"></script><script src="https://cdn.joinquant.com/themes/jq/static/third/transition-notice.js"></script> <script charset="UTF-8">MathJax.Hub.Config({tex2jax:{inlineMath:[["$","$"],["\\(","\\)"]]}})</script>   <div style="top: 0px; left: 0px; visibility: hidden; position: absolute; width: 1px; height: 1px;"><iframe style="height:0px; width:0px;" src="https://qiyukf.com/webapi/sdkres/delegate.html?k=d65beefd7552d92ee02344b3cc6173de&amp;1784374686730"></iframe></div><div id="YSF-BTN-HOLDER" style="display: none;"><div id="YSF-CUSTOM-ENTRY-0" class="YSF-CUSTOM-ENTRY"><img src="https://xlx03.qiyukf.net/463a7f7a19b9c07a71b61506233233d7.jpg?imageView&amp;thumbnail=300x300"></div><span id="YSF-BTN-CIRCLE"></span><div id="YSF-BTN-BUBBLE"><div id="YSF-BTN-CONTENT"></div><span id="YSF-BTN-ARROW"></span><span id="YSF-BTN-CLOSE"></span></div></div></body></html>

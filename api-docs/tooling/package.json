@@ -1,0 +1,23 @@
+{
+  "name": "quant-api-docs-tooling",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Offline, reproducible HTML-to-Markdown tooling for archived quant platform API documentation.",
+  "scripts": {
+    "snapshot:raw": "node convert_html_to_markdown.mjs --snapshot-raw",
+    "evaluate": "node convert_html_to_markdown.mjs --evaluate",
+    "convert": "node convert_html_to_markdown.mjs --all",
+    "qa": "node qa_markdown.mjs",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "cheerio": "1.1.2",
+    "js-yaml": "4.1.0",
+    "turndown": "7.2.1",
+    "turndown-plugin-gfm": "1.0.2"
+  }
+}

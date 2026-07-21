@@ -1263,6 +1263,38 @@ textarea {
   background: rgba(23, 195, 178, 0.7);
 }
 
+.lq-task-elapsed-badge.is-cancelled::before {
+  background: rgba(100, 116, 139, 0.72);
+}
+
+.lq-task-elapsed-badge.is-failed {
+  color: #a64b4b;
+}
+
+.lq-task-elapsed-badge.is-failed::before {
+  background: rgba(220, 38, 38, 0.68);
+}
+
+.lq-task-elapsed-badge.is-dirty {
+  opacity: 0.55;
+}
+
+.lq-terminal-partial-result {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px dashed rgba(148, 163, 184, 0.55);
+  border-radius: 10px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.lq-terminal-partial-result pre {
+  margin-top: 8px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .lq-task-billing-badge {
   display: inline-flex;
   width: fit-content;

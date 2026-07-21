@@ -47,14 +47,6 @@ type MarkdownContract = {
   titles: Partial<Record<MarkdownSectionKey, string>>;
 };
 
-const CONVERSION_CONTRACT: MarkdownContract = {
-  keys: ["code", "notes"],
-  titles: {
-    code: "目标平台代码",
-    notes: "迁移说明"
-  }
-};
-
 const ANALYSIS_CONTRACT: MarkdownContract = {
   keys: ["overview", "tradingLogic", "parameters", "risks", "suggestions"],
   titles: {
@@ -73,7 +65,7 @@ const SECTION_ALIASES: Array<{ key: MarkdownSectionKey; pattern: RegExp }> = [
   { key: "suggestions", pattern: /优化建议|工程建议|可读性|显式化|回测验证|平台兼容|异常处理|日志/i },
   { key: "summary", pattern: /结论|摘要|范围提示/i },
   { key: "code", pattern: /代码块|目标平台代码|策略代码|生成代码/i },
-  { key: "notes", pattern: /迁移说明|解析说明|说明|兼容|复核/i },
+  { key: "notes", pattern: /迁移说明|解析说明|兼容说明|平台差异/i },
   { key: "risks", pattern: /风险提醒|风险|注意事项|提醒/i }
 ];
 
@@ -143,11 +135,11 @@ export function parseStreamingMarkdownResult(input: AiProviderInput, markdown: s
   }
 
   const codeSection = getSectionContent(sections, "code");
-  const notes = getSectionContent(sections, "notes");
-  const extractedCode = extractGeneratedCodeFromMarkdown(codeSection || finalAnswerMarkdown, input.task.type, input.task.targetPlatform);
+  const notes = extractConversionNotes(finalAnswerMarkdown, sections);
+  const extractedCode = extractGeneratedCodeFromMarkdown(finalAnswerMarkdown, input.task.type, input.task.targetPlatform);
   const generatedCode = extractedCode.code ?? extractGeneratedCode(codeSection || finalAnswerMarkdown);
-  const migrationNotes = truncateResultText(notes || null, input.config.maxResultChars);
-  const explanation = truncateResultText(stripMarkdownNoise(removeCodeFences(codeSection || summary)), input.config.maxResultChars);
+  const migrationNotes = truncateResultText(notes, input.config.maxResultChars);
+  const explanation = truncateResultText(stripMarkdownNoise(removeCodeFences(finalAnswerMarkdown)), input.config.maxResultChars);
 
   const result = buildProviderResult(input, scopeStatus, finalAnswerMarkdown, sections, {
     explanation: scopeStatus === "out_of_scope" ? input.skill.outOfScopeResponse : explanation,
@@ -170,8 +162,6 @@ export function normalizeMarkdown(markdown: string, task: Pick<AiTask, "type">) 
     return buildEmptyMarkdown(task);
   }
 
-  const sections = splitMarkdownSections(trimmed);
-
   if (task.type === "strategy_generation") {
     const strategyMarkdown = normalizeStrategyFinalAnswerMarkdown({
       finalAnswerMarkdown: trimmed
@@ -181,10 +171,11 @@ export function normalizeMarkdown(markdown: string, task: Pick<AiTask, "type">) 
   }
 
   if (task.type === "code_analysis") {
+    const sections = splitMarkdownSections(trimmed);
     return buildNormalizedMarkdown(trimmed, sections, ANALYSIS_CONTRACT, task);
   }
 
-  return buildNormalizedMarkdown(trimmed, sections, CONVERSION_CONTRACT, task);
+  return trimmed;
 }
 
 export function formatProviderResultAsMarkdown(
@@ -220,14 +211,11 @@ export function formatProviderResultAsMarkdown(
   }
 
   return [
-    `## ${CONVERSION_CONTRACT.titles.code}`,
     result.generatedCode?.trim()
       ? `\`\`\`python\n${result.generatedCode.trim()}\n\`\`\``
       : "暂无可直接运行的目标平台代码。",
-    "",
-    `## ${CONVERSION_CONTRACT.titles.notes}`,
-    result.migrationNotes?.trim() || "请按目标平台 API 逐项复核后再运行。"
-  ].join("\n");
+    result.migrationNotes?.trim() ? `兼容说明：\n${result.migrationNotes.trim()}` : ""
+  ].filter(Boolean).join("\n\n");
 }
 
 export function truncateStreamingText(value: string, maxLength: number) {
@@ -318,9 +306,7 @@ function getNormalizedSectionContent(
   }
 
   if (key === "notes") {
-    return task.type === "code_conversion"
-      ? "请按目标平台 API 逐项复核后再运行。"
-      : "请结合输入代码和业务场景复核解析结论。";
+    return task.type === "code_conversion" ? "" : "请结合输入代码和业务场景检查解析结论。";
   }
 
   return formatRiskWarnings(parseRiskWarnings(markdown).slice(0, 8));
@@ -389,6 +375,25 @@ function extractGeneratedCode(value: string) {
     .trim();
 
   return looksLikeCode(stripped) ? stripped : null;
+}
+
+function extractConversionNotes(markdown: string, sections: MarkdownSection[]) {
+  const notesSection = getSectionContent(sections, "notes");
+  const prose = removeCodeFences(markdown).trim();
+  const marker = /^(?:#{1,6}\s*)?(?:兼容说明|迁移说明|平台差异)\s*[：:]?\s*$/im.exec(prose);
+  const source = notesSection || (marker?.index !== undefined
+    ? prose.slice(marker.index + marker[0].length)
+    : prose);
+  const notes = source
+    .split(/\n{2,}|(?=^\s*[-*+]\s+)/m)
+    .map((item) => item
+      .replace(/^\s*[-*+]\s*/, "")
+      .replace(/^(?:需要人工复核|保守近似|目标平台可能需要替换为实际接口)\s*[：:]?\s*/i, "")
+      .trim())
+    .filter((item) => item && !/^(?:已完成转换|转换完成|请.*复核|请.*验证|暂无|无)$/i.test(item))
+    .filter((item) => Boolean(notesSection || marker) || /版本|字段差异|返回结构|运行环境|内置 Python|XtQuant|MiniQMT|VBA|提交委托.*成交|没有.*等价|缺少.*能力|不支持/.test(item));
+
+  return notes.length ? [...new Set(notes)].slice(0, 3).join("\n") : null;
 }
 
 function parseRiskWarnings(value: string) {
@@ -651,13 +656,7 @@ function buildEmptyMarkdown(task: Pick<AiTask, "type">) {
     ].join("\n");
   }
 
-  return [
-    `## ${CONVERSION_CONTRACT.titles.code}`,
-    "",
-    "",
-    `## ${CONVERSION_CONTRACT.titles.notes}`,
-    "请稍后重试，或补充更明确的输入。"
-  ].join("\n");
+  return "模型未返回有效转换结果，请稍后重试。";
 }
 
 function buildCodeAnalysisReport(sections: MarkdownSection[]): CodeAnalysisReport {
@@ -1063,13 +1062,9 @@ function buildFallbackCodeSection(value: string, task: Pick<AiTask, "type">) {
 }
 
 function formatRiskWarnings(warnings: string[]) {
-  const riskWarnings = warnings.length > 0 ? warnings : getDefaultRiskWarnings();
+  const riskWarnings = warnings.length > 0 ? warnings : [REPORT_MISSING_VALUE];
 
   return riskWarnings.map((warning) => `- ${warning}`).join("\n");
-}
-
-function getDefaultRiskWarnings() {
-  return ["请在回测和模拟盘中验证结果，不构成投资建议。"];
 }
 
 function removeCodeFences(value: string) {

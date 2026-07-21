@@ -36,8 +36,8 @@ async function main() {
       "strategy answer uses non-stream JSON-only contract",
       "full PTrade strategy uses streaming Markdown-only contract and extracts generatedCode",
       "repair/re-output full strategy routes to streaming Markdown without lazy placeholders",
-    "code conversion uses Markdown contract, fenced target code, and parsed migrationNotes",
-    "code conversion uncertain target APIs are migration notes rather than failure",
+      "code conversion uses natural Markdown, one fenced target code block, and parsed compatibility notes",
+      "code conversion prompt has no generic manual-review disclaimer",
       "non-stream system prompt contains JSON-only rules",
       "streaming system prompt contains Markdown-only rules and no JSON-only sentence"
     ]
@@ -168,7 +168,8 @@ async function testRepairFullStrategyMarkdownRouting() {
 
 async function testCodeConversionMarkdownContract() {
   const markdown = [
-    "## 目标平台代码",
+    "已按 PTrade 生命周期转换，代码如下：",
+    "",
     "```python",
     "def initialize(context):",
     "    run_daily(trade, time='09:35')",
@@ -177,9 +178,9 @@ async function testCodeConversionMarkdownContract() {
     "    order_value('000001.SZ', 10000)",
     "```",
     "",
-    "## 迁移说明",
+    "兼容说明：",
     "- 已将源平台定时调度映射到 PTrade run_daily。",
-    "- 下单逻辑使用 order_value，需要按实盘账户复核。"
+    "- 下单逻辑保留为按金额委托。"
   ].join("\n");
   const result = await runStreamingScenario("code_conversion", {
     prompt: "转换为 PTrade 完整代码。",
@@ -191,12 +192,15 @@ async function testCodeConversionMarkdownContract() {
 
     expect("conversion markdown prompt", systemMessage.includes("最终回答必须使用 Markdown"));
     expect("conversion no JSON-only prompt", !systemMessage.includes("必须返回一个 JSON 对象"));
-    expect("conversion uncertain API is not failure", systemMessage.includes("不要当成任务失败"));
-    expect("conversion uncertain API manual review", systemMessage.includes("需要人工复核"));
-    expect("conversion uncertain API conservative approximation", systemMessage.includes("保守近似"));
+    expect("conversion docs are lightweight evidence", systemMessage.includes("事实索引是参考工具，不是白名单或硬阻断器"));
+    expect("conversion missing docs do not block", systemMessage.includes("文档未命中时不要拒绝转换"));
+    expect("conversion prompt has no generic manual review", !systemMessage.includes("需要人工复核"));
+    expect("conversion prompt has no conservative approximation", !systemMessage.includes("保守近似"));
+    expect("conversion prompt avoids product fields", systemMessage.includes("不要输出产品内部字段"));
   });
 
-  expect("conversion fenced target code", /## 目标平台代码[\s\S]+```python[\s\S]+def initialize[\s\S]+```/.test(result.finalAnswerMarkdown));
+  expect("conversion natural markdown preserved", result.finalAnswerMarkdown === markdown);
+  expect("conversion fenced target code", /```python[\s\S]+def initialize[\s\S]+```/.test(result.finalAnswerMarkdown));
   expect("conversion generatedCode extracted", Boolean(result.result.generatedCode?.includes("order_value")));
   expect("conversion migration notes parsed", Boolean(result.result.migrationNotes?.includes("run_daily")));
 }
@@ -261,7 +265,31 @@ function createProviderInput(
   return {
     task,
     skill: getAiSkill(type),
-    config: getAiTaskConfig(type)
+    config: getAiTaskConfig(type),
+    apiDocumentContext: createTestApiDocumentContext(task)
+  };
+}
+
+function createTestApiDocumentContext(task: AiTask) {
+  return {
+    text: "API参考资料\n测试文档上下文",
+    metadata: {
+      taskId: task.id,
+      taskType: task.type,
+      sourcePlatform: task.sourcePlatform,
+      targetPlatform: task.targetPlatform,
+      detectedApiNames: [],
+      matchedSymbolCount: 0,
+      matchedChunkCount: 0,
+      normalizedFallbackCount: 0,
+      includedApiNames: [],
+      documentContextCharacterCount: 13,
+      estimatedDocumentTokens: 4,
+      documentCompressionApplied: false,
+      retrievalDurationMs: 0,
+      documentBudgetCharacters: 1000,
+      outputTokenReserve: 1000
+    }
   };
 }
 

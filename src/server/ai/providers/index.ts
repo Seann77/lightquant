@@ -8,6 +8,7 @@ import { runChunkedCodeProcessing, shouldUseChunkedCodeProcessing } from "@/serv
 import { runMockAiProvider, runMockAiProviderStream } from "@/server/ai/providers/mock-provider";
 import { runOpenAiCompatibleProvider, runOpenAiCompatibleProviderStream } from "@/server/ai/providers/openai-compatible-provider";
 import type { AiProviderAttachment, AiProviderInput, AiProviderResult, AiProviderStreamCallbacks, AiProviderStreamResult } from "@/server/ai/providers/types";
+import { ApiDocumentKnowledgeBaseError, retrieveApiDocumentContext } from "@/server/ai/api-document-retrieval";
 
 export async function runAiProvider(
   task: AiTask,
@@ -16,12 +17,22 @@ export async function runAiProvider(
   attachments?: AiProviderAttachment[]
 ): Promise<AiProviderResult> {
   const runtimeConfig = await readRuntimeConfig();
+  const skill = getAiSkill(task.type);
+  const config = getAiTaskConfig(task.type);
+  const apiDocumentContext = await readApiDocumentContext({
+    task,
+    skill,
+    config,
+    conversationContext,
+    modelMaxOutputTokens: runtimeConfig.modelMaxOutputTokens
+  });
   const input = {
     task,
-    skill: getAiSkill(task.type),
-    config: getAiTaskConfig(task.type),
+    skill,
+    config,
     conversationContext,
     attachments,
+    apiDocumentContext,
     progressReporter
   };
 
@@ -39,12 +50,22 @@ export async function runAiProviderStream(
   attachments?: AiProviderAttachment[]
 ): Promise<AiProviderStreamResult> {
   const runtimeConfig = await readRuntimeConfig();
+  const skill = getAiSkill(task.type);
+  const config = getAiTaskConfig(task.type);
+  const apiDocumentContext = await readApiDocumentContext({
+    task,
+    skill,
+    config,
+    conversationContext,
+    modelMaxOutputTokens: runtimeConfig.modelMaxOutputTokens
+  });
   const input = {
     task,
-    skill: getAiSkill(task.type),
-    config: getAiTaskConfig(task.type),
+    skill,
+    config,
     conversationContext,
-    attachments
+    attachments,
+    apiDocumentContext
   };
 
   if (runtimeConfig.provider === "mock") {
@@ -76,6 +97,18 @@ async function readRuntimeConfig() {
   } catch (error) {
     if (error instanceof ServerConfigError) {
       throw new ApiError("AI_PROVIDER_CONFIG_ERROR", "AI 服务配置不可用", 500);
+    }
+
+    throw error;
+  }
+}
+
+async function readApiDocumentContext(input: Parameters<typeof retrieveApiDocumentContext>[0]) {
+  try {
+    return await retrieveApiDocumentContext(input);
+  } catch (error) {
+    if (error instanceof ApiDocumentKnowledgeBaseError) {
+      throw new ApiError("AI_PROVIDER_CONFIG_ERROR", "API 文档知识库配置不可用", 500);
     }
 
     throw error;

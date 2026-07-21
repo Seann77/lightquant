@@ -1,0 +1,45 @@
+{
+  "cross_platform_aliases_allowed": false,
+  "joinquant": {
+    "alias_body_indexed": false,
+    "alias_source": "api-docs/raw/joinquant/main/rendered.html",
+    "canonical_strategy_source": "api-docs/raw/joinquant/api/rendered.html"
+  },
+  "ptrade": {
+    "default_resolution": "prefer_guojin_primary_when_variant_is_unspecified",
+    "same_name_policy": "keep_guojin_and_shenwan_as_independent_records",
+    "supplementary_policy": "shenwan_may_fill_coverage_but_never_overwrites_guojin"
+  },
+  "purpose": "Factual platform-local API resolution. Cross-platform semantic mapping is prohibited.",
+  "qmt": {
+    "ocr_used": false,
+    "source_mode": "existing_structured_html_only"
+  },
+  "rules": [
+    {
+      "authority": "primary",
+      "namespace": "ptrade.guojin",
+      "platform_variant": "ptrade/guojin",
+      "resolution_priority": 100
+    },
+    {
+      "authority": "supplementary",
+      "namespace": "ptrade.shenwan",
+      "platform_variant": "ptrade/shenwan",
+      "resolution_priority": 50
+    },
+    {
+      "authority": "primary",
+      "namespace": "qmt.builtin_python",
+      "platform_variant": "qmt/builtin-python",
+      "resolution_priority": 100
+    },
+    {
+      "authority": "primary",
+      "namespace": "joinquant.web_help",
+      "platform_variant": "joinquant/web-help",
+      "resolution_priority": 100
+    }
+  ],
+  "schema_version": 1
+}

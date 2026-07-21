@@ -1,0 +1,1902 @@
+<!DOCTYPE html><html><head> <meta charset="UTF-8"> <title>因子分析 - JoinQuant</title> <meta charset="utf-8"> <meta name="keywords" content="joinquant,聚宽,量化,宽客,quant,量化交易,量化平台,量化投资,量化策略,程序化交易,量化交易平台,python,金融工程,level2,level1"> <meta name="description" content="聚宽（JoinQuant）量化交易平台是为量化爱好者（宽客）量身打造的云平台，我们为您提供精准的回测功能、高速实盘交易接口、易用的API文档、由易入难的策略库，便于您快速实现、使用自己的量化交易策略。"> <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no"> <link type="text/css" href="https://cdn.joinquant.com/third/bootstrap/css/bootstrap.min.css" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/third/bootstrap/css/bootstrap-dialog.min.css" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/third/awesome/font-awesome.min.css" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/third/jquery-ui/ui.jqgrid.css?v=17679309750001783575403239" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/third/jquery-ui/jqGrid.overrides.css?v=17679309750001783575403239" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/third/jquery-ui/jquery-ui.min.css?v=17679309750001783575403239" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/common/css/common.css?v=17679309750001783575403239" rel="stylesheet"> <link rel="stylesheet" href="https://cdn.joinquant.com/third/silviomoreto-bootstrap-select/dist/css/bootstrap-select.css" type="text/css"> <link type="text/css" href="https://cdn.joinquant.com/third/backtotop/css/style.css?v=17679309750001783575403239" rel="stylesheet"> <link rel="stylesheet" href="https://cdn.joinquant.com/themes/jq/static/common/css/jq-common.css?v=17679309750001783575403239"> <link type="text/css" href="https://cdn.joinquant.com/themes/jq/static/default/css/iconfont.css" rel="stylesheet"> <link rel="stylesheet" href="https://cdn.joinquant.com/themes/jq/static/dist/asset/general/backtotop.bundle.css?v=17679309750001783575403239"> <link rel="icon" href="https://cdn.joinquant.com/common/img/favicon-16-16.png?v=2" type="image/x-icon"> <link rel="stylesheet" type="text/css" href="https://cdn.joinquant.com/themes/jq/static/user/css/loginDialog.css?v=17679309750001783575403239"> <link rel="stylesheet" type="text/css" href="https://cdn.joinquant.com/default/css/slide.css?v=17679309750001783575403239"> <link rel="stylesheet" type="text/css" href="https://cdn.joinquant.com/themes/jq/static/default/css/flexslider.css?v=17679309750001783575403239"> <link type="text/css" href="https://cdn.joinquant.com/themes/jq/static/default/css/style.css?v=17679309750001783575403239" rel="stylesheet"> <style>.tips.isfirst{background-position:calc(50% + 58px) 0}</style> <style>span.new{background:rgba(0,0,0,0)}.side-bar .top .name.user-alias img{width:16px;height:16px;float:none;margin-right:0}.kk_footer .wp20.last img{position:relative;top:-2px}.kk_footer .wp20.last .item>a{position:relative;left:-5px}</style> <style>header#kk_nav .nav .dropdown-menu a{display:block;padding:5px 35px;font-size:13px}.sanjiao.display{display:none}@media(max-width:320px){header#kk_nav .nav a{padding:11px 20px}}@media(min-width:768px){.sanjiao.display{display:block}.dropdown-menu{left:-90px;overflow-y:visible}#kk_nav .nav .dropdown-menu a{color:#333}.sanjiao:after,.sanjiao:before{left:80%}}.last>a,.nav.navbar-nav .help-mobile{padding-bottom:8px!important;outline:0}#kk_nav{position:fixed;width:100%;height:50px;z-index:100}.kk_main>.kk_body{top:50px}.mobile .top_50{top:0}span.new{background:rgba(0,0,0,0)}.side-bar .top .name.user-alias img{width:16px;height:16px;float:none;margin-right:0}.kk_footer .wp20.last img{position:relative;top:-2px}.kk_footer .wp20.last .item>a{position:relative;left:-5px}.kk_main{min-height:auto}</style> <link rel="stylesheet" type="text/css" href="https://cdn.joinquant.com/std/dist/asset/jq-plugin.css?v=17679309750001783575403239"> <link rel="stylesheet" type="text/css" href="https://cdn.joinquant.com/std/dist/asset/general/login-dialog.bundle.css?v=17679309750001783575403239">  <link type="text/css" href="https://cdn.joinquant.com/third/amaze/css/amazeui.min.css" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/third/amaze/css/amazeui.tree.min.css" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/third/markdown/default2.css?v=17679309750001783575403239" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/std/dist/modules/help/api/help.bundle.css?v=17679309750001783575403239" rel="stylesheet"> <style type="text/css">.MathJax_Hover_Frame {border-radius: .25em; -webkit-border-radius: .25em; -moz-border-radius: .25em; -khtml-border-radius: .25em; box-shadow: 0px 0px 15px #83A; -webkit-box-shadow: 0px 0px 15px #83A; -moz-box-shadow: 0px 0px 15px #83A; -khtml-box-shadow: 0px 0px 15px #83A; border: 1px solid #A6D ! important; display: inline-block; position: absolute}
+.MathJax_Menu_Button .MathJax_Hover_Arrow {position: absolute; cursor: pointer; display: inline-block; border: 2px solid #AAA; border-radius: 4px; -webkit-border-radius: 4px; -moz-border-radius: 4px; -khtml-border-radius: 4px; font-family: 'Courier New',Courier; font-size: 9px; color: #F0F0F0}
+.MathJax_Menu_Button .MathJax_Hover_Arrow span {display: block; background-color: #AAA; border: 1px solid; border-radius: 3px; line-height: 0; padding: 4px}
+.MathJax_Hover_Arrow:hover {color: white!important; border: 2px solid #CCC!important}
+.MathJax_Hover_Arrow:hover span {background-color: #CCC!important}
+</style><style type="text/css">#MathJax_About {position: fixed; left: 50%; width: auto; text-align: center; border: 3px outset; padding: 1em 2em; background-color: #DDDDDD; color: black; cursor: default; font-family: message-box; font-size: 120%; font-style: normal; text-indent: 0; text-transform: none; line-height: normal; letter-spacing: normal; word-spacing: normal; word-wrap: normal; white-space: nowrap; float: none; z-index: 201; border-radius: 15px; -webkit-border-radius: 15px; -moz-border-radius: 15px; -khtml-border-radius: 15px; box-shadow: 0px 10px 20px #808080; -webkit-box-shadow: 0px 10px 20px #808080; -moz-box-shadow: 0px 10px 20px #808080; -khtml-box-shadow: 0px 10px 20px #808080; filter: progid:DXImageTransform.Microsoft.dropshadow(OffX=2, OffY=2, Color='gray', Positive='true')}
+#MathJax_About.MathJax_MousePost {outline: none}
+.MathJax_Menu {position: absolute; background-color: white; color: black; width: auto; padding: 5px 0px; border: 1px solid #CCCCCC; margin: 0; cursor: default; font: menu; text-align: left; text-indent: 0; text-transform: none; line-height: normal; letter-spacing: normal; word-spacing: normal; word-wrap: normal; white-space: nowrap; float: none; z-index: 201; border-radius: 5px; -webkit-border-radius: 5px; -moz-border-radius: 5px; -khtml-border-radius: 5px; box-shadow: 0px 10px 20px #808080; -webkit-box-shadow: 0px 10px 20px #808080; -moz-box-shadow: 0px 10px 20px #808080; -khtml-box-shadow: 0px 10px 20px #808080; filter: progid:DXImageTransform.Microsoft.dropshadow(OffX=2, OffY=2, Color='gray', Positive='true')}
+.MathJax_MenuItem {padding: 1px 2em; background: transparent}
+.MathJax_MenuArrow {position: absolute; right: .5em; padding-top: .25em; color: #666666; font-size: .75em}
+.MathJax_MenuActive .MathJax_MenuArrow {color: white}
+.MathJax_MenuArrow.RTL {left: .5em; right: auto}
+.MathJax_MenuCheck {position: absolute; left: .7em}
+.MathJax_MenuCheck.RTL {right: .7em; left: auto}
+.MathJax_MenuRadioCheck {position: absolute; left: .7em}
+.MathJax_MenuRadioCheck.RTL {right: .7em; left: auto}
+.MathJax_MenuLabel {padding: 1px 2em 3px 1.33em; font-style: italic}
+.MathJax_MenuRule {border-top: 1px solid #DDDDDD; margin: 4px 3px}
+.MathJax_MenuDisabled {color: GrayText}
+.MathJax_MenuActive {background-color: #606872; color: white}
+.MathJax_MenuDisabled:focus, .MathJax_MenuLabel:focus {background-color: #E8E8E8}
+.MathJax_ContextMenu:focus {outline: none}
+.MathJax_ContextMenu .MathJax_MenuItem:focus {outline: none}
+#MathJax_AboutClose {top: .2em; right: .2em}
+.MathJax_Menu .MathJax_MenuClose {top: -10px; left: -10px}
+.MathJax_MenuClose {position: absolute; cursor: pointer; display: inline-block; border: 2px solid #AAA; border-radius: 18px; -webkit-border-radius: 18px; -moz-border-radius: 18px; -khtml-border-radius: 18px; font-family: 'Courier New',Courier; font-size: 24px; color: #F0F0F0}
+.MathJax_MenuClose span {display: block; background-color: #AAA; border: 1.5px solid; border-radius: 18px; -webkit-border-radius: 18px; -moz-border-radius: 18px; -khtml-border-radius: 18px; line-height: 0; padding: 8px 0 6px}
+.MathJax_MenuClose:hover {color: white!important; border: 2px solid #CCC!important}
+.MathJax_MenuClose:hover span {background-color: #CCC!important}
+.MathJax_MenuClose:hover:focus {outline: none}
+</style><style type="text/css">.MathJax_Preview .MJXf-math {color: inherit!important}
+</style><style type="text/css">.MJX_Assistive_MathML {position: absolute!important; top: 0; left: 0; clip: rect(1px, 1px, 1px, 1px); padding: 1px 0 0 0!important; border: 0!important; height: 1px!important; width: 1px!important; overflow: hidden!important; display: block!important; -webkit-touch-callout: none; -webkit-user-select: none; -khtml-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none}
+.MJX_Assistive_MathML.MJX_Assistive_MathML_Block {width: 100%!important}
+</style><style type="text/css">#MathJax_Zoom {position: absolute; background-color: #F0F0F0; overflow: auto; display: block; z-index: 301; padding: .5em; border: 1px solid black; margin: 0; font-weight: normal; font-style: normal; text-align: left; text-indent: 0; text-transform: none; line-height: normal; letter-spacing: normal; word-spacing: normal; word-wrap: normal; white-space: nowrap; float: none; -webkit-box-sizing: content-box; -moz-box-sizing: content-box; box-sizing: content-box; box-shadow: 5px 5px 15px #AAAAAA; -webkit-box-shadow: 5px 5px 15px #AAAAAA; -moz-box-shadow: 5px 5px 15px #AAAAAA; -khtml-box-shadow: 5px 5px 15px #AAAAAA; filter: progid:DXImageTransform.Microsoft.dropshadow(OffX=2, OffY=2, Color='gray', Positive='true')}
+#MathJax_ZoomOverlay {position: absolute; left: 0; top: 0; z-index: 300; display: inline-block; width: 100%; height: 100%; border: 0; padding: 0; margin: 0; background-color: white; opacity: 0; filter: alpha(opacity=0)}
+#MathJax_ZoomFrame {position: relative; display: inline-block; height: 0; width: 0}
+#MathJax_ZoomEventTrap {position: absolute; left: 0; top: 0; z-index: 302; display: inline-block; border: 0; padding: 0; margin: 0; background-color: white; opacity: 0; filter: alpha(opacity=0)}
+</style><style type="text/css">.MathJax_Preview {color: #888}
+#MathJax_Message {position: fixed; left: 1em; bottom: 1.5em; background-color: #E6E6E6; border: 1px solid #959595; margin: 0px; padding: 2px 8px; z-index: 102; color: black; font-size: 80%; width: auto; white-space: nowrap}
+#MathJax_MSIE_Frame {position: absolute; top: 0; left: 0; width: 0px; z-index: 101; border: 0px; margin: 0px; padding: 0px}
+.MathJax_Error {color: #CC0000; font-style: italic}
+</style><style type="text/css">.MJXp-script {font-size: .8em}
+.MJXp-right {-webkit-transform-origin: right; -moz-transform-origin: right; -ms-transform-origin: right; -o-transform-origin: right; transform-origin: right}
+.MJXp-bold {font-weight: bold}
+.MJXp-italic {font-style: italic}
+.MJXp-scr {font-family: MathJax_Script,'Times New Roman',Times,STIXGeneral,serif}
+.MJXp-frak {font-family: MathJax_Fraktur,'Times New Roman',Times,STIXGeneral,serif}
+.MJXp-sf {font-family: MathJax_SansSerif,'Times New Roman',Times,STIXGeneral,serif}
+.MJXp-cal {font-family: MathJax_Caligraphic,'Times New Roman',Times,STIXGeneral,serif}
+.MJXp-mono {font-family: MathJax_Typewriter,'Times New Roman',Times,STIXGeneral,serif}
+.MJXp-largeop {font-size: 150%}
+.MJXp-largeop.MJXp-int {vertical-align: -.2em}
+.MJXp-math {display: inline-block; line-height: 1.2; text-indent: 0; font-family: 'Times New Roman',Times,STIXGeneral,serif; white-space: nowrap; border-collapse: collapse}
+.MJXp-display {display: block; text-align: center; margin: 1em 0}
+.MJXp-math span {display: inline-block}
+.MJXp-box {display: block!important; text-align: center}
+.MJXp-box:after {content: " "}
+.MJXp-rule {display: block!important; margin-top: .1em}
+.MJXp-char {display: block!important}
+.MJXp-mo {margin: 0 .15em}
+.MJXp-mfrac {margin: 0 .125em; vertical-align: .25em}
+.MJXp-denom {display: inline-table!important; width: 100%}
+.MJXp-denom > * {display: table-row!important}
+.MJXp-surd {vertical-align: top}
+.MJXp-surd > * {display: block!important}
+.MJXp-script-box > *  {display: table!important; height: 50%}
+.MJXp-script-box > * > * {display: table-cell!important; vertical-align: top}
+.MJXp-script-box > *:last-child > * {vertical-align: bottom}
+.MJXp-script-box > * > * > * {display: block!important}
+.MJXp-mphantom {visibility: hidden}
+.MJXp-munderover, .MJXp-munder {display: inline-table!important}
+.MJXp-over {display: inline-block!important; text-align: center}
+.MJXp-over > * {display: block!important}
+.MJXp-munderover > *, .MJXp-munder > * {display: table-row!important}
+.MJXp-mtable {vertical-align: .25em; margin: 0 .125em}
+.MJXp-mtable > * {display: inline-table!important; vertical-align: middle}
+.MJXp-mtr {display: table-row!important}
+.MJXp-mtd {display: table-cell!important; text-align: center; padding: .5em 0 0 .5em}
+.MJXp-mtr > .MJXp-mtd:first-child {padding-left: 0}
+.MJXp-mtr:first-child > .MJXp-mtd {padding-top: 0}
+.MJXp-mlabeledtr {display: table-row!important}
+.MJXp-mlabeledtr > .MJXp-mtd:first-child {padding-left: 0}
+.MJXp-mlabeledtr:first-child > .MJXp-mtd {padding-top: 0}
+.MJXp-merror {background-color: #FFFF88; color: #CC0000; border: 1px solid #CC0000; padding: 1px 3px; font-style: normal; font-size: 90%}
+.MJXp-scale0 {-webkit-transform: scaleX(.0); -moz-transform: scaleX(.0); -ms-transform: scaleX(.0); -o-transform: scaleX(.0); transform: scaleX(.0)}
+.MJXp-scale1 {-webkit-transform: scaleX(.1); -moz-transform: scaleX(.1); -ms-transform: scaleX(.1); -o-transform: scaleX(.1); transform: scaleX(.1)}
+.MJXp-scale2 {-webkit-transform: scaleX(.2); -moz-transform: scaleX(.2); -ms-transform: scaleX(.2); -o-transform: scaleX(.2); transform: scaleX(.2)}
+.MJXp-scale3 {-webkit-transform: scaleX(.3); -moz-transform: scaleX(.3); -ms-transform: scaleX(.3); -o-transform: scaleX(.3); transform: scaleX(.3)}
+.MJXp-scale4 {-webkit-transform: scaleX(.4); -moz-transform: scaleX(.4); -ms-transform: scaleX(.4); -o-transform: scaleX(.4); transform: scaleX(.4)}
+.MJXp-scale5 {-webkit-transform: scaleX(.5); -moz-transform: scaleX(.5); -ms-transform: scaleX(.5); -o-transform: scaleX(.5); transform: scaleX(.5)}
+.MJXp-scale6 {-webkit-transform: scaleX(.6); -moz-transform: scaleX(.6); -ms-transform: scaleX(.6); -o-transform: scaleX(.6); transform: scaleX(.6)}
+.MJXp-scale7 {-webkit-transform: scaleX(.7); -moz-transform: scaleX(.7); -ms-transform: scaleX(.7); -o-transform: scaleX(.7); transform: scaleX(.7)}
+.MJXp-scale8 {-webkit-transform: scaleX(.8); -moz-transform: scaleX(.8); -ms-transform: scaleX(.8); -o-transform: scaleX(.8); transform: scaleX(.8)}
+.MJXp-scale9 {-webkit-transform: scaleX(.9); -moz-transform: scaleX(.9); -ms-transform: scaleX(.9); -o-transform: scaleX(.9); transform: scaleX(.9)}
+.MathJax_PHTML .noError {vertical-align: ; font-size: 90%; text-align: left; color: black; padding: 1px 3px; border: 1px solid}
+</style><style type="text/css">#YSF-BTN-HOLDER{position: fixed;max-width:300px;max-height:300px;right: 30px; bottom: 24px; cursor: pointer; overflow: visible; filter: alpha(opacity=100);opacity:1;z-index: 9990} #YSF-BTN-HOLDER:hover{filter: alpha(opacity=95);opacity:.95} #YSF-BTN-HOLDER img{ display: block;overflow: hidden; } #YSF-BTN-CIRCLE{display: none;position: absolute;right: -5px;top: -6px;width: auto;min-width: 12px;height: 20px;padding: 0 4px;background-color: #f00;font-size: 12px;line-height: 20px;color: #fff;text-align: center;white-space: nowrap;font-family: sans-serif;border-radius: 10px;z-index:1;} #YSF-BTN-BUBBLE{display: none;position: absolute;left: -274px;bottom:-15px;width: 278px;height: 80px;box-sizing: border-box;padding: 14px 22px;filter: alpha(opacity=100);opacity:1;background: url(//res.qiyukf.net/sdk/res/img/sdk/bg_floatMsg2x.png)  no-repeat;background:url(//res.qiyukf.net/sdk/res/img/sdk/bg_floatMsg.png); background-size: 278px 80px; z-index: 1;} #YSF-BTN-HOLDER.layer-6{bottom:0;} #YSF-BTN-HOLDER.layer-1 #YSF-BTN-BUBBLE{top:0} #YSF-BTN-HOLDER.layer-6 #YSF-BTN-BUBBLE{bottom:-6px;} #YSF-BTN-BUBBLE:hover{filter: alpha(opacity=95);opacity:.95} #YSF-BTN-CONTENT{height:45px;padding: 0;white-space: normal;word-break: break-all;text-align: left;font-size: 14px;line-height: 1.6;color: #222;overflow: hidden;z-index: 0;} #YSF-BTN-ARROW{ display: none; } #YSF-BTN-CLOSE{position: absolute; width:15px; height:15px;right: 4px;top: -3px; filter: alpha(opacity=90); opacity:.9; cursor: pointer; background: url(//res.qiyukf.net/sdk/res/img/sdk/btn-close.png) no-repeat;z-index: 1} #YSF-BTN-CLOSE:hover{filter: alpha(opacity=100); opacity: 1;} #YSF-PANEL-CORPINFO.ysf-chat-layeropen{ width: 511px; height: 500px; border-radius: 8px; box-shadow: 0 0 20px 0 rgba(0, 0, 0, .15);} #YSF-PANEL-CORPINFO{ position: fixed; bottom: 0px; right: 20px; width: 0; height: 0; z-index: 99999; } #YSF-PANEL-INFO.ysf-chat-layeropen{ width: 360px; height: 500px; border-radius: 8px; filter: alpha(opacity=100);opacity:1; box-shadow: 0 0 20px 0 rgba(0, 0, 0, .15);} #YSF-PANEL-INFO{ position: fixed; bottom: 0px; right: 20px; width: 0px; height: 0px; filter: alpha(opacity=0);opacity:0;z-index: 99999;} #YSF-PANEL-INFO .u-btn{background-color: none;} #YSF-CUSTOM-ENTRY{background-color: #F96868;} #YSF-CUSTOM-ENTRY-0{position: relative;width:auto;background-color: none;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-1{position: relative;width:auto;background-color: none;border-radius: 14px; box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-2{position: relative;width:auto;background-color: none;border-radius: 8px;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-3{position: relative;width:auto;background-color: none;border-radius: 50%;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-4{position: relative;width:auto;background-color: none;border-radius: 50%;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-5{position: relative;width:auto;background-color: none;border-radius: 8px;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-6{position: relative;width:auto;background-color: none;border-radius: 8px;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-7{position: relative;width:auto;background-color: none;border-radius: 50%;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-8{position: relative;width:auto;background-color: none;border-radius: 8px;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-0 img{max-width: 300px;max-height: 300px;} #YSF-CUSTOM-ENTRY-1 img{width:28px;height:auto;} #YSF-CUSTOM-ENTRY-2 img{width:58px;height:auto;} #YSF-CUSTOM-ENTRY-3 img{width:60px;height:auto;} #YSF-CUSTOM-ENTRY-4 img{width:60px;height:auto;} #YSF-CUSTOM-ENTRY-5 img{width:60px;height:auto;} #YSF-CUSTOM-ENTRY-6 img{width:58px;height:auto;} #YSF-CUSTOM-ENTRY-7 img{width:60px;height:auto;} #YSF-CUSTOM-ENTRY-8 img{width:60px;height:auto;} #YSF-IFRAME-LAYER{ border:0; outline:none; } .ysf-online-invite-wrap{z-index:10001;position:fixed;_position:absolute;top:50%;left:50%;} .ysf-online-invite{position:relative;top:-50%;left:-50%;cursor:pointer;border-radius: 16px;box-shadow: 0 10px 30px 0 rgba(47,56,111,0.15);} .ysf-online-invite img{display:block;width:250px;} .ysf-online-invite .ysf-online-invite-img{width:100%;height:100%} .ysf-online-invite .text{position:absolute;top:-11px;left:0;right:0;overflow:hidden;margin: 36px 20px 0 67px;line-height:140%;color:#526069;font-size:14px;font-family:"Microsoft YaHei","微软雅黑",tahoma,arial,simsun,"宋体";text-align:left;white-space:normal;word-wrap:break-word;} .ysf-online-invite .close{position:absolute;top:12px;right:12px;width:16px;height:16px;background:url("https://ysf.nosdn.127.net/operation/4602027f7e6a0109ac433863d7d0acdf") no-repeat;cursor:pointer;background-size: cover;} #YSF-PANEL-MOBILE{ background: rgba(46,47,49,0.7); position: fixed; bottom: 0px; right: 0px; width: 100%; height: 0px; transition-property: height,bottom; transition-duration: 0.3s; transition-timing-function: ease; transition-delay: 0s; z-index: 99999; } #YSF-PANEL-MOBILE.ysf-chat-layeropen{ width: 100%; height: 100%; transition-property:height,bottom; transition-duration: 0.3s; transition-timing-function: ease; transition-delay: 0s; } #YSF-IFRAME-LAYER.ysf-chat-mobile-layeropen{ height: 90% !important; transition-property: height,bottom; transition-duration: 0.3s; transition-timing-function: ease; transition-delay: 0s; } #YSF-IFRAME-LAYER.ysf-chat-mobile-layeropen.ysf-chat-mobile-invite-layer{ height: 33% !important; } #YSF-IFRAME-LAYER{ position: absolute; bottom: 0px;left: 0; right: 0px; width: 0px; height: 0px; transition-property: height,bottom; transition-duration: 0.3s; transition-timing-function: ease; transition-delay: 0s; z-index: 9999; } .YSF-PANEL-BODY-FIXED{ position: fixed !important; left: 0; right: 0;} .YSF-INVITE-LAYER-WRAPPER {cursor: pointer; position: relative; border: 1px solid #eaf0f6; background: #fff;box-shadow: 0 5px 20px rgba(0,0,0,0.1); border-radius: 4px; width: 220px; padding: 16px; box-sizing: border-box; margin-bottom: 12px; background: #FFFFFF;box-shadow: 0 6px 20px 0 rgba(40,53,75,0.17);border-radius: 8px;} .YSF-INVITE-LAYER-HEADER {display: flex;align-items: center;justify-content: space-between;margin-bottom: 8px;} .YSF-INVITE-LAYER-HEADER-LEFT {display: flex;flex: 1;align-items: center;} .YSF-INVITE-LAYER-RICHTEXT { height: 44px; max-width: 168px; word-break: break-all; overflow: hidden; text-overflow: ellipsis; font-size: 14px; color: #333333; line-height: 22px; text-align: left; } .YSF-INVITE-LAYER-RICHTEXT p { margin: 0;} #YSF-BTN-HOLDER .YSF-INVITE-LAYER-AVATAR { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; } .YSF-INVITE-LAYER-KEFU-NAME { font-size: 12px; color: #999999; margin-left: 4px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; } #YSF-ONLINE-INVITE-LAYER-CLOSE{ width:12px; height:12px; background:url("https://ysf.nosdn.127.net/operation/0e5ee37a71d33e05b74d1a5aa3cdd99a") no-repeat; background-size: cover; cursor:pointer; } #YSF-INVITE-LAYER-WRAPPER-ENTRY { position: relative; float: right; } .YSF-LAYER-ENTRY-CIRCLE { width: auto; min-width: 12px; height: 20px; padding: 0 4px; border-radius: 10px; color: #FFFFFF; background-color: #f00; font-size: 12px; line-height: 20px; white-space: nowrap; z-index:1; background: url("https://ysf.nosdn.127.net/operation/997228b687d805f7a5d6244865615ec9") no-repeat; background-size: cover; position: absolute; top: 6px; right: -8px; } .YSF-INVITE-IMG {background-color: none;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);float: right;} .YSF_INVITE-IMG-0{max-width: 300px; height:auto;} .YSF_INVITE-IMG-1{width:28px; height:auto; border-radius: 14px;} .YSF_INVITE-IMG-2{width:58px; height:auto; border-radius: 8px;} .YSF_INVITE-IMG-3{width:60px; height:auto; border-radius: 50%;} .YSF_INVITE-IMG-4{width:60px; height:auto; border-radius: 50%;} .YSF_INVITE-IMG-5{width:60px; height:auto; border-radius: 8px;} .YSF_INVITE-IMG-6{width:58px; height:auto; border-radius: 8px;} .YSF_INVITE-IMG-7{width:60px; height:auto; border-radius: 50%;} .YSF_INVITE-IMG-8{width:60px; height:auto; border-radius: 8px;} #YSF-BTN-HOLDER .portrait_icon{width: 24px;height: 24px;vertical-align: middle;display: inline-block;}</style></head> <body><div id="MathJax_Message" style="display: none;"></div> <div class="kk_main in_wrap"> <input type="hidden" id="imagePath" value="https://image.joinquant.com"> <input type="hidden" id="cdnPath" value="https://cdn.joinquant.com"> <input type="hidden" id="filePath" value="https://file.joinquant.com"> <input type="hidden" id="version" value="17679309750001783575403239"> <header id="kk_nav" class="kk_nav navbar narbar-static-top"> <div class="kk_nav_container js-jq-header"><div class="navbar-header clear" style="position:relative;z-index:1">  <a href="/" title="joinQuant" class="navbar-brand fleft headerLogBg">  </a>  </div> <nav id="kk_navbar" class="kk_navbar collapse navbar-collapse relative" aria-expanded="false"> <ul class="nav navbar-nav">  <li> <a href="/" class="">   首页   </a>      </li>  <li> <a href="javascript:void(0)" class="">   量化研究平台   </a>    <div class="submenu">  <a href="/research" class="item"> 研究环境   </a>  <a href="/algorithm/index/list" class="item"> 策略回测   </a>  <a href="/algorithm/trade/list?process=1" class="item"> 模拟列表   </a>  <a href="/view/factorlib/list" class="item"> 因子看板   </a>  <a href="/help/api/help?name=api" class="item"> 平台API文档   </a>  <a href="https://www.joinquant.com/data" class="item"> 平台数据字典   </a>  <a href="/post/4589" class="item"> 新手指引   </a>  <a href="https://www.joinquant.com/view/vip/charge" class="item"> 平台会员   </a>  </div>    </li>  <li> <a href="/community/new" class="">   聚宽社区   </a>    <div class="submenu">  <a href="https://www.joinquant.com/view/community/list?listType=5" class="item"> 精选文章   </a>  </div>    </li>  <li> <a href="javascript:void(0)" class="">   帮助   </a>    <div class="submenu">  <a href="/faq" class="item"> 常见问题   </a>  <a href="/view/algorithm/pythonConversion?utm_source=Nav" class="item"> Python 2 to 3   </a>  <a href="https://www.joinquant.com/help/api/help#faq:%E5%AE%9E%E7%9B%98%E8%AF%B4%E6%98%8E" class="item"> 实盘说明   </a>  <a href="/study" class="item"> 量化课堂   </a>  <a href="/help/api/help?name=factor" class="item"> 因子分析   </a>  </div>    </li>  <li> <a href="javascript:void(0)" class="">   JQData本地数据   </a>    <div class="submenu">  <a href="https://www.joinquant.com/default/index/sdk?utm_campaign=JQData%E7%94%B3%E8%AF%B7&amp;utm_medium=%E7%BD%91%E9%A1%B5&amp;utm_source=%E8%81%9A%E5%AE%BD&amp;gio_link_id=xRxqAjP5" class="item"> 申请试用   </a>  <a href="https://www.joinquant.com/help/api/doc?name=JQDatadoc" class="item"> Python版API   </a>  <a href="https://www.joinquant.com/help/api/doc?name=logon&amp;id=9830" class="item"> 试用及购买   </a>  </div>    </li>  <li> <a href="javascript:void(0)" class="">   平台会员   </a>    <div class="submenu">  <a href="https://www.joinquant.com/view/vip/charge" class="item"> 平台会员   </a>  <a href="https://www.joinquant.com/view/credits/list" class="item"> 积分商城   </a>  </div>    </li>  <li> <a href="/user/login/index?type=login" class="">   登录   </a>      </li>  <li> <a href="/user/register/index?type=register" class="">   注册   </a>      </li>  <div class="hidden" id="userInfoForCs" _userid="" _alias="" _mob=""></div> </ul> </nav></div> </header> <div class="kk_body"> <div class="in_body"> </div></div></div> <div class="js-app" style="min-height:450px"> <div class="jq-l-help-api no-search" id="help"> <div class="help-api-search"> <div class="search-input"> <input type="text" placeholder="搜索你想要的数据，如股票分钟数据、十大股东等(Enter搜索)" id="searchInput" autocomplete="off"> <svg class="enter-icon" viewBox="0 0 1024 1024" title="Enter搜索"> <path d="M639.199519 894.900713 253.016039 894.900713l0 0-96.577592 0c-5.27412 0-9.983375-1.539053-14.378475-3.768837-9.168824 1.098008-18.714224-1.381463-25.746384-8.413624l-44.143383-44.175105c-12.18246-12.183484-12.18246-31.933293 0-44.145429l208.851679-273.122471c12.18246-12.17939 31.962969-12.17939 44.145429 0l44.145429 44.146453c12.17939 12.211113 12.17939 31.994692 0 44.173059L249.498936 766.299777l335.880817 0c98.149391-5.276167 176.393429-83.266425 181.228551-181.035146L766.608304 348.34264c0-17.772782 14.377452-32.149211 32.151257-32.149211l64.98813 0c17.772782 0 32.150234 14.376429 32.150234 32.149211l0 33.593096 0 225.27472 0 32.496112C895.897925 780.64653 780.985756 894.900713 639.199519 894.900713z"> </path> </svg> </div> <div class="search-result"> <span id="searchBack">返回</span> <ul class="search-list" id="searchListBody"></ul> </div> </div> <div class="help-api-left"> <div> <ul class="am-tree am-tree-folder-select" role="tree" id="jq-api-tree" style="overflow:initial"> <li class="am-tree-branch am-hide" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder"></span>
+        <span class="am-tree-label"></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li>
+  <li class="am-tree-item am-hide" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item"></span>
+      <span class="am-tree-label"></span>
+    </button>
+  </li> <li class="am-tree-branch am-tree-open" data-template="treebranch" role="treeitem" aria-expanded="true">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-minus-square-o"></span>
+        <span class="am-tree-label"><a data-name="factor" href="#name:factor">因子分析 </a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children am-tree-folder-select" role="group"> <li class="am-tree-branch am-hide" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder"></span>
+        <span class="am-tree-label"></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li>
+  <li class="am-tree-item am-hide" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item"></span>
+      <span class="am-tree-label"></span>
+    </button>
+  </li> <li class="am-tree-branch am-tree-open" data-template="treebranch" role="treeitem" aria-expanded="true" id="first" aria-labelledby="first-label">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-minus-square-o"></span>
+        <span class="am-tree-label" id="first-label"><a href="#因子定义和计算">因子定义和计算</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#因子计算">因子计算</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#因子定义">因子定义</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#在因子定义中获取额外数据">在因子定义中获取额外数据</a></span>
+    </button>
+  </li><li class="am-tree-branch am-tree-open" data-template="treebranch" role="treeitem" aria-expanded="true">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-minus-square-o"></span>
+        <span class="am-tree-label"><a href="#因子定义dependencies中的财务因子">因子定义 dependencies 中的财务因子</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#情景一">情景一</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#情景二">情景二</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#示例-计算TTM数据">示例-计算TTM数据</a></span>
+    </button>
+  </li></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch am-tree-open" data-template="treebranch" role="treeitem" aria-expanded="true">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-minus-square-o"></span>
+        <span class="am-tree-label"><a href="#因子数据处理函数">因子数据处理函数</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#中性化">中性化</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#去极值">去极值</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#中位数去极值">中位数去极值</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#标准化">标准化</a></span>
+    </button>
+  </li></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch am-tree-open" data-template="treebranch" role="treeitem" aria-expanded="true">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-minus-square-o"></span>
+        <span class="am-tree-label"><a href="#因子分析">因子分析</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#因子分析API">因子分析API</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#绘制图表">绘制图表</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#属性列表">属性列表</a></span>
+    </button>
+  </li></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch am-tree-open" data-template="treebranch" role="treeitem" aria-expanded="true">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-minus-square-o"></span>
+        <span class="am-tree-label"><a href="#因子分析结果">因子分析结果</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#收益分析">收益分析</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#IC分析">IC 分析</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#换手率分析">换手率分析</a></span>
+    </button>
+  </li></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch am-tree-open" data-template="treebranch" role="treeitem" aria-expanded="true">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-minus-square-o"></span>
+        <span class="am-tree-label"><a href="#示例">示例</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#『价量』alpha191中的013">『价量』alpha 191 中的 013</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#『基本面』grossprofitability">『基本面』gross profitability</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#『中性化』产权比率">『中性化』产权比率</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#『指数』近10日alpha">『指数』近10日 alpha</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#『基本面』近两年净利润增长率">『基本面』近两年净利润增长率</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#『多季度』资产回报率">『多季度』 资产回报率</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#构建因子数据进行单因子分析">构建因子数据进行单因子分析</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#多因子参考资料">多因子参考资料</a></span>
+    </button>
+  </li></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch am-tree-open" data-template="treebranch" role="treeitem" aria-expanded="true">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-minus-square-o"></span>
+        <span class="am-tree-label"><a href="#附录">附录</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#normalIC与rankIC的区别">normal IC 与 rank IC 的区别</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#常见问题或报错">常见问题或报错</a></span>
+    </button>
+  </li></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li></ul> </div> </div> <div class="help-api-right"> <div id="jq-api-subcontent" class="hidden"></div> <div id="jq-api-content"><h2 id="因子定义和计算">因子定义和计算</h2>
+<p><strong>学习资料</strong></p>
+<ul>
+<li><a href="https://github.com/JoinQuant/jqfactor_analyzer">开源因子分析框架：jqfactor_analyzer</a></li>
+<li><a href="https://www.joinquant.com/view/community/detail/5535e9ae3e551e132aa441219a71999d">经典教程：因子及多因子分析</a></li>
+<li><a href="https://www.joinquant.com/view/community/detail/bcde6092a40c993ba697c70d5477cb89">【有用功】从单因子到策略</a></li>
+<li><a href="https://www.joinquant.com/help/api/help?name=api#get_factor_kanban_values">获取因子看板列表数据</a></li>
+</ul>
+<h3 id="因子计算">因子计算</h3>
+<p>在回测以及研究中， 可以通过调用jqfactor中的 calc_factors 函数来计算单因子分析中定义的因子值。</p>
+<p>为了便于理解，将因子计算部分置于因子定义前面。</p>
+<pre><code class="python language-python hljs">calc_factors(securities, factors, start_date, end_date, use_real_price, skip_paused)
+</code></pre>
+<p><strong>参数</strong></p>
+<ul>
+<li>securities: 股票代码列表。 </li>
+<li>factors: 因子(object)列表</li>
+<li>start_date: 开始日期</li>
+<li>end_date: 在回测中使用时，注意应该保证截止日期小于 context.current_dt</li>
+<li>use_real_price: 是否使用真实价格。默认为 False，表示使用后复权价格。 </li>
+<li>skip_paused:是否跳过停牌。 默认为 False。 注意：当 dependencies 使用的因子为价量信息，且 skip_paused = True 时，返回的 DataFrame 的索引由 datetime 变为 int， 值越大，表示离『当前』日期越近。其他情况下，返回的 DataFrame 的索引为 datetime。</li>
+</ul>
+<p><strong>返回值</strong>
+返回一个 dict 对象, key 是各 factors 的 name，value 是一个pandas.DataFrame，DataFrame 的 index 是日期， column 是股票代码。 </p>
+<p><strong>示例</strong></p>
+<p>示例中的ALPHA013、GROSSPROFITABILITY为自定义因子，定义因子的方法及说明见下节<strong>因子定义</strong>。</p>
+<pre><code class="python language-python hljs"><span class="hljs-comment"># 导入函数库</span>
+<span class="hljs-keyword">from</span> jqfactor <span class="hljs-keyword">import</span> Factor, calc_factors
+
+<span class="hljs-comment"># 定义因子</span>
+<span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">ALPHA013</span><span class="hljs-params">(Factor)</span>:</span>
+    name = <span class="hljs-string">'alpha013_name'</span>
+    max_window = <span class="hljs-number">1</span>
+    dependencies = [<span class="hljs-string">'high'</span>,<span class="hljs-string">'low'</span>,<span class="hljs-string">'volume'</span>,<span class="hljs-string">'money'</span>]
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">calc</span><span class="hljs-params">(self, data)</span>:</span>
+        high = data[<span class="hljs-string">'high'</span>]
+        low = data[<span class="hljs-string">'low'</span>]
+        vwap = data[<span class="hljs-string">'money'</span>]/data[<span class="hljs-string">'volume'</span>]
+        <span class="hljs-keyword">return</span> (np.power(high*low,<span class="hljs-number">0.5</span>) - vwap).mean()
+
+<span class="hljs-comment"># 定义因子</span>
+<span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">GROSSPROFITABILITY</span><span class="hljs-params">(Factor)</span>:</span>
+    name = <span class="hljs-string">'gross_profitability'</span>
+    max_window = <span class="hljs-number">1</span>
+    dependencies = [<span class="hljs-string">'total_operating_revenue'</span>,<span class="hljs-string">'total_operating_cost'</span>,<span class="hljs-string">'total_assets'</span>]
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">calc</span><span class="hljs-params">(self, data)</span>:</span>
+        total_operating_revenue = data[<span class="hljs-string">'total_operating_revenue'</span>]
+        total_operating_cost = data[<span class="hljs-string">'total_operating_cost'</span>]
+        total_assets = data[<span class="hljs-string">'total_assets'</span>]
+        gross_profitability = (total_operating_revenue - total_operating_cost)/total_assets
+        <span class="hljs-keyword">return</span> gross_profitability.mean()
+<span class="hljs-comment"># 定义股票池</span>
+securities = [<span class="hljs-string">'600000.XSHG'</span>,<span class="hljs-string">'600016.XSHG'</span>]
+<span class="hljs-comment"># 计算因子值</span>
+factors = calc_factors(securities, [ALPHA013(),GROSSPROFITABILITY()], start_date=<span class="hljs-string">'2017-01-01'</span>, end_date=<span class="hljs-string">'2017-02-01'</span>,  use_real_price=<span class="hljs-keyword">False</span>, skip_paused=<span class="hljs-keyword">False</span>)
+
+<span class="hljs-comment"># 查看因子值</span>
+factors[<span class="hljs-string">'alpha013_name'</span>].head()
+&gt;&gt;&gt;
+<span class="hljs-number">600000.</span>XSHG  <span class="hljs-number">600016.</span>XSHG
+<span class="hljs-number">2017</span><span class="hljs-number">-01</span><span class="hljs-number">-03</span>    <span class="hljs-number">-0.176511</span>    <span class="hljs-number">-0.070154</span>
+<span class="hljs-number">2017</span><span class="hljs-number">-01</span><span class="hljs-number">-04</span>    <span class="hljs-number">-0.068026</span>     <span class="hljs-number">0.006268</span>
+<span class="hljs-number">2017</span><span class="hljs-number">-01</span><span class="hljs-number">-05</span>    <span class="hljs-number">-0.092072</span>     <span class="hljs-number">0.022604</span>
+<span class="hljs-number">2017</span><span class="hljs-number">-01</span><span class="hljs-number">-06</span>    <span class="hljs-number">-0.021411</span>     <span class="hljs-number">0.259906</span>
+<span class="hljs-number">2017</span><span class="hljs-number">-01</span><span class="hljs-number">-09</span>     <span class="hljs-number">0.054015</span>    <span class="hljs-number">-0.118956</span>
+</code></pre>
+<h3 id="因子定义">因子定义</h3>
+<p><strong>使用方法</strong><br>
+<code>用户需要实现一个自定义因子的类， 继承 Factor 类， 并实现 calc 方法。</code><br>
+<code>max_window 和 dependencies 定义了在 calc 中可以获取到的数据，calc 实现因子的算法。</code><br>
+<code>calc 的返回值即每天的因子值。 calc 需要返回一个pandas.Series。index 是股票代码， value 是因子值。</code>   </p>
+<pre><code class="python language-python hljs"><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">MA5</span><span class="hljs-params">(Factor)</span>:</span>
+    name = <span class="hljs-string">'ma5'</span>
+    <span class="hljs-comment"># 每天获取过去五日的数据</span>
+    max_window = <span class="hljs-number">5</span>
+    <span class="hljs-comment"># 获取的数据是收盘价</span>
+    dependencies = [<span class="hljs-string">'close'</span>]
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">calc</span><span class="hljs-params">(self, data)</span>:</span>
+        <span class="hljs-comment"># print("现在处理{}的数据"format( self._current_date)) #打印逻辑日期</span>
+        <span class="hljs-keyword">return</span> data[<span class="hljs-string">'close'</span>][<span class="hljs-number">-5</span>:].mean()
+</code></pre>
+<p><strong>各属性的含义</strong></p>
+<ul>
+<li>name： 因子的名称， 不能与基础因子冲突。</li>
+<li>max_window： 获取数据的最长时间窗口，返回的是日级别的数据。 </li>
+<li>dependencies： 依赖的基础因子名称。</li>
+<li>main_class: 指定是否为主因子，取值为 True 或 False，仅单因子分析时有效当因子需要定义依赖因子时，用该字段指定需要分析的主因子。</li>
+</ul>
+<p><strong>dependencies 中可以使用的基础因子</strong></p>
+<style>
+#data_table th:first-of-type {width: 100px;}
+#data_table th:nth-of-type(3) {width: 400px;}
+#data_table td{ vertical-align:middle; }
+</style>
+<table id="data_table">
+<thead>
+<tr>
+<th>数据</th>
+<th style="text-align: left">说明</th>
+<th style="text-align: left">示例</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td>价量信息</td>
+<td style="text-align: left">包含open\close\high\low\money\volume 字段 <br>当use_real_price=True时使用动态复权数据 , 为False时使用后复权数据</td>
+<td style="text-align: left">dependencies=[‘open']</td>
+</tr>
+<tr>
+<td>聚宽因子库数据</td>
+<td style="text-align: left">包含质量因子、基础因子、情绪因子、成长因子、风险因子、每股因子等数百个因子数据<br>详细的因子列表请参考<a href="/help/api/help?name=factor_values">因子库</a></td>
+<td style="text-align: left">质量因子: 营业周期、市场杠杆<br>dependencies = ['OperatingCycle','MLEV']</td>
+</tr>
+<tr>
+<td>单季度财务指标因子</td>
+<td style="text-align: left">每日可看到的最新单季度财务指标。包含市值数据（valuation）、资产负债数据（balance）、现金流数据（cash_flow）、利润数据（income）、财务指标数据（indicator）。<br>可以直接使用该指标的名称获取数据。详细的指标列表请参考：<a href="/data/dict/fundamentals">股票财务数据</a></td>
+<td style="text-align: left">获取利润表（income）中的营业收入（operating_revenue）数据<br>dependencies = [‘operating_revenue']</td>
+</tr>
+<tr>
+<td>前 N 季度的财务数据</td>
+<td style="text-align: left">前1-8季度的单季度财务指标。<br>包含资产负债数据（balance）、现金流数据（cash_flow）、利润数据（income）、财务指标数据（indicator）。<br>可以通过在因子后加『_1』的方式， 获取前几个季度的财务指标。<br>详细的指标列表请参考：<a href="/data/dict/fundamentals">股票财务数据</a></td>
+<td style="text-align: left">某公司于6月23日发布半年报，当前的逻辑时间是6月24日<br>operating_revenue 表示第二季度的营业收入<br>operating_revenue_1 表示第一季度的营业收入。</td>
+</tr>
+<tr>
+<td>过去五年的年度财务数据</td>
+<td style="text-align: left">过去五年的年度财务数据<br>包含资产负债数据（balance）、现金流数据（cash_flow）、利润数据（income）、财务指标数据（indicator）。<br>可以通过在因子后加『_y1』的方式， 获取前几年的财务指标。<br>详细的指标列表请参考：<a href="/data/dict/fundamentals">股票财务数据</a></td>
+<td style="text-align: left">当前的逻辑时间是2016年9月24日<br>operating_revenue_y 表示当前时间可以看到的最新年度营业收入数据，即2015年的营业收入数据<br>operating_revenue_y1 表示2014年的营业收入数据。</td>
+</tr>
+<tr>
+<td>行业因子</td>
+<td style="text-align: left">包含证监会行业分类、聚宽一、二级行业分类以及申万一、二、三级行业分类。<br>因子名称是行业代码， 因子值是一个哑变量，如果某股票属于某行业， 则返回1， 否则， 返回0。 <br>详细的行业列表请参考<a href="/data/dict/plateData">行业数据</a></td>
+<td style="text-align: left">获取聚宽一级能源行业因子<br>dependencies = [‘HY001’]</td>
+</tr>
+<tr>
+<td>概念因子</td>
+<td style="text-align: left">因子的名称是概念代码，因子值是一个哑变量， 如果某股票属于某个概念，则返回1； 否则，返回0。<br>详细的概念列表请参考<a href="/data/dict/plateData">概念数据</a></td>
+<td style="text-align: left">获取智能电网概念因子<br>dependencies = [‘GN028’]</td>
+</tr>
+<tr>
+<td>指数因子</td>
+<td style="text-align: left">因子名称是指数代码， 因子值是一个哑变量， 如果某股票属于某个指数，则返回1； 否则，返回0。<br>详细的指数列表请参考<a href="/data/dict/indexData">指数数据</a></td>
+<td style="text-align: left">获取沪深300指数因子<br>dependencies = [‘000300.XSHG’]</td>
+</tr>
+<tr>
+<td>资金流因子</td>
+<td style="text-align: left"> 即 <a href="/api#jqdatagetmoneyflow-%E8%8E%B7%E5%8F%96%E8%B5%84%E9%87%91%E6%B5%81%E4%BF%A1%E6%81%AF">get_money_flow</a> API 查询的数据。<br>可以使用的字段包括：change_pct(涨跌幅(%)、net_amount_main(主力净额(万))、net_pct_main(主力净占比(%))、net_amount_xl(超大单净额(万))、net_pct_xl(超大单净占比(%))、net_amount_l(大单净额(万))、net_pct_l(大单净占比(%))、net_amount_m(中单净额(万))、net_pct_m(中单净占比(%))、net_amount_s(小单净额(万))、net_pct_s(小单净占比(%))</td>
+<td style="text-align: left">获取主力净占比因子<br>dependencies = [‘net_pct_main’]</td>
+</tr>
+</tbody>
+</table>
+<p><strong>calc 的参数</strong></p>
+<p>在 calc 中，<br>
+(1) self._current_date返回当前数据的逻辑日期，使用此日期可以结合其他取数api获取到更多额外的数据，因子分析是使用T日因子值和T+X日后的收益进行分析，因此获取此日期(T日)收盘后的数据不存在未来信息。<br>
+(2) 可以通过 data 参数获取通过 max_window 和 dependencies 定义的数据。 
+data 是一个 dict， key 是 dependencies 中的因子名称， value 是pandas.DataFrame。 </p>
+<ul>
+<li>DataFrame 的 column 是股票代码; </li>
+<li>DataFrame 的 index 是一个时间序列，结束时间是当前时间， 长度是 max_window; </li>
+</ul>
+<p><strong>calc 的返回值</strong></p>
+<p>需要保证返回一个pandas.Series, index 股票代码， value 是因子值。</p>
+<p>注意：当 max_window 设置为1时，返回的是一个<strong>1行N列</strong>的 dataframe。需要使用dataframe.iloc[0] 或 dataframe.mean() 的方式转换为一个 Series。</p>
+<h3 id="在因子定义中获取额外数据">在因子定义中获取额外数据</h3>
+<pre><code class="python language-python hljs">self._get_extra_data(securities=[],fields=[])
+</code></pre>
+<p>在 calc 方法中获取额外数据的方法。可以用来获取指数收盘价等数据。
+<strong>只能在 calc 内部使用</strong></p>
+<p><strong>参数</strong></p>
+<ul>
+<li>securities:股票代码的列表，可以使用个股和指数</li>
+<li>fields:基础因子名称列表。表示需要获取那些基础因子。支持的因子与 dependencies 中相同。</li>
+</ul>
+<p><strong>返回</strong></p>
+<ul>
+<li>dict, 结构与 data 类似。
+dict 的 key 是 fields 中定义的基础因子名称。 value 是一个 dataframe。
+dataframe 的 index 是日期索引， column 是 securities 中定义的股票代码， values 是因子值。
+其中， index 的时间跨度与 data 中一致， 都是由 max_window 定义的。</li>
+</ul>
+<p><strong>示例 获取指数收盘价</strong></p>
+<pre><code class="python language-python hljs"><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">IndexClose</span><span class="hljs-params">(Factor)</span>:</span>
+    name = <span class="hljs-string">'indice_close'</span>
+    max_window = <span class="hljs-number">10</span>
+    dependencies = [<span class="hljs-string">'market_cap'</span>]
+
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">calc</span><span class="hljs-params">(self, data)</span>:</span>
+        market_cap = data[<span class="hljs-string">'market_cap'</span>]
+        <span class="hljs-comment"># 获取指数的开盘收盘价</span>
+        index = self._get_extra_data(securities=[<span class="hljs-string">'000001.XSHG'</span>,<span class="hljs-string">'000002.XSHG'</span>,<span class="hljs-string">'399433.XSHE'</span>],fields=[<span class="hljs-string">'open'</span>,<span class="hljs-string">'close'</span>])
+
+        <span class="hljs-keyword">print</span> index.keys()
+        <span class="hljs-keyword">print</span> index[<span class="hljs-string">'close'</span>].columns
+        <span class="hljs-keyword">print</span> index[<span class="hljs-string">'open'</span>].head()
+        <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>
+</code></pre>
+<h3 id="因子定义dependencies中的财务因子">因子定义 dependencies 中的财务因子</h3>
+<p>在因子定义中，如果依赖的基础因子名称（dependencies）为财务因子，可能有些小伙伴理解起来有困难，下面通过一些场景和示例帮助理解。<br>
+也可以自学一下金融方面的基础知识，多查看一些上市公司的财务报告。</p>
+<h4 id="情景一">情景一</h4>
+<p>当前时间是2015年8月23日， 平安银行二季报的发布日期是 2015年8月15日。</p>
+<table>
+<thead>
+<tr>
+<th>基础因子</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>net_profit</td>
+<td>2015q2 的单季度净利润</td>
+</tr>
+<tr>
+<td>net_profit_1</td>
+<td>2015q1 的单季度净利润</td>
+</tr>
+<tr>
+<td>net_profit_y</td>
+<td>2014 的年度净利润</td>
+</tr>
+<tr>
+<td>net_profit_y1</td>
+<td>2013 的年度净利润</td>
+</tr>
+</tbody>
+</table>
+<h4 id="情景二">情景二</h4>
+<p>我们继续以 『00001.XSHE』 的数据为例， 说明 data 中返回数据的逻辑。
+『00001.XSHE』2017年 Q1 ~ Q3 的三季营业收入数据如下：</p>
+<table>
+<thead>
+<tr>
+<th>季度</th>
+<th>发布时间</th>
+<th>营业收入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2017q1</td>
+<td>2017-04-22</td>
+<td>27712000000</td>
+</tr>
+<tr>
+<td>2017q2</td>
+<td>2017-08-11</td>
+<td>26360999936</td>
+</tr>
+<tr>
+<td>2017q3</td>
+<td>2017-10-21</td>
+<td>25760000000</td>
+</tr>
+</tbody>
+</table>
+<p>假设我们定义 max_window = 5, dependencies = ['operating_revenue', 'operating_revenue_1']， 观察10月25日的数据情况：</p>
+<p><code>data['operating_revenue'] 的数据特征</code></p>
+<p>由于10月21日是周六， 所以数据在10月23日之前为 2017Q2 的数据， 10月23日之后（含当日）为 2017Q3 的数据
+<strong>『operating_revenue』 表示每天（index），每个股票（column），可以看到的最新单季度数据（value）</strong></p>
+<table>
+<thead>
+<tr>
+<th>日期/股票</th>
+<th>000001.XSHE</th>
+<th>000002.XSHE</th>
+<th>000008.XSHE</th>
+<th>000060.XSHE</th>
+<th>000063.XSHE</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2017-10-19</td>
+<td>26360999936</td>
+<td>51221250048</td>
+<td>365977728</td>
+<td>5138314240</td>
+<td>28265984000</td>
+</tr>
+<tr>
+<td>2017-10-20</td>
+<td>26360999936</td>
+<td>51221250048</td>
+<td>365977728</td>
+<td>5138314240</td>
+<td>28265984000</td>
+</tr>
+<tr>
+<td>2017-10-23</td>
+<td>25760000000</td>
+<td>51221250048</td>
+<td>365977728</td>
+<td>5138314240</td>
+<td>28265984000</td>
+</tr>
+<tr>
+<td>2017-10-24</td>
+<td>25760000000</td>
+<td>51221250048</td>
+<td>365977728</td>
+<td>5138314240</td>
+<td>28265984000</td>
+</tr>
+<tr>
+<td>2017-10-25</td>
+<td>25760000000</td>
+<td>51221250048</td>
+<td>365977728</td>
+<td>5138314240</td>
+<td>28265984000</td>
+</tr>
+</tbody>
+</table>
+<p><code>data['operating_revenue_1'] 的数据特征</code></p>
+<ol>
+<li>2017-10-19 能取到的最新数据是 2017Q2 的季报， 而下表中的数据是 2017Q1 的数据。  </li>
+<li>2017-10-23 能取到的最新数据是 2017Q3 的季报， 而下表中的数据是 2017Q2 的数据。<br>
+总结一下， <strong>『operating_revenue_1』 表示获取最新报告期上一期的数据</strong></li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>日期/股票</th>
+<th>000001.XSHE</th>
+<th>000002.XSHE</th>
+<th>000008.XSHE</th>
+<th>000060.XSHE</th>
+<th>000063.XSHE</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2017-10-19</td>
+<td>27712000000</td>
+<td>18589229056</td>
+<td>202465472</td>
+<td>4739692032</td>
+<td>25744611328</td>
+</tr>
+<tr>
+<td>2017-10-20</td>
+<td>27712000000</td>
+<td>18589229056</td>
+<td>202465472</td>
+<td>4739692032</td>
+<td>25744611328</td>
+</tr>
+<tr>
+<td>2017-10-23</td>
+<td>26360999936</td>
+<td>18589229056</td>
+<td>202465472</td>
+<td>4739692032</td>
+<td>25744611328</td>
+</tr>
+<tr>
+<td>2017-10-24</td>
+<td>26360999936</td>
+<td>18589229056</td>
+<td>202465472</td>
+<td>4739692032</td>
+<td>25744611328</td>
+</tr>
+<tr>
+<td>2017-10-25</td>
+<td>26360999936</td>
+<td>18589229056</td>
+<td>202465472</td>
+<td>4739692032</td>
+<td>25744611328</td>
+</tr>
+</tbody>
+</table>
+<h4 id="示例-计算TTM数据">示例-计算TTM数据</h4>
+<pre><code class="python language-python hljs"><span class="hljs-comment"># 计算营业收入TTM</span>
+<span class="hljs-keyword">from</span> jqfactor <span class="hljs-keyword">import</span> Factor
+<span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">OR_TTM</span><span class="hljs-params">(Factor)</span>:</span>
+    <span class="hljs-comment"># 设置因子名称</span>
+    name = <span class="hljs-string">'operating_revenue_ttm'</span>
+    <span class="hljs-comment"># 设置获取数据的时间窗口长度</span>
+    max_window = <span class="hljs-number">1</span>
+    <span class="hljs-comment"># 设置依赖的数据，即前四季度的营业收入</span>
+    dependencies = [<span class="hljs-string">'operating_revenue'</span>,
+                    <span class="hljs-string">'operating_revenue_1'</span>,
+                    <span class="hljs-string">'operating_revenue_2'</span>,
+                    <span class="hljs-string">'operating_revenue_3'</span>]
+
+    <span class="hljs-comment"># 计算因子的函数， 需要返回一个 pandas.Series, index 是股票代码，value 是因子值</span>
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">calc</span><span class="hljs-params">(self, data)</span>:</span>
+        <span class="hljs-comment"># 计算 ttm ， 为前四季度相加</span>
+        ttm = data[<span class="hljs-string">'operating_revenue'</span>] + data[<span class="hljs-string">'operating_revenue_1'</span>] + data[<span class="hljs-string">'operating_revenue_2'</span>] + data[<span class="hljs-string">'operating_revenue_3'</span>]
+        <span class="hljs-comment"># 将 ttm 转换成 series</span>
+        <span class="hljs-keyword">return</span> ttm.mean()
+</code></pre>
+<h2 id="因子数据处理函数">因子数据处理函数</h2>
+<p>提供了常见的数据处理方法。<br>
+实践过程中，是否应该对原始的因子数据进一步处理、怎么处理最合理、参数怎么设置效果最优等，需要小伙伴们自己进一步的研究。</p>
+<h3 id="中性化">中性化</h3>
+<pre><code class="python language-python hljs">neutralize(series, how=<span class="hljs-keyword">None</span>, date=<span class="hljs-keyword">None</span>, axis=<span class="hljs-number">1</span>)
+</code></pre>
+<p><strong>参数</strong> </p>
+<ul>
+<li>data: pd.Series/pd.DataFrame , 待中性化的序列，序列的 index 为股票的 code</li>
+<li>how: str list 。 中性化使用的因子名称列表。默认为 ['jq_l1', 'market_cap'] 支持的内容包括：<ul>
+<li>'jq_l1'： 聚宽一级行业</li>
+<li>'jq_l2'： 聚宽二级行业</li>
+<li>'sw_l1'： 申万一级行业</li>
+<li>'sw_l2'： 申万二级行业</li>
+<li>'sw_l3'： 申万三级行业</li>
+<li>风险因子：可以使用的风险因子包括： ['size', 'beta', 'momentum', 'residual_volatility', 'non_linear_size', 'book_to_price_ratio', 'liquidity', 'earnings_yield', 'growth', 'leverage']</li></ul></li>
+<li>date: 日期格式 str  将用 date 这天的相关变量数据对 series 进行中性化</li>
+<li>axis: 默认为 1。仅在 data 为 pd.DataFrame 时生效。 表示沿哪个方向做标准化，0 为对每列做中性化，1 为对每行做中性化</li>
+</ul>
+<p><strong>返回</strong></p>
+<p>中性化后的因子数据</p>
+<p><strong>示例</strong></p>
+<pre><code class="python language-python hljs"><span class="hljs-comment"># 导入需要的函数库</span>
+<span class="hljs-keyword">import</span> pandas <span class="hljs-keyword">as</span> pd
+<span class="hljs-keyword">import</span> numpy <span class="hljs-keyword">as</span> np
+<span class="hljs-keyword">from</span> jqfactor <span class="hljs-keyword">import</span> neutralize
+<span class="hljs-comment"># 生成数据</span>
+data = pd.DataFrame(np.random.rand(<span class="hljs-number">3</span>,<span class="hljs-number">300</span>), columns=get_index_stocks(<span class="hljs-string">'000300.XSHG'</span>, date=<span class="hljs-string">'2018-05-02'</span>),index=[<span class="hljs-string">'a'</span>, <span class="hljs-string">'b'</span>, <span class="hljs-string">'c'</span>])
+<span class="hljs-comment"># 数据中性化</span>
+neutralize(data, how=[<span class="hljs-string">'jq_l1'</span>, <span class="hljs-string">'market_cap'</span>], date=<span class="hljs-string">'2018-05-02'</span>, axis=<span class="hljs-number">1</span>)
+</code></pre>
+<h3 id="去极值">去极值</h3>
+<pre><code class="python language-python hljs">winsorize(series, scale=<span class="hljs-keyword">None</span>, range=<span class="hljs-keyword">None</span>, qrange=<span class="hljs-keyword">None</span>, inclusive=<span class="hljs-keyword">True</span>, inf2nan=<span class="hljs-keyword">True</span>, axis=<span class="hljs-number">1</span>)
+</code></pre>
+<p><strong>参数</strong></p>
+<ul>
+<li>data: pd.Series/pd.DataFrame/np.array, 待缩尾的序列</li>
+<li>scale: 标准差倍数，与 range，qrange 三选一，不可同时使用。会将位于 [mu - scale * sigma, mu + scale * sigma] 边界之外的值替换为边界值</li>
+<li>range:  列表， 缩尾的上下边界。与 scale，qrange 三选一，不可同时使用。 </li>
+<li>qrange: 列表，缩尾的上下分位数边界，值应在 0 到 1 之间，如 [0.05, 0.95]。与 scale，range 三选一，不可同时使用。</li>
+<li>inclusive: 是否将位于边界之外的值替换为边界值，默认为 True。如果为 True，则将边界之外的值替换为边界值，否则则替换为 np.nan</li>
+<li>inf2nan: 是否将 np.inf 和 -np.inf 替换成 np.nan，默认为 True如果为 True，在缩尾之前会先将 np.inf 和 -np.inf 替换成 np.nan，缩尾的时候不会考虑 np.nan，否则 inf 被认为是在上界之上，-inf 被认为在下界之下</li>
+<li>axis: 在 data 为 pd.DataFrame 时使用，沿哪个方向做标准化，默认为 1。 0 为对每列做缩尾，1 为对每行做缩尾。</li>
+</ul>
+<p><strong>返回</strong></p>
+<p>去极值处理之后的因子数据</p>
+<p><strong>示例</strong></p>
+<pre><code class="python language-python hljs"><span class="hljs-comment"># 导入需要的函数库</span>
+<span class="hljs-keyword">import</span> pandas <span class="hljs-keyword">as</span> pd
+<span class="hljs-keyword">import</span> numpy <span class="hljs-keyword">as</span> np
+<span class="hljs-keyword">from</span> jqfactor <span class="hljs-keyword">import</span> winsorize
+<span class="hljs-comment"># 生成数据</span>
+data = pd.DataFrame(np.random.rand(<span class="hljs-number">3</span>,<span class="hljs-number">300</span>), columns=get_index_stocks(<span class="hljs-string">'000300.XSHG'</span>, date=<span class="hljs-string">'2018-05-02'</span>),index=[<span class="hljs-string">'a'</span>, <span class="hljs-string">'b'</span>, <span class="hljs-string">'c'</span>])
+<span class="hljs-comment"># 数据去极值</span>
+winsorize(data, qrange=[<span class="hljs-number">0.05</span>,<span class="hljs-number">0.93</span>], inclusive=<span class="hljs-keyword">True</span>, inf2nan=<span class="hljs-keyword">True</span>, axis=<span class="hljs-number">1</span>)
+</code></pre>
+<h3 id="中位数去极值">中位数去极值</h3>
+<pre><code class="python language-python hljs">winsorize_med(series, scale=<span class="hljs-number">1</span>, inclusive=<span class="hljs-keyword">True</span>, inf2nan=<span class="hljs-keyword">True</span>, axis=<span class="hljs-number">1</span>)
+</code></pre>
+<p><strong>参数</strong></p>
+<ul>
+<li>data: pd.Series/pd.DataFrame/np.array, 待缩尾的序列</li>
+<li>scale: 倍数，默认为 1.0。会将位于 [med - scale * distance, med + scale * distance] 边界之外的值替换为边界值/np.nan</li>
+<li>inclusive bool  是否将位于边界之外的值替换为边界值，默认为 True。 如果为 True，则将边界之外的值替换为边界值，否则则替换为 np.nan</li>
+<li>inf2nan: 是否将 np.inf 和 -np.inf 替换成 np.nan，默认为 True。如果为 True，在缩尾之前会先将 np.inf 和 -np.inf 替换成 np.nan，缩尾的时候不会考虑 np.nan，否则 inf 被认为是在上界之上，-inf 被认为在下界之下</li>
+<li>axis: 在 data 为 pd.DataFrame 时使用，沿哪个方向做标准化，默认为 1。0 为对每列做缩尾，1 为对每行做缩尾</li>
+</ul>
+<p><strong>返回</strong></p>
+<p>中位数去极值之后的因子数据</p>
+<p><strong>示例</strong></p>
+<pre><code class="python language-python hljs"><span class="hljs-comment"># 导入需要的函数库</span>
+<span class="hljs-keyword">import</span> pandas <span class="hljs-keyword">as</span> pd
+<span class="hljs-keyword">import</span> numpy <span class="hljs-keyword">as</span> np
+<span class="hljs-keyword">from</span> jqfactor <span class="hljs-keyword">import</span> winsorize_med
+<span class="hljs-comment"># 生成数据</span>
+data = pd.DataFrame(np.random.rand(<span class="hljs-number">3</span>,<span class="hljs-number">300</span>), columns=get_index_stocks(<span class="hljs-string">'000300.XSHG'</span>, date=<span class="hljs-string">'2018-05-02'</span>),index=[<span class="hljs-string">'a'</span>, <span class="hljs-string">'b'</span>, <span class="hljs-string">'c'</span>])
+<span class="hljs-comment"># 数据中位数去极值</span>
+winsorize_med(data, scale=<span class="hljs-number">1</span>, inclusive=<span class="hljs-keyword">True</span>, inf2nan=<span class="hljs-keyword">True</span>, axis=<span class="hljs-number">0</span>)
+</code></pre>
+<h3 id="标准化">标准化</h3>
+<pre><code class="python language-python hljs">standardlize(series, inf2nan=<span class="hljs-keyword">True</span>, axis=<span class="hljs-number">1</span>)
+</code></pre>
+<p><strong>参数</strong></p>
+<ul>
+<li>data: pd.Series/pd.DataFrame/np.array, 待标准化的序列</li>
+<li>inf2nan: 是否将 np.inf 和 -np.inf 替换成 np.nan。默认为 True</li>
+<li>axis=1: 在 data 为 pd.DataFrame 时使用，如果 series 为 pd.DataFrame，沿哪个方向做标准化。0 为对每列做标准化，1 为对每行做标准化</li>
+</ul>
+<p><strong>返回</strong></p>
+<p>标准化后的因子数据</p>
+<p><strong>示例</strong></p>
+<pre><code class="python language-python hljs"><span class="hljs-comment"># 导入需要的函数库</span>
+<span class="hljs-keyword">import</span> pandas <span class="hljs-keyword">as</span> pd
+<span class="hljs-keyword">import</span> numpy <span class="hljs-keyword">as</span> np
+<span class="hljs-keyword">from</span> jqfactor <span class="hljs-keyword">import</span> standardlize
+<span class="hljs-comment"># 生成数据</span>
+data = pd.DataFrame(np.random.rand(<span class="hljs-number">3</span>,<span class="hljs-number">300</span>), columns=get_index_stocks(<span class="hljs-string">'000300.XSHG'</span>, date=<span class="hljs-string">'2018-05-02'</span>),index=[<span class="hljs-string">'a'</span>, <span class="hljs-string">'b'</span>, <span class="hljs-string">'c'</span>])
+<span class="hljs-comment"># 数据标准化</span>
+standardlize(data, inf2nan=<span class="hljs-keyword">True</span>, axis=<span class="hljs-number">0</span>)
+</code></pre>
+<h2 id="因子分析">因子分析</h2>
+
+<h3 id="因子分析API">因子分析API</h3>
+<p>为了让用户在<a href="https://www.joinquant.com/research">研究环境</a>中，可以便捷的分析因子，我们准备了单因子分析工具</p>
+<pre><code class="python language-python hljs"><span class="hljs-comment">#载入函数库</span>
+<span class="hljs-keyword">from</span> jqfactor <span class="hljs-keyword">import</span> analyze_factor
+
+<span class="hljs-comment">#对因子进行分析</span>
+far = analyze_factor(factor, start_date, end_date, industry, universe, quantiles, periods, weight_method, use_real_price, skip_paused, max_loss, factor_dep_definitions)
+</code></pre>
+<p><strong>参数：</strong></p>
+<ul>
+<li>factor：因子值，可输入三种类型的值<ul>
+<li>pandas.DataFrame:因子值，columns为股票代码（如'000001.XSHE'）,index为日期的DatetimeIndex或str</li>
+<li>pandas.Series:因子值，index为日期和股票代码的MultiIndex</li>
+<li>Factor的子类：因子定义（具体见下方示例）</li></ul></li>
+<li>start_date: 开始日期，如果factor为因子定义的话，默认为'2017-01-01'；如果factor为因子值的话，默认为'2017-12-31'</li>
+<li>end_date: 结束日期，如果factor为因子定义的话，默认为为'2017-12-31'；如果factor为因子值的话，默认为因子值的日期的最大值。</li>
+<li>industry: 行业分类，默认为'jq_l1'<ul>
+<li>'sw_l1':申万一级行业</li>
+<li>'sw_l2':申万二级行业</li>
+<li>'sw_l3':申万三级行业</li>
+<li>'jq_l1':聚宽一级行业</li>
+<li>'jq_l2':聚宽二级行业</li>
+<li>'zjw':证监会行业</li></ul></li>
+<li>universe: 对股票池的定义，可输入两种类型的值。<strong>当factor输入为因子值时(DataFrame、Series)，这个参数失效</strong><ul>
+<li>str:认为输入的是一个指数，股票池为这个指数的成分股</li>
+<li>list：认为输入的是一个股票池</li></ul></li>
+<li>quantiles:分位数数量，默认为5</li>
+<li>periods：调仓周期，int或int的列表，默认为[1,5,10]</li>
+<li>weight_method: 计算分位数收益时的加权方法<ul>
+<li>avg: 按平均加权</li>
+<li>mktcap：按市值加权 </li></ul></li>
+<li>use_real_price: 是否动态复权，默认为False（当factor为因子值时这个参数失效）</li>
+<li>skip_paused: 是否跳过停牌，默认为False（当factor为因子值时这个参数失效）。需要注意的情况同 calc_factors 中的 skip_paused 参数</li>
+<li>max_loss: 因重复值或nan值太多而无效的因子值的最大占比，默认为0.25</li>
+<li>factor_dep_definitions: 主因子的依赖因子的列表，默认为空列表（注:当factor为因子值时这个参数失效）</li>
+</ul>
+<p><strong>示例一：自定义因子进行分析</strong></p>
+<pre><code class="python language-python hljs"><span class="hljs-comment">#导入需要的数据库</span>
+<span class="hljs-keyword">from</span> jqfactor <span class="hljs-keyword">import</span> analyze_factor
+<span class="hljs-keyword">from</span> jqfactor <span class="hljs-keyword">import</span> Factor
+
+<span class="hljs-comment">#自定义因子的类</span>
+<span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">MA5</span><span class="hljs-params">(Factor)</span>:</span>
+
+    name = <span class="hljs-string">'ma5'</span>
+    max_window = <span class="hljs-number">5</span>
+    dependencies = [<span class="hljs-string">'close'</span>]
+
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">calc</span><span class="hljs-params">(self, data)</span>:</span>
+        <span class="hljs-keyword">return</span> data[<span class="hljs-string">'close'</span>][<span class="hljs-number">-5</span>:].mean()
+
+<span class="hljs-comment">#使用自定义因子的类进行单因子分析</span>
+far = analyze_factor(factor=MA5, start_date=<span class="hljs-string">'2018-01-01'</span>, end_date=<span class="hljs-string">'2018-03-01'</span>, weight_method=<span class="hljs-string">'mktcap'</span>, universe=<span class="hljs-string">'000300.XSHG'</span>, industry=<span class="hljs-string">'jq_l1'</span>, quantiles=<span class="hljs-number">8</span>, periods=(<span class="hljs-number">1</span>,<span class="hljs-number">5</span>,<span class="hljs-number">22</span>))
+
+<span class="hljs-comment">#分析结束后通过不同属性获取数据</span>
+far.ic_monthly <span class="hljs-comment">#月度信息系数</span>
+</code></pre>
+<p><strong>示例二：获取因子库因子进行分析</strong></p>
+<pre><code class="python language-python hljs"><span class="hljs-comment">#导入需要的数据库</span>
+<span class="hljs-keyword">from</span> jqfactor <span class="hljs-keyword">import</span> analyze_factor
+<span class="hljs-keyword">from</span> jqfactor <span class="hljs-keyword">import</span> get_factor_values
+
+<span class="hljs-comment">#获取因子值pandas.DataFrame</span>
+factor_data=get_factor_values(securities=get_index_stocks(<span class="hljs-string">'000300.XSHG'</span>,<span class="hljs-string">'2018-01-01'</span>), factors=[<span class="hljs-string">'Skewness60'</span>],
+                  start_date=<span class="hljs-string">'2018-01-01'</span>, end_date=<span class="hljs-string">'2018-03-01'</span>)[<span class="hljs-string">'Skewness60'</span>]
+
+<span class="hljs-comment">#使用获取的因子值进行单因子分析</span>
+far = analyze_factor(factor=factor_data, start_date=<span class="hljs-string">'2018-01-01'</span>, end_date=<span class="hljs-string">'2018-03-01'</span>, weight_method=<span class="hljs-string">'mktcap'</span>, industry=<span class="hljs-string">'jq_l1'</span>, quantiles=<span class="hljs-number">8</span>, periods=(<span class="hljs-number">1</span>,<span class="hljs-number">5</span>,<span class="hljs-number">22</span>),max_loss=<span class="hljs-number">0.2</span>)
+
+<span class="hljs-comment">#分析结束后通过不同属性获取数据</span>
+far.mean_return_std_by_quantile <span class="hljs-comment">#获取按分位数分组加权平均因子收益</span>
+</code></pre>
+<h3 id="绘制图表">绘制图表</h3>
+<h4>展示全部分析</h4>
+<pre><code class="hljs routeros">far.create_full_tear_sheet(<span class="hljs-attribute">demeaned</span>=<span class="hljs-literal">False</span>, <span class="hljs-attribute">group_adjust</span>=<span class="hljs-literal">False</span>, <span class="hljs-attribute">by_group</span>=<span class="hljs-literal">False</span>, <span class="hljs-attribute">turnover_periods</span>=None, avgretplot=(5, 15), <span class="hljs-attribute">std_bar</span>=<span class="hljs-literal">False</span>)
+</code></pre>
+<p><strong>参数:</strong></p>
+<ul>
+<li>demeaned:<ul>
+<li>True：使用超额收益计算 (基准收益被认为是每日所有股票收益按照weight列中权重加权的均值)</li>
+<li>False：不使用超额收益</li></ul></li>
+<li>group_adjust:<ul>
+<li>True：使用行业中性化后的收益计算 (行业收益被认为是每日各个行业股票收益按照weight列中权重加权的均值)</li>
+<li>False：不使用行业中性化后的收益</li></ul></li>
+<li>by_group:<ul>
+<li>True: 按行业展示</li>
+<li>False: 不按行业展示</li></ul></li>
+<li>turnover_periods: 调仓周期</li>
+<li>avgretplot: tuple 因子预测的天数:(计算过去的天数, 计算未来的天数)</li>
+<li>std_bar:<ul>
+<li>True: 显示标准差</li>
+<li>False: 不显示标准差</li></ul></li>
+</ul>
+<h4>因子值特征分析</h4>
+<pre><code class="hljs routeros">far.create_summary_tear_sheet(<span class="hljs-attribute">demeaned</span>=<span class="hljs-literal">False</span>, <span class="hljs-attribute">group_adjust</span>=<span class="hljs-literal">False</span>)
+</code></pre>
+<p><strong>参数:</strong></p>
+<ul>
+<li>demeaned:
+详见 calc_mean_return_by_quantile 中 demeaned 参数<ul>
+<li>True：使用超额收益计算 (基准收益被认为是每日所有股票收益按照weight列中权重加权的均值)</li>
+<li>False：不使用超额收益</li></ul></li>
+<li>group_adjust:
+详见 calc_mean_return_by_quantile 中 group_adjust 参数<ul>
+<li>True：使用行业中性化后的收益计算 (行业收益被认为是每日各个行业股票收益按照weight列中权重加权的均值)</li>
+<li>False：不使用行业中性化后的收益</li></ul></li>
+</ul>
+<h4>因子收益分析</h4>
+<pre><code class="hljs routeros">far.create_returns_tear_sheet(<span class="hljs-attribute">demeaned</span>=<span class="hljs-literal">False</span>, <span class="hljs-attribute">group_adjust</span>=<span class="hljs-literal">False</span>, <span class="hljs-attribute">by_group</span>=<span class="hljs-literal">False</span>)
+</code></pre>
+<p><strong>参数:</strong></p>
+<ul>
+<li>demeaned:<ul>
+<li>True：使用超额收益计算 (基准收益被认为是每日所有股票收益按照weight列中权重加权的均值)</li>
+<li>False：不使用超额收益</li></ul></li>
+<li>group_adjust:<ul>
+<li>True：使用行业中性化后的收益计算 (行业收益被认为是每日各个行业股票收益按照weight列中权重加权的均值)</li>
+<li>False：不使用行业中性化后的收益</li></ul></li>
+<li>by_group:<ul>
+<li>True: 画各行业的各分位数平均收益图</li>
+<li>False: 不画各行业的各分位数平均收益图</li></ul></li>
+</ul>
+<h4>因子 IC 分析</h4>
+<pre><code class="hljs routeros">far.create_information_tear_sheet(<span class="hljs-attribute">group_adjust</span>=<span class="hljs-literal">False</span>, <span class="hljs-attribute">by_group</span>=<span class="hljs-literal">False</span>)
+</code></pre>
+<p><strong>参数:</strong></p>
+<ul>
+<li>group_adjust:<ul>
+<li>True: 使用行业中性收益 (行业收益被认为是每日各个行业股票收益按照weight列中权重的加权的均值)</li>
+<li>False: 不使用行业中性收益</li></ul></li>
+<li>by_group:<ul>
+<li>True: 画按行业分组信息系数(IC)图</li>
+<li>False: 画月度信息系数(IC)图</li></ul></li>
+</ul>
+<h4>因子换手率分析</h4>
+<pre><code class="hljs reasonml">far.create<span class="hljs-constructor">_turnover_tear_sheet(<span class="hljs-params">turnover_periods</span>=None)</span>
+</code></pre>
+<p><strong>参数:</strong></p>
+<ul>
+<li>turnover_periods: 调仓周期</li>
+</ul>
+<h4>因子预测能力分析</h4>
+<pre><code class="hljs routeros">far.create_event_returns_tear_sheet(avgretplot=(5, 15), <span class="hljs-attribute">demeaned</span>=<span class="hljs-literal">False</span>, <span class="hljs-attribute">group_adjust</span>=<span class="hljs-literal">False</span>,std_bar=False)
+</code></pre>
+<p><strong>参数:</strong></p>
+<ul>
+<li>avgretplot: tuple 因子预测的天数: (计算过去的天数, 计算未来的天数)</li>
+<li>demeaned:
+详见 calc_mean_return_by_quantile 中 demeaned 参数<ul>
+<li>True: 使用超额收益计算累积收益 (基准收益被认为是每日所有股票收益按照weight列中权重加权的均值)</li>
+<li>False: 不使用超额收益</li></ul></li>
+<li>group_adjust:
+详见 calc_mean_return_by_quantile 中 group_adjust 参数<ul>
+<li>True: 使用行业中性化后的收益计算累积收益 (行业收益被认为是每日各个行业股票收益按照weight列中权重加权的均值)</li>
+<li>False: 不使用行业中性化后的收益</li></ul></li>
+<li>std_bar:<ul>
+<li>True: 显示标准差</li>
+<li>False: 不显示标准差</li></ul></li>
+</ul>
+<h4>打印因子收益表</h4>
+<pre><code class="hljs routeros">far.plot_returns_table(<span class="hljs-attribute">demeaned</span>=<span class="hljs-literal">False</span>, <span class="hljs-attribute">group_adjust</span>=<span class="hljs-literal">False</span>)
+</code></pre>
+<p><strong>参数：</strong></p>
+<ul>
+<li>demeaned:<ul>
+<li>True：使用超额收益计算 (基准收益被认为是每日所有股票收益按照weight列中权重的加权的均值)</li>
+<li>False：不使用超额收益</li></ul></li>
+<li>group_adjust:<ul>
+<li>True：使用行业中性收益 (行业收益被认为是每日各个行业股票收益按照weight列中权重的加权的均值)</li>
+<li>False：不使用行业中性收益</li></ul></li>
+</ul>
+<h4>打印换手率表</h4>
+<pre><code class="hljs css"><span class="hljs-selector-tag">far</span><span class="hljs-selector-class">.plot_turnover_table</span>()
+</code></pre>
+<h4>打印信息系数（IC）相关表</h4>
+<pre><code class="hljs oxygene">far.plot_information_table(group_adjust=<span class="hljs-keyword">False</span>, <span class="hljs-function"><span class="hljs-keyword">method</span>='<span class="hljs-title">rank</span>')
+</span></code></pre>
+<p><strong>参数：</strong></p>
+<ul>
+<li>group_adjust:<ul>
+<li>True：使用行业中性收益 (行业收益被认为是每日各个行业股票收益按照weight列中权重的加权的均值)</li>
+<li>False：不使用行业中性收益</li></ul></li>
+<li>method：<ul>
+<li>'rank'：用秩相关系数计算IC值</li>
+<li>'normal': 用相关系数计算IC值</li></ul></li>
+</ul>
+<h4>打印各分位数统计表</h4>
+<pre><code class="hljs css"><span class="hljs-selector-tag">far</span><span class="hljs-selector-class">.plot_quantile_statistics_table</span>()
+</code></pre>
+<h4>画信息系数(IC)时间序列图</h4>
+<pre><code class="hljs oxygene">far.plot_ic_ts(group_adjust=<span class="hljs-keyword">False</span>, <span class="hljs-function"><span class="hljs-keyword">method</span>='<span class="hljs-title">rank</span>')
+</span></code></pre>
+<p><strong>参数：</strong></p>
+<ul>
+<li>group_adjust:<ul>
+<li>True：使用行业中性收益 (行业收益被认为是每日各个行业股票收益按照weight列中权重的加权的均值)</li>
+<li>False：不使用行业中性收益</li></ul></li>
+<li>method：<ul>
+<li>'rank'：用秩相关系数计算IC值</li>
+<li>'normal': 用相关系数计算IC值</li></ul></li>
+</ul>
+<h4>画信息系数分布直方图</h4>
+<pre><code class="hljs oxygene">far.plot_ic_hist(group_adjust=<span class="hljs-keyword">False</span>, <span class="hljs-function"><span class="hljs-keyword">method</span>='<span class="hljs-title">rank</span>')
+</span></code></pre>
+<p><strong>参数：</strong></p>
+<ul>
+<li>group_adjust:<ul>
+<li>True：使用行业中性收益 (行业收益被认为是每日各个行业股票收益按照weight列中权重的加权的均值)</li>
+<li>False：不使用行业中性收益</li></ul></li>
+<li>method：<ul>
+<li>'rank'：用秩相关系数计算IC值</li>
+<li>'normal': 用相关系数计算IC值</li></ul></li>
+</ul>
+<h4>画信息系数 qq 图</h4>
+<pre><code class="hljs oxygene">far.plot_ic_qq(group_adjust=<span class="hljs-keyword">False</span>, <span class="hljs-function"><span class="hljs-keyword">method</span>='<span class="hljs-title">rank</span>', <span class="hljs-title">theoretical_dist</span>='<span class="hljs-title">norm</span>')
+</span></code></pre>
+<p><strong>参数：</strong></p>
+<ul>
+<li>group_adjust:<ul>
+<li>True：使用行业中性收益 (行业收益被认为是每日各个行业股票收益按照weight列中权重的加权的均值)</li>
+<li>False：不使用行业中性收益</li></ul></li>
+<li>method：<ul>
+<li>'rank'：用秩相关系数计算IC值</li>
+<li>'normal': 用相关系数计算IC值</li></ul></li>
+<li>theoretical_dist：<ul>
+<li>'norm'：正态分布</li>
+<li>'t'：t分布</li></ul></li>
+</ul>
+<h4>画各分位数平均收益图</h4>
+<pre><code class="hljs routeros">far.plot_quantile_returns_bar(<span class="hljs-attribute">by_group</span>=<span class="hljs-literal">False</span>, <span class="hljs-attribute">demeaned</span>=<span class="hljs-literal">False</span>, <span class="hljs-attribute">group_adjust</span>=<span class="hljs-literal">False</span>)
+</code></pre>
+<p><strong>参数：</strong></p>
+<ul>
+<li>by_group：<ul>
+<li>True：各行业的各分位数平均收益图</li>
+<li>False：各分位数平均收益图</li></ul></li>
+<li>demeaned:<ul>
+<li>True：使用超额收益计算累积收益 (基准收益被认为是每日所有股票收益按照weight列中权重加权的均值)</li>
+<li>False：不使用超额收益</li></ul></li>
+<li>group_adjust:<ul>
+<li>True：使用行业中性化后的收益计算累积收益 (行业收益被认为是每日各个行业股票收益按照weight列中权重加权的均值)</li>
+<li>False：不使用行业中性化后的收益</li></ul></li>
+</ul>
+<h4>画最高分位减最低分位收益图</h4>
+<pre><code class="hljs routeros">far.plot_mean_quantile_returns_spread_time_series(<span class="hljs-attribute">demeaned</span>=<span class="hljs-literal">False</span>, <span class="hljs-attribute">group_adjust</span>=<span class="hljs-literal">False</span>, <span class="hljs-attribute">bandwidth</span>=1)
+</code></pre>
+<p><strong>参数：</strong></p>
+<ul>
+<li>demeaned:<ul>
+<li>True：使用超额收益计算累积收益 (基准收益被认为是每日所有股票收益按照weight列中权重加权的均值)</li>
+<li>False：不使用超额收益</li></ul></li>
+<li>group_adjust:<ul>
+<li>True：使用行业中性化后的收益计算累积收益 (行业收益被认为是每日各个行业股票收益按照weight列中权重加权的均值)</li>
+<li>False：不使用行业中性化后的收益</li></ul></li>
+<li>bandwidth：n，加减n倍当日标准差</li>
+</ul>
+<h4>画按行业分组信息系数(IC)图</h4>
+<pre><code class="hljs oxygene">far.plot_ic_by_group(group_adjust=<span class="hljs-keyword">False</span>, <span class="hljs-function"><span class="hljs-keyword">method</span>='<span class="hljs-title">rank</span>')
+</span></code></pre>
+<p><strong>参数：</strong></p>
+<ul>
+<li>group_adjust:<ul>
+<li>True：使用行业中性收益 (行业收益被认为是每日各个行业股票收益按照weight列中权重的加权的均值)</li>
+<li>False：不使用行业中性收益</li></ul></li>
+<li>method：<ul>
+<li>'rank'：用秩相关系数计算IC值</li>
+<li>'normal': 用相关系数计算IC值</li></ul></li>
+</ul>
+<h4>画因子自相关图</h4>
+<pre><code class="hljs routeros">far.plot_factor_auto_correlation(<span class="hljs-attribute">periods</span>=None, <span class="hljs-attribute">rank</span>=<span class="hljs-literal">True</span>)
+</code></pre>
+<p><strong>参数：</strong></p>
+<ul>
+<li><p>periods: 滞后周期</p></li>
+<li><p>rank：</p>
+<ul>
+<li>True：用秩相关系数</li>
+<li>False：用相关系数</li></ul></li>
+</ul>
+<h4>画最高最低分位换手率图</h4>
+<pre><code class="hljs angelscript">far.plot_top_bottom_quantile_turnover(periods=(<span class="hljs-number">1</span>, <span class="hljs-number">3</span>, <span class="hljs-number">9</span>))
+</code></pre>
+<p><strong>参数：</strong></p>
+<ul>
+<li>periods：调仓周期</li>
+</ul>
+<h4>画月度信息系数(IC)图</h4>
+<pre><code class="hljs routeros">far.plot_monthly_ic_heatmap(<span class="hljs-attribute">group_adjust</span>=<span class="hljs-literal">False</span>)
+</code></pre>
+<p><strong>参数：</strong></p>
+<ul>
+<li>group_adjust:<ul>
+<li>True：使用行业中性收益 (行业收益被认为是每日各个行业股票收益按照weight列中权重的加权的均值)</li>
+<li>False：不使用行业中性收益
+数值越接近0，会越趋向于黄色。
+数值大于0会逐渐过渡到绿色
+数值小于0会逐渐过渡到红色</li></ul></li>
+</ul>
+<h4>画按因子值加权多空组合每日累积收益图</h4>
+<pre><code class="hljs routeros">far.plot_cumulative_returns(<span class="hljs-attribute">period</span>=1, <span class="hljs-attribute">demeaned</span>=<span class="hljs-literal">False</span>, <span class="hljs-attribute">group_adjust</span>=<span class="hljs-literal">False</span>)
+</code></pre>
+<p><strong>参数：</strong></p>
+<ul>
+<li>periods：调仓周期</li>
+<li>demeaned:
+详见 calc_factor_returns 中 demeaned 参数<ul>
+<li>True：对因子值加权组合每日收益的权重去均值 (每日权重 = 每日权重 - 每日权重的均值),使组合转换为cash-neutral多空组合</li>
+<li>False：不对权重去均值</li></ul></li>
+<li>group_adjust:
+详见 calc_factor_returns 中 group_adjust 参数<ul>
+<li>True：对权重分行业去均值 (每日权重 = 每日权重 - 每日各行业权重的均值)，使组合转换为 industry-neutral 多空组合</li>
+<li>False：不对权重分行业去均值</li></ul></li>
+</ul>
+<h4>画各分位数每日累积收益图</h4>
+<pre><code class="hljs routeros">far.plot_cumulative_returns_by_quantile(period=(1, 3, 9), <span class="hljs-attribute">demeaned</span>=<span class="hljs-literal">False</span>, <span class="hljs-attribute">group_adjust</span>=<span class="hljs-literal">False</span>)
+</code></pre>
+<p><strong>参数：</strong></p>
+<ul>
+<li>period：调仓周期</li>
+<li>demeaned:
+详见 calc_mean_return_by_quantile 中 demeaned 参数<ul>
+<li>True：使用超额收益计算累积收益 (基准收益被认为是每日所有股票收益按照weight列中权重加权的均值)</li>
+<li>False：不使用超额收益</li></ul></li>
+<li>group_adjust:
+详见 calc_mean_return_by_quantile 中 group_adjust 参数<ul>
+<li>True：使用行业中性化后的收益计算累积收益 (行业收益被认为是每日各个行业股票收益按照weight列中权重加权的均值)</li>
+<li>False：不使用行业中性化后的收益</li></ul></li>
+</ul>
+<h4>因子预测能力平均累计收益图</h4>
+<pre><code class="hljs routeros">far.plot_quantile_average_cumulative_return(<span class="hljs-attribute">periods_before</span>=5, <span class="hljs-attribute">periods_after</span>=10, <span class="hljs-attribute">by_quantile</span>=<span class="hljs-literal">False</span>, <span class="hljs-attribute">std_bar</span>=<span class="hljs-literal">False</span>, <span class="hljs-attribute">demeaned</span>=<span class="hljs-literal">False</span>, <span class="hljs-attribute">group_adjust</span>=<span class="hljs-literal">False</span>)
+</code></pre>
+<p><strong>参数：</strong></p>
+<ul>
+<li>periods_before: 计算过去的天数</li>
+<li>periods_after: 计算未来的天数</li>
+<li>by_quantile：是否各分位数分别显示因子预测能力平均累计收益图</li>
+<li>std_bar：<ul>
+<li>True：显示标准差</li>
+<li>False：不显示标准差</li></ul></li>
+<li>demeaned:
+详见 calc_mean_return_by_quantile 中 demeaned 参数<ul>
+<li>True：使用超额收益计算累积收益 (基准收益被认为是每日所有股票收益按照weight列中权重加权的均值)</li>
+<li>False：不使用超额收益</li></ul></li>
+<li>group_adjust:
+详见 calc_mean_return_by_quantile 中 group_adjust 参数<ul>
+<li>True：使用行业中性化后的收益计算累积收益 (行业收益被认为是每日各个行业股票收益按照weight列中权重加权的均值)</li>
+<li>False：不使用行业中性化后的收益</li></ul></li>
+</ul>
+<h4>画有效因子数量统计图</h4>
+<pre><code class="hljs reasonml">far.plot<span class="hljs-constructor">_events_distribution(<span class="hljs-params">num_days</span>=1)</span>
+</code></pre>
+<p><strong>参数：</strong></p>
+<ul>
+<li>num_days：统计间隔天数</li>
+</ul>
+<h4>关闭中文图例显示</h4>
+<pre><code class="hljs css"><span class="hljs-selector-tag">far</span><span class="hljs-selector-class">.plot_disable_chinese_label</span>()
+</code></pre>
+<h3 id="属性列表">属性列表</h3>
+<p>用于访问因子分析的结果，大部分为惰性属性，在访问才会计算结果并返回</p>
+<h4 id="">查看因子值</h4>
+<pre><code class="hljs stylus">far<span class="hljs-selector-class">.factor_data</span>
+</code></pre>
+<ul>
+<li>类型：pandas.Series</li>
+<li>index：为日期和股票代码的MultiIndex</li>
+</ul>
+<h4 id="naninfforward_return">去除 nan/inf，整理后的因子值、forward_return 和分位数</h4>
+<pre><code class="hljs stylus">far<span class="hljs-selector-class">.clean_factor_data</span>
+</code></pre>
+<ul>
+<li>类型：pandas.DataFrame index：为日期和股票代码的MultiIndex</li>
+<li>columns：根据period选择后的forward_return(如果调仓周期为1天，那么forward_return为[第二天的收盘价-今天的收盘价]/今天的收盘价)、因子值、行业分组、分位数数组、权重</li>
+</ul>
+<h4 id="-1">按分位数分组加权平均因子收益</h4>
+<pre><code class="hljs ceylon">far.mean<span class="hljs-number">_</span><span class="hljs-keyword">return</span><span class="hljs-number">_</span><span class="hljs-meta">by</span><span class="hljs-number">_</span>quantile
+</code></pre>
+<ul>
+<li>类型：pandas.DataFrame</li>
+<li>index：分位数分组</li>
+<li>columns：调仓周期</li>
+</ul>
+<h4 id="-2">按分位数分组加权因子收益标准差</h4>
+<pre><code class="hljs ceylon">far.mean<span class="hljs-number">_</span><span class="hljs-keyword">return</span><span class="hljs-number">_</span>std<span class="hljs-number">_</span><span class="hljs-meta">by</span><span class="hljs-number">_</span>quantile
+</code></pre>
+<ul>
+<li>类型：pandas.DataFrame</li>
+<li>index：分位数分组</li>
+<li>columns：调仓周期</li>
+</ul>
+<h4 id="-3">按分位数及日期分组加权平均因子收益</h4>
+<pre><code class="hljs ceylon">far.mean<span class="hljs-number">_</span><span class="hljs-keyword">return</span><span class="hljs-number">_</span><span class="hljs-meta">by</span><span class="hljs-number">_</span>date
+</code></pre>
+<ul>
+<li>类型：pandas.DataFrame</li>
+<li>index：为日期和分位数的MultiIndex</li>
+<li>columns：调仓周期</li>
+</ul>
+<h4 id="-4">按分位数及日期分组加权因子收益标准差</h4>
+<pre><code class="hljs ceylon">far.mean<span class="hljs-number">_</span><span class="hljs-keyword">return</span><span class="hljs-number">_</span>std<span class="hljs-number">_</span><span class="hljs-meta">by</span><span class="hljs-number">_</span>date
+</code></pre>
+<ul>
+<li>类型：pandas.DataFrame</li>
+<li>index：为日期和分位数的MultiIndex</li>
+<li>columns：调仓周期</li>
+</ul>
+<h4 id="-5">按分位数及行业分组加权平均因子收益</h4>
+<pre><code class="hljs ceylon">far.mean<span class="hljs-number">_</span><span class="hljs-keyword">return</span><span class="hljs-number">_</span><span class="hljs-meta">by</span><span class="hljs-number">_</span>group
+</code></pre>
+<ul>
+<li>类型：pandas.DataFrame</li>
+<li>index：为行业和分位数的MultiIndex</li>
+<li>columns：调仓周期</li>
+</ul>
+<h4 id="-6">按分位数及行业分组加权因子收益标准差</h4>
+<pre><code class="hljs ceylon">far.mean<span class="hljs-number">_</span><span class="hljs-keyword">return</span><span class="hljs-number">_</span>std<span class="hljs-number">_</span><span class="hljs-meta">by</span><span class="hljs-number">_</span>group
+</code></pre>
+<ul>
+<li>类型：pandas.DataFrame</li>
+<li>index：为行业和分位数的MultiIndex</li>
+<li>columns：调仓周期</li>
+</ul>
+<h4 id="-7">最高分位数因子收益减最低分位数因子收益每日均值</h4>
+<pre><code class="hljs ceylon">far.mean<span class="hljs-number">_</span><span class="hljs-keyword">return</span><span class="hljs-number">_</span>spread<span class="hljs-number">_</span><span class="hljs-meta">by</span><span class="hljs-number">_</span>quantile
+</code></pre>
+<ul>
+<li>类型：pandas.DataFrame</li>
+<li>index：日期</li>
+<li>columns：调仓周期</li>
+</ul>
+<h4 id="-8">最高分位数因子收益减最低分位数因子收益每日标准差</h4>
+<pre><code class="hljs ceylon">far.mean<span class="hljs-number">_</span><span class="hljs-keyword">return</span><span class="hljs-number">_</span>spread<span class="hljs-number">_</span>std<span class="hljs-number">_</span><span class="hljs-meta">by</span><span class="hljs-number">_</span>quantile
+</code></pre>
+<ul>
+<li>类型：pandas.DataFrame</li>
+<li>index：日期</li>
+<li>columns：调仓周期</li>
+</ul>
+<h4 id="-9">信息系数</h4>
+<pre><code class="hljs stylus">far<span class="hljs-selector-class">.ic</span>
+</code></pre>
+<ul>
+<li>类型：pandas.DataFrame</li>
+<li>index：日期</li>
+<li>columns：调仓周期</li>
+</ul>
+<h4 id="-10">分行业信息系数</h4>
+<pre><code class="hljs stylus">far<span class="hljs-selector-class">.ic_by_group</span>
+</code></pre>
+<ul>
+<li>类型：pandas.DataFrame</li>
+<li>index：行业</li>
+<li>columns：调仓周期</li>
+</ul>
+<h4 id="-11">月度信息系数</h4>
+<pre><code class="hljs stylus">far<span class="hljs-selector-class">.ic_monthly</span>
+</code></pre>
+<ul>
+<li>类型：pandas.DataFrame</li>
+<li>index：月度</li>
+<li>columns：调仓周期表</li>
+</ul>
+<h4 id="-12">换手率</h4>
+<pre><code class="hljs stylus">far<span class="hljs-selector-class">.quantile_turnover</span>
+</code></pre>
+<ul>
+<li>键：调仓周期</li>
+<li>值: pandas.DataFrame 换手率<ul>
+<li>index：日期</li>
+<li>columns：分位数分组</li></ul></li>
+</ul>
+<h4 id="-13">计算按分位数分组因子收益和标准差</h4>
+<pre><code class="hljs routeros">mean,std = far.calc_mean_return_by_quantile(<span class="hljs-attribute">by_date</span>=<span class="hljs-literal">False</span>, <span class="hljs-attribute">by_group</span>=<span class="hljs-literal">False</span>, <span class="hljs-attribute">demeaned</span>=<span class="hljs-literal">False</span>, <span class="hljs-attribute">group_adjust</span>=<span class="hljs-literal">False</span>)
+</code></pre>
+<p>因子收益为收益按照 weight 列中权重的加权平均值</p>
+<p><strong>参数：</strong></p>
+<ul>
+<li>by_date：<ul>
+<li>True: 按天计算收益</li>
+<li>False: 不按天计算收益</li></ul></li>
+<li>by_group:<ul>
+<li>True: 按行业计算收益</li>
+<li>False：不按行业计算收益</li></ul></li>
+<li>demeaned:<ul>
+<li>True: 使用超额收益计算各分位数收益，收益=收益-基准收益 (基准收益被认为是每日所有股票收益按照weight列中权重的加权的均值)</li>
+<li>False：不使用超额收益</li></ul></li>
+<li>group_adjust:<ul>
+<li>True: 使用行业中性收益计算各分位数收益，收益=收益-行业收益 (行业收益被认为是每日各个行业股票收益按照weight列中权重的加权的均值)</li>
+<li>False：不使用行业中性收益</li></ul></li>
+</ul>
+<h4 id="-14">计算按因子值加权组合每日收益</h4>
+<pre><code class="hljs routeros">far.calc_factor_returns(<span class="hljs-attribute">demeaned</span>=<span class="hljs-literal">True</span>, <span class="hljs-attribute">group_adjust</span>=<span class="hljs-literal">False</span>)
+</code></pre>
+<p>权重 = 每日因子值 / 每日因子值的绝对值的和</p>
+<p>正的权重代表买入, 负的权重代表卖出</p>
+<p><strong>参数：</strong></p>
+<ul>
+<li>demeaned:<ul>
+<li>True: 对权重去均值 (每日权重 = 每日权重 - 每日权重的均值), 使组合转换为 cash-neutral 多空组合</li>
+<li>False：不对权重去均值</li></ul></li>
+<li>group_adjust:<ul>
+<li>True：对权重分行业去均值 (每日权重 = 每日权重 - 每日各行业权重的均值)，使组合转换为 industry-neutral 多空组合</li>
+<li>False：不对权重分行业去均值</li></ul></li>
+</ul>
+<h4 id="-15">计算两个分位数相减的因子收益和标准差</h4>
+<pre><code class="hljs routeros">mean, std = far.compute_mean_returns_spread (<span class="hljs-attribute">upper_quant</span>=None, <span class="hljs-attribute">lower_quant</span>=None, <span class="hljs-attribute">by_date</span>=<span class="hljs-literal">True</span>, <span class="hljs-attribute">by_group</span>=<span class="hljs-literal">False</span>, <span class="hljs-attribute">demeaned</span>=<span class="hljs-literal">False</span>, <span class="hljs-attribute">group_adjust</span>=<span class="hljs-literal">False</span>)
+</code></pre>
+<p><strong>参数：</strong></p>
+<ul>
+<li>upper_quant：用upper_quant选择的分位数减去lower_quant选择的分位数，只能在已有的范围内选择，默认为最大分位</li>
+<li>lower_quant：用upper_quant选择的分位数减去lower_quant选择的分位数，只能在已有的范围内选择，默认为最小分位</li>
+<li>by_date：<ul>
+<li>True：按天计算两个分位数相减的因子收益和标准差</li>
+<li>False：不按天计算两个分位数相减的因子收益和标准差</li></ul></li>
+<li>by_group:<ul>
+<li>True: 分行业计算两个分位数相减的因子收益和标准差</li>
+<li>False：不分行业计算两个分位数相减的因子收益和标准差</li></ul></li>
+<li>demeaned:<ul>
+<li>True：使用超额收益计算 (基准收益被认为是每日所有股票收益按照weight列中权重的加权的均值)</li>
+<li>False：不使用超额收益</li></ul></li>
+<li>group_adjust:<ul>
+<li>True：使用行业中性收益 (行业收益被认为是每日各个行业股票收益按照weight列中权重的加权的均值)</li>
+<li>False：不使用行业中性收益</li></ul></li>
+</ul>
+<h4 id="alphabeta">计算因子的 alpha 和 beta</h4>
+<pre><code class="hljs routeros">far.calc_factor_alpha_beta(<span class="hljs-attribute">demeaned</span>=<span class="hljs-literal">True</span>, <span class="hljs-attribute">group_adjust</span>=<span class="hljs-literal">False</span>)
+</code></pre>
+<p>因子值加权组合每日收益 = beta * 市场组合每日收益 + alpha</p>
+<p>因子值加权组合每日收益计算方法见 calc_factor_returns 函数，</p>
+<p>市场组合每日收益是每日所有股票收益按照weight列中权重加权的均值，</p>
+<p>结果中的 alpha 是年化 alpha</p>
+<p><strong>参数：</strong></p>
+<ul>
+<li>demeaned:
+详见 calc_factor_returns 中 demeaned 参数<ul>
+<li>True: 对因子值加权组合每日收益权重去均值 (每日权重 = 每日权重 - 每日权重的均值),使组合转换为cash-neutral多空组合</li>
+<li>False：不对权重去均值</li></ul></li>
+<li>group_adjust:
+详见 calc_factor_returns 中 group_adjust 参数<ul>
+<li>True：对权重分行业去均值 (每日权重 = 每日权重 - 每日各行业权重的均值)，使组合转换为 industry-neutral 多空组合</li>
+<li>False：不对权重分行业去均值</li></ul></li>
+</ul>
+<h4 id="ic">计算每日因子信息系数（IC值）</h4>
+<pre><code class="hljs oxygene">far.calc_factor_information_coefficient(group_adjust=<span class="hljs-keyword">False</span>, by_group=<span class="hljs-keyword">False</span>, <span class="hljs-function"><span class="hljs-keyword">method</span>='<span class="hljs-title">rank</span>')
+</span></code></pre>
+<p><strong>参数：</strong></p>
+<ul>
+<li>group_adjust:<ul>
+<li>True：使用行业中性收益计算 IC (行业收益被认为是每日各个行业股票收益按照weight列中权重加权的均值)</li>
+<li>False：不使用行业中性收益</li></ul></li>
+<li>by_group:<ul>
+<li>True：分行业计算 IC</li>
+<li>False：不分行业计算 IC</li></ul></li>
+<li>method：<ul>
+<li>'rank'：用秩相关系数计算IC值</li>
+<li>'normal'：用普通相关系数计算IC值</li></ul></li>
+</ul>
+<h4 id="ic-1">计算因子信息系数均值（IC值均值）</h4>
+<pre><code class="hljs oxygene">far.calc_mean_information_coefficient(group_adjust=<span class="hljs-keyword">False</span>, by_group=<span class="hljs-keyword">False</span>, by_time=None, <span class="hljs-function"><span class="hljs-keyword">method</span>='<span class="hljs-title">rank</span>')
+</span></code></pre>
+<p><strong>参数：</strong></p>
+<ul>
+<li>group_adjust:<ul>
+<li>True：使用行业中性收益计算 IC (行业收益被认为是每日各个行业股票收益按照weight列中权重加权的均值)</li>
+<li>False：不使用行业中性收益</li></ul></li>
+<li>by_group:<ul>
+<li>True：分行业计算 IC</li>
+<li>False：不分行业计算 IC</li></ul></li>
+<li>by_time：<ul>
+<li>'Y'：按年求均值</li>
+<li>'M'：按月求均值</li>
+<li>None：对所有日期求均值</li></ul></li>
+<li>method：<ul>
+<li>'rank'：用秩相关系数计算IC值</li>
+<li>'normal'：用普通相关系数计算IC值</li></ul></li>
+</ul>
+<h4 id="-16">按照当天的分位数算分位数未来和过去的收益均值和标准差</h4>
+<pre><code class="hljs routeros">far.calc_average_cumulative_return_by_quantile(<span class="hljs-attribute">periods_before</span>=5, <span class="hljs-attribute">periods_after</span>=15, <span class="hljs-attribute">demeaned</span>=<span class="hljs-literal">False</span>, <span class="hljs-attribute">group_adjust</span>=<span class="hljs-literal">False</span>)
+</code></pre>
+<p><strong>参数：</strong></p>
+<ul>
+<li>periods_before：计算过去的天数</li>
+<li>periods_after：计算未来的天数</li>
+<li>demeaned：是否使用超额收益计算累积收益 (基准收益被认为是每日所有股票收益按照weight列中权重加权的均值)</li>
+<li>group_adjust：是否使用行业中性化后的收益计算累积收益 (行业收益被认为是每日各个行业股票收益按照weight列中权重加权的均值)</li>
+</ul>
+<h4 id="-17">计算指定调仓周期的各分位数每日累积收益</h4>
+<pre><code class="hljs ceylon">far.calc<span class="hljs-number">_</span>cumulative<span class="hljs-number">_</span><span class="hljs-keyword">return</span><span class="hljs-number">_</span><span class="hljs-meta">by</span><span class="hljs-number">_</span>quantile(period=<span class="hljs-number">5</span>)
+</code></pre>
+<p><strong>参数：</strong></p>
+<ul>
+<li>period：指定调仓周期</li>
+</ul>
+<h4 id="-18">计算指定调仓周期的按因子值加权组合每日累积收益</h4>
+<pre><code class="hljs routeros">far.calc_cumulative_returns(<span class="hljs-attribute">period</span>=5, <span class="hljs-attribute">demeaned</span>=<span class="hljs-literal">False</span>, <span class="hljs-attribute">group_adjust</span>=<span class="hljs-literal">False</span>)
+</code></pre>
+<p>当 调仓周期 period &gt; 1 时，组合的累积收益计算方法为：</p>
+<p>组合每日收益 = （从第0天开始每period天一调仓的组合每日收益 + 从第1天开始每period天一调仓的组合每日收益 + … +
+从第period-1天开始每period天一调仓的组合每日收益) / period</p>
+<p>组合累积收益 = 组合每日收益的累积</p>
+<p><strong>参数：</strong></p>
+<ul>
+<li>period：指定调仓周期</li>
+<li>demeaned:
+详见 calc_factor_returns 中 demeaned 参数<ul>
+<li>True：对权重去均值 (每日权重 = 每日权重 - 每日权重的均值), 使组合转换为 cash-neutral 多空组合</li>
+<li>False：不对权重去均值</li></ul></li>
+<li>group_adjust:
+详见 calc_factor_returns 中 group_adjust 参数<ul>
+<li>True：对权重分行业去均值 (每日权重 = 每日权重 - 每日各行业权重的均值)，使组合转换为 industry-neutral 多空组合</li>
+<li>False：不对权重分行业去均值</li></ul></li>
+</ul>
+<h4 id="-19">计算做多最大分位，做空最小分位组合每日累积收益</h4>
+<pre><code class="hljs routeros">far.calc_top_down_cumulative_returns(<span class="hljs-attribute">period</span>=5, <span class="hljs-attribute">demeaned</span>=<span class="hljs-literal">False</span>, <span class="hljs-attribute">group_adjust</span>=<span class="hljs-literal">False</span>)
+</code></pre>
+<p>当 调仓周期 period &gt; 1 时，组合的累积收益计算方法 见 calc_cumulative_returns</p>
+<p><strong>参数：</strong></p>
+<ul>
+<li>period：指定调仓周期</li>
+<li>demeaned:
+详见 calc_mean_return_by_quantile 中 demeaned 参数<ul>
+<li>True：使用超额收益计算累积收益 (基准收益被认为是每日所有股票收益按照weight列中权重加权的均值)</li>
+<li>False：不使用超额收益</li></ul></li>
+<li>group_adjust:
+详见 calc_mean_return_by_quantile 中 group_adjust 参数<ul>
+<li>True：使用行业中性化后的收益计算累积收益 (行业收益被认为是每日各个行业股票收益按照weight列中权重加权的均值)</li>
+<li>False：不使用行业中性化后的收益</li></ul></li>
+</ul>
+<h4 id="-20">根据调仓周期确定滞后期的每天计算因子自相关性</h4>
+<pre><code class="hljs routeros">far.calc_autocorrelation(<span class="hljs-attribute">rank</span>=<span class="hljs-literal">True</span>)
+</code></pre>
+<p>当日因子值和滞后period天的因子值的自相关性</p>
+<p><strong>参数：</strong></p>
+<ul>
+<li>rank：<ul>
+<li>True：秩相关系数</li>
+<li>False：普通相关系数</li></ul></li>
+</ul>
+<h4 id="1n">滞后1-n天因子值自相关性均值</h4>
+<pre><code class="hljs reasonml">far.calc<span class="hljs-constructor">_autocorrelation_n_days_lag(<span class="hljs-params">n</span>=9,<span class="hljs-params">rank</span>=True)</span>
+</code></pre>
+<p><strong>参数：</strong></p>
+<ul>
+<li>n：滞后1天到n天的因子值自相关性</li>
+<li>rank：<ul>
+<li>True：秩相关系数</li>
+<li>False：普通相关系数</li></ul></li>
+</ul>
+<h4 id="1n-1">各分位数滞后1天到n天的换手率均值</h4>
+<pre><code class="hljs reasonml">far.calc<span class="hljs-constructor">_quantile_turnover_mean_n_days_lag(<span class="hljs-params">n</span>=10)</span>
+</code></pre>
+<p><strong>参数：</strong></p>
+<ul>
+<li>n: 滞后1天到n天的换手率</li>
+</ul>
+<h4 id="0nic">滞后 0 - n 天因子收益信息系数(IC)的均值</h4>
+<pre><code class="hljs oxygene">far.calc_ic_mean_n_days_lag(n=<span class="hljs-number">10</span>,group_adjust=<span class="hljs-keyword">False</span>,by_group=<span class="hljs-keyword">False</span>,<span class="hljs-function"><span class="hljs-keyword">method</span>=<span class="hljs-title">None</span>)
+</span></code></pre>
+<p>滞后 n 天 IC 表示使用当日因子值和滞后 n 天的因子收益计算 IC</p>
+<p><strong>参数：</strong></p>
+<ul>
+<li>n：滞后0-n天因子收益的信息系数(IC)的均值</li>
+<li>group_adjust:<ul>
+<li>True：使用行业中性收益计算 IC (行业收益被认为是每日各个行业股票收益按照weight列中权重加权的均值)</li>
+<li>False：不使用行业中性收益</li></ul></li>
+<li>by_group：<ul>
+<li>True：分行业计算 IC</li>
+<li>False：不分行业计算 IC</li></ul></li>
+<li>method：<ul>
+<li>'rank'：用秩相关系数计算IC值</li>
+<li>'normal'：用普通相关系数计算IC值</li></ul></li>
+</ul>
+<h2 id="因子分析结果">因子分析结果</h2>
+
+<h3 id="收益分析">收益分析</h3>
+<p>在收益分析中, 分位数的平均收益， 各分位数的累积收益， 以及分位数的多空组合收益三方面观察因子的表现。
+第一分位数的因子值最小， 第五分位数的因子值最大。</p>
+<ol>
+<li>分位数收益： 表示持仓1、5、10天后，各分位数可以获得的平均收益。</li>
+<li>分位数的累积收益： 表示各分位数持仓收益的累计值。</li>
+<li>多空组合收益： 做多五分位（因子值最大）， 做空一分位（因子值最小）的投资组合的收益。</li>
+</ol>
+<h3 id="IC分析">IC 分析</h3>
+<p>IC 是 information coefficient 的缩写。IC 代表了预测值和实现值之间的相关性， 通常用以评价预测能力。 取值在-1到1之间， 绝对值越大， 表示预测能力越好。</p>
+<p>IC 的计算， 一般有两种方法， normal IC 与 rank IC。 我们计算的是rank IC.</p>
+<ul>
+<li><p>normal IC： 因子载荷与因子收益之间的相关系数</p></li>
+<li><p>rank IC： 因子载荷的排序值与收益的排序值之间的相关系数</p></li>
+<li><p>详情：<a href="#normal_rank_IC">normal IC 与 rank IC 的区别</a></p>
+<p>同时考虑到单日 IC 的波动较大， 我们提供了 IC 的月度移动平均线作为参考。 </p></li>
+</ul>
+<h3 id="换手率分析">换手率分析</h3>
+<p>因子的换手率是在不同的时间周期下， 观察因子个分位中个股的进出情况。
+计算方法举例：
+某因子第一分位持有的股票数量为30支， 一天后有一只发生变动， 换手率为： 1/30 *100% = 3.33%
+对于5日、10日的换手率，在每日都会对比当日1、5分位数的成分股与5日、10日前该分位数的成分股的变化进行计算。</p>
+<p>因子分位数换手率的价值体现在两个方面：</p>
+<ol>
+<li>因子稳定性的体现：换手率低的因子，因子值在时间序列层面的持续性更好</li>
+<li>衡量交易成本：在实际的交易过程中， 假设我们要维护投资组合的因子暴露恒定， 对于高换手率因子， 则需要进行更多的交易。 交易中的税费和滑点， 也会吞噬掉我们的部分利润。</li>
+</ol>
+<h2 id="示例">示例</h2>
+
+<h3 id="『价量』alpha191中的013">『价量』alpha 191 中的 013</h3>
+<p><strong>因子链接</strong></p>
+<ul>
+<li><a href="/data/dict/alpha191#alpha013">alpha_013</a></li>
+</ul>
+<p><strong>因子公式</strong></p>
+<ul>
+<li>(((HIGH*LOW)^0.5)-VWAP)</li>
+</ul>
+<p><strong>因子实现</strong></p>
+<pre><code class="python language-python hljs"><span class="hljs-keyword">from</span> jqfactor <span class="hljs-keyword">import</span> Factor
+<span class="hljs-keyword">import</span> numpy <span class="hljs-keyword">as</span> np 
+
+<span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">ALPHA013</span><span class="hljs-params">(Factor)</span>:</span>
+    <span class="hljs-comment"># 设置因子名称</span>
+    name = <span class="hljs-string">'alpha013'</span>
+    <span class="hljs-comment"># 设置获取数据的时间窗口长度</span>
+    max_window = <span class="hljs-number">1</span>
+    <span class="hljs-comment"># 设置依赖的数据</span>
+    dependencies = [<span class="hljs-string">'high'</span>,<span class="hljs-string">'low'</span>,<span class="hljs-string">'volume'</span>,<span class="hljs-string">'money'</span>]
+
+    <span class="hljs-comment"># 计算因子的函数， 需要返回一个 pandas.Series, index 是股票代码，value 是因子值</span>
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">calc</span><span class="hljs-params">(self, data)</span>:</span>
+
+    <span class="hljs-comment"># 最高价的 dataframe ， index 是日期， column 是股票代码</span>
+        high = data[<span class="hljs-string">'high'</span>]
+
+        <span class="hljs-comment"># 最低价的 dataframe ， index 是日期， column 是股票代码</span>
+        low = data[<span class="hljs-string">'low'</span>]
+
+        <span class="hljs-comment">#计算 vwap</span>
+        vwap = data[<span class="hljs-string">'money'</span>]/data[<span class="hljs-string">'volume'</span>]
+
+        <span class="hljs-comment"># 返回因子值， 这里求平均值是为了把只有一行的 dataframe 转成 series</span>
+        <span class="hljs-keyword">return</span> (np.power(high*low,<span class="hljs-number">0.5</span>) - vwap).mean()
+</code></pre>
+<h3 id="『基本面』grossprofitability">『基本面』gross profitability</h3>
+<p><strong>参考链接</strong></p>
+<ul>
+<li><a href="https://www.joinquant.com/post/6585?tag=algorithm">首席质量因子 - Gross Profitability -- 小兵哥</a></li>
+</ul>
+<p><strong>因子公式</strong></p>
+<ul>
+<li>(total_operating_revenue - total_operating_cost) / total_assets</li>
+</ul>
+<p><strong>因子实现</strong></p>
+<pre><code class="python language-python hljs"><span class="hljs-keyword">from</span> jqfactor <span class="hljs-keyword">import</span> Factor
+
+<span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">GROSSPROFITABILITY</span><span class="hljs-params">(Factor)</span>:</span>
+    <span class="hljs-comment"># 设置因子名称</span>
+    name = <span class="hljs-string">'gross_profitability'</span>
+    <span class="hljs-comment"># 设置获取数据的时间窗口长度</span>
+    max_window = <span class="hljs-number">1</span>
+    <span class="hljs-comment"># 设置依赖的数据</span>
+    <span class="hljs-comment"># 在策略中需要使用 get_fundamentals 获取的 income.total_operating_revenue, 在这里可以直接写做total_operating_revenue。 其他数据同理。</span>
+    dependencies = [<span class="hljs-string">'total_operating_revenue'</span>,<span class="hljs-string">'total_operating_cost'</span>,<span class="hljs-string">'total_assets'</span>]
+
+    <span class="hljs-comment"># 计算因子的函数， 需要返回一个 pandas.Series, index 是股票代码，value 是因子值</span>
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">calc</span><span class="hljs-params">(self, data)</span>:</span>
+        <span class="hljs-comment"># 获取单季度的营业总收入数据 , index 是日期，column 是股票代码， value 是营业总收入</span>
+        total_operating_revenue = data[<span class="hljs-string">'total_operating_revenue'</span>]
+        <span class="hljs-comment"># 获取单季度的营业总成本数据</span>
+        total_operating_cost = data[<span class="hljs-string">'total_operating_cost'</span>]
+        <span class="hljs-comment"># 获取总资产</span>
+        total_assets = data[<span class="hljs-string">'total_assets'</span>]
+        <span class="hljs-comment"># 计算 gross_profitability</span>
+        gross_profitability = (total_operating_revenue - total_operating_cost)/total_assets
+        <span class="hljs-comment"># 由于 gross_profitability 是一个一行 n 列的 dataframe，可以直接求 mean 转成 series</span>
+        <span class="hljs-keyword">return</span> gross_profitability.mean()
+</code></pre>
+<h3 id="『中性化』产权比率">『中性化』产权比率</h3>
+<p><strong>因子公式</strong></p>
+<ul>
+<li>负债合计/归属母公司所有者权益合计</li>
+</ul>
+<p><strong>因子实现</strong></p>
+<pre><code class="python language-python hljs"><span class="hljs-keyword">from</span> jqfactor <span class="hljs-keyword">import</span> Factor
+<span class="hljs-keyword">import</span> numpy <span class="hljs-keyword">as</span> np
+<span class="hljs-keyword">import</span> pandas <span class="hljs-keyword">as</span> pd
+
+<span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">DebtEquityRatio</span><span class="hljs-params">(Factor)</span>:</span>
+    name = <span class="hljs-string">'debt_to_equity_ratio'</span>
+    max_window = <span class="hljs-number">1</span>
+    dependencies = [<span class="hljs-string">'total_liability'</span>,<span class="hljs-string">'equities_parent_company_owners'</span>,
+                    <span class="hljs-comment"># 以下为中性化需要使用的数据</span>
+                    <span class="hljs-string">'market_cap'</span>,
+                    <span class="hljs-string">'HY001'</span>,<span class="hljs-string">'HY002'</span>,<span class="hljs-string">'HY003'</span>,
+                    <span class="hljs-string">'HY004'</span>,<span class="hljs-string">'HY005'</span>,<span class="hljs-string">'HY006'</span>,
+                    <span class="hljs-string">'HY007'</span>,<span class="hljs-string">'HY008'</span>,<span class="hljs-string">'HY009'</span>,
+                    <span class="hljs-string">'HY010'</span>,<span class="hljs-string">'HY011'</span>]
+
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">calc</span><span class="hljs-params">(self, data)</span>:</span>
+        tl = data[<span class="hljs-string">'total_liability'</span>]
+        epco = data[<span class="hljs-string">'equities_parent_company_owners'</span>]
+        result = tl / epco
+        <span class="hljs-keyword">return</span> neutralization(data, result.mean())
+
+<span class="hljs-comment"># 行业市值中性化</span>
+<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">neutralization</span><span class="hljs-params">(data, factor)</span>:</span>
+    <span class="hljs-keyword">from</span> statsmodels.api <span class="hljs-keyword">import</span> OLS
+    industry_exposure = pd.DataFrame(index=data[<span class="hljs-string">'HY001'</span>].columns)
+    industry_list = [<span class="hljs-string">'HY001'</span>,<span class="hljs-string">'HY002'</span>,<span class="hljs-string">'HY003'</span>,<span class="hljs-string">'HY004'</span>,<span class="hljs-string">'HY005'</span>,
+                    <span class="hljs-string">'HY006'</span>,<span class="hljs-string">'HY007'</span>,<span class="hljs-string">'HY008'</span>,<span class="hljs-string">'HY009'</span>,<span class="hljs-string">'HY010'</span>,<span class="hljs-string">'HY011'</span>]
+    <span class="hljs-keyword">for</span> key, value <span class="hljs-keyword">in</span> data.items():
+        <span class="hljs-keyword">if</span> key <span class="hljs-keyword">in</span> industry_list:
+            industry_exposure[key]=value.iloc[<span class="hljs-number">-1</span>]
+    market_cap_exposure = data[<span class="hljs-string">'market_cap'</span>].iloc[<span class="hljs-number">-1</span>]
+    total_exposure = pd.concat([market_cap_exposure,industry_exposure],axis=<span class="hljs-number">1</span>)
+    result = OLS(factor, total_exposure, missing=<span class="hljs-string">'drop'</span>).fit().resid
+    <span class="hljs-keyword">return</span> result
+</code></pre>
+<h3 id="『指数』近10日alpha">『指数』近10日 alpha</h3>
+<p><strong>因子公式</strong></p>
+<ul>
+<li>个股近10日收益 - 指数（沪深300）近10日收益
+近10日收益计算方法： (第10日价格/第1日价格) - 1</li>
+</ul>
+<p><strong>因子实现</strong></p>
+<pre><code class="python language-python hljs"><span class="hljs-keyword">from</span> jqfactor <span class="hljs-keyword">import</span> Factor
+
+<span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Hs300Alpha</span><span class="hljs-params">(Factor)</span>:</span>
+    <span class="hljs-comment"># 设置因子名称</span>
+    name = <span class="hljs-string">'hs300_alpha'</span>
+    <span class="hljs-comment"># 设置获取数据的时间窗口长度</span>
+    max_window = <span class="hljs-number">10</span>
+    <span class="hljs-comment"># 设置依赖的数据</span>
+    dependencies = [<span class="hljs-string">'close'</span>]
+
+    <span class="hljs-comment"># 计算因子的函数， 需要返回一个 pandas.Series, index 是股票代码，value 是因子值</span>
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">calc</span><span class="hljs-params">(self, data)</span>:</span>
+        <span class="hljs-comment"># 获取个股的收盘价数据</span>
+        close = data[<span class="hljs-string">'close'</span>]
+        <span class="hljs-comment"># 计算个股近10日收益</span>
+        stock_return = close.iloc[<span class="hljs-number">-1</span>,:]/close.iloc[<span class="hljs-number">0</span>,:] <span class="hljs-number">-1</span>
+        <span class="hljs-comment"># 获取指数（沪深300）的收盘价数据</span>
+        index_close = self._get_extra_data(securities=[<span class="hljs-string">'000300.XSHG'</span>], fields=[<span class="hljs-string">'close'</span>])[<span class="hljs-string">'close'</span>]
+        <span class="hljs-comment"># 计算指数的近10日收益</span>
+        index_return = index_close.iat[<span class="hljs-number">-1</span>,<span class="hljs-number">0</span>]/index_close.iat[<span class="hljs-number">0</span>,<span class="hljs-number">0</span>] - <span class="hljs-number">1</span>
+        <span class="hljs-comment"># 计算 alpha</span>
+        alpha = stock_return - index_return
+        <span class="hljs-keyword">return</span> alpha
+</code></pre>
+<h3 id="『基本面』近两年净利润增长率">『基本面』近两年净利润增长率</h3>
+<p><strong>因子公式</strong></p>
+<ul>
+<li>最新一年度的净利润/上一年度的净利润 -1</li>
+</ul>
+<p><strong>因子实现</strong></p>
+<pre><code class="python language-python hljs"><span class="hljs-keyword">from</span> jqfactor <span class="hljs-keyword">import</span> Factor
+
+<span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">NetProfitGrowth</span><span class="hljs-params">(Factor)</span>:</span>
+    <span class="hljs-comment"># 设置因子名称</span>
+    name = <span class="hljs-string">'net_profit_growth_rate'</span>
+    <span class="hljs-comment"># 设置获取数据的时间窗口长度</span>
+    max_window = <span class="hljs-number">1</span>
+    <span class="hljs-comment"># 设置依赖的数据</span>
+    dependencies = [<span class="hljs-string">'net_profit_y'</span>,<span class="hljs-string">'net_profit_y1'</span>]
+
+    <span class="hljs-comment"># 计算因子的函数， 需要返回一个 pandas.Series, index 是股票代码，value 是因子值</span>
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">calc</span><span class="hljs-params">(self, data)</span>:</span>
+        <span class="hljs-comment"># 个股最新一年度的净利润数据</span>
+        net_profit_y = data[<span class="hljs-string">'net_profit_y'</span>]
+        <span class="hljs-comment"># 个股最新一年度的上一年的净利润数据</span>
+        net_profit_y1 = data[<span class="hljs-string">'net_profit_y1'</span>]
+        <span class="hljs-comment"># 计算增长率</span>
+        growth = net_profit_y/net_profit_y1 - <span class="hljs-number">1</span>
+        <span class="hljs-comment"># 返回一个 series</span>
+        <span class="hljs-keyword">return</span> growth.mean()
+</code></pre>
+<h3 id="『多季度』资产回报率">『多季度』 资产回报率</h3>
+<p><strong>因子公式</strong></p>
+<ul>
+<li>过去四个季度的净利润之和/期末总资产</li>
+</ul>
+<p><strong>因子实现</strong></p>
+<pre><code class="python language-python hljs"><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">ROATTM</span><span class="hljs-params">(Factor)</span>:</span>
+    name = <span class="hljs-string">'roa_ttm'</span>
+    max_window = <span class="hljs-number">1</span>
+    <span class="hljs-comment"># 定义依赖的数据： 过去四个季度的净利润， 以及最新一个季度的总资产</span>
+    dependencies = [<span class="hljs-string">'net_profit'</span>, <span class="hljs-string">'net_profit_1'</span>, <span class="hljs-string">'net_profit_2'</span>, <span class="hljs-string">'net_profit_3'</span>,
+                    <span class="hljs-string">'total_assets'</span>]
+
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">calc</span><span class="hljs-params">(self, data)</span>:</span>
+        <span class="hljs-comment"># 计算净利润的 ttm 值</span>
+        net_profit_ttm = data[<span class="hljs-string">'net_profit'</span>] + data[<span class="hljs-string">'net_profit_1'</span>] + data[<span class="hljs-string">'net_profit_2'</span>] + data[<span class="hljs-string">'net_profit_3'</span>]
+        <span class="hljs-comment"># 计算 ROA</span>
+        result = net_profit_ttm / data[<span class="hljs-string">'total_assets'</span>]
+        <span class="hljs-comment"># 把结果转成一个 series</span>
+        <span class="hljs-keyword">return</span> result.mean()
+</code></pre>
+<h3 id="构建因子数据进行单因子分析">构建因子数据进行单因子分析</h3>
+<p>前面的例子讲述了通过自定义类实现因子，本例讲解如何直接获取因子数据或者构建因子数据，然后对得到的数据进行单因子分析。<br>
+其中的factor_data数据需要自己获取，并整理成符合因子分析要求的格式。<br>
+更多关于factor_data数据格式请查看单因子分析框架<a href="https://github.com/JoinQuant/jqfactor_analyzer">jqfactor_analyzer</a></p>
+<pre><code class="python language-python hljs"><span class="hljs-comment"># 载入函数库</span>
+<span class="hljs-keyword">from</span> jqfactor <span class="hljs-keyword">import</span> analyze_factor
+<span class="hljs-keyword">from</span> jqdata <span class="hljs-keyword">import</span> *
+<span class="hljs-keyword">from</span> jqlib <span class="hljs-keyword">import</span> alpha191
+<span class="hljs-keyword">import</span> pandas <span class="hljs-keyword">as</span> pd
+<span class="hljs-keyword">import</span> warnings
+warnings.filterwarnings(<span class="hljs-string">"ignore"</span>)
+
+<span class="hljs-comment"># 测试开始时间</span>
+start_date = <span class="hljs-string">'2019-10-01'</span>
+<span class="hljs-comment"># 测试结束时间</span>
+end_date = <span class="hljs-string">'2019-11-11'</span>
+<span class="hljs-comment"># 测试时间区间的交易日</span>
+date_list = get_trade_days(start_date=start_date, end_date=end_date)
+<span class="hljs-comment"># 转换交易日时间的数据类型</span>
+<span class="hljs-comment"># date_list = [date.strftime('%Y-%m-%d') for date in date_list]</span>
+
+<span class="hljs-comment"># 获取一段时间股票池191因子数据</span>
+factor_data = {}
+<span class="hljs-comment"># 循环获取每天数据</span>
+<span class="hljs-keyword">for</span> date <span class="hljs-keyword">in</span> date_list:
+    <span class="hljs-comment"># 获取每天的股票池</span>
+    universe = get_index_stocks(<span class="hljs-string">'000300.XSHG'</span>, date=date)
+    <span class="hljs-comment"># 获取每天股票池的因子数据</span>
+    _factor_data = alpha191.alpha_002(code=universe, end_date=date, fq=<span class="hljs-string">'post'</span>)
+    <span class="hljs-comment"># 添加每天的因子数据</span>
+    factor_data[date] = _factor_data
+
+<span class="hljs-comment"># 将字典类型数据转换为DataFrame</span>
+factor_data = pd.DataFrame(factor_data).T
+<span class="hljs-comment"># 将 index 转换为 DatetimeIndex</span>
+factor_data.index = pd.to_datetime(factor_data.index)
+
+<span class="hljs-comment"># 对因子进行分析，参数使用默认值</span>
+far = analyze_factor(factor=factor_data, )
+<span class="hljs-comment"># 展示全部分析</span>
+far.create_full_tear_sheet(demeaned=<span class="hljs-keyword">False</span>, group_adjust=<span class="hljs-keyword">False</span>, by_group=<span class="hljs-keyword">False</span>, turnover_periods=<span class="hljs-keyword">None</span>, 
+                           avgretplot=(<span class="hljs-number">5</span>, <span class="hljs-number">15</span>), std_bar=<span class="hljs-keyword">False</span>)
+</code></pre>
+<h3 id="多因子参考资料">多因子参考资料</h3>
+<ol>
+<li>《主动投资组合管理》 英文版的名称是"Active Portfolio Management" </li>
+<li>Quantitative Equity Portfolio Management -- An Active Approach to Portfolio Construction and Management</li>
+<li>Quantitative Equity Portfolio Management -- Modern Techniques and Applications</li>
+<li>Barra Risk Model Handbook</li>
+</ol>
+<h2 id="附录">附录</h2>
+
+<h3 id="normalIC与rankIC的区别">normal IC 与 rank IC 的区别</h3>
+<p><span></span></p>
+<h4>1、normal IC</h4>
+<p>IC（Information coefficient 信息系数)的定义：t期的因子载荷（因子值）和t+1期的因子收益之间的相关系数。</p>
+<p>举个例子：</p>
+<p>因子：Variance20 20日收益方差</p>
+<p>股票池：000001.XSHE(平安银行)、000002.XSHE(万科A)、000060.XSHE(中金岭南)、000063.XSHE(中兴通讯)、000069.XSHE(华侨城A)</p>
+<p>日期：2018年1月2日</p>
+<table>
+<thead>
+<tr>
+<th>股票代码</th>
+<th>因子值</th>
+<th>下期股票收益</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>000001.XSHE</td>
+<td>0.120140</td>
+<td>-0.0267</td>
+</tr>
+<tr>
+<td>000002.XSHE</td>
+<td>0.105666</td>
+<td>-0.0070</td>
+</tr>
+<tr>
+<td>000060.XSHE</td>
+<td>0.07945</td>
+<td>-0.0547</td>
+</tr>
+<tr>
+<td>000063.XSHE</td>
+<td>0.237343</td>
+<td>0.0269</td>
+</tr>
+<tr>
+<td>000069.XSHE</td>
+<td>0.134598</td>
+<td>0.0057</td>
+</tr>
+</tbody>
+</table>
+<p>(注：下期股票收益为股票下一交易日的涨幅)</p>
+<p>可以求IC得两个必要条件就是求到因子值和下一期的股票收益，我们对这两列求相关系数就可以得到该因子在当前股票池范围内的IC值，值为0.8505（由于上表中的股票池极少，导致了求得的IC值比较高）。我们对每一天都求一个IC值就可以得到IC值得时间序列图，单日IC值得波动是比较大的，所以提供了IC的月度移动平均线作为参考，而因子的有效性也是通过IC值均值来判断，当IC值均值大于0.03，可以说该因子是有效因子。</p>
+<p>注：当样本股票过少时，IC是没有统计意义的，在对因子做有效性分析时，要保证至少有100只股票，IC才有意义。</p>
+<h4>2、rank IC</h4>
+<p>rank IC和IC唯一的不同点就是在求相关系数时，换成秩相关系数，即：
+rank IC： t 期的因子载荷（因子值）的排序值和 t+1 期的因子收益的排序值之间的相关系数。</p>
+<p>举个例子：</p>
+<table>
+<thead>
+<tr>
+<th>股票代码</th>
+<th>因子值</th>
+<th>因子值排名</th>
+<th>下期股票收益</th>
+<th>下期股票收益排名</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>000001.XSHE</td>
+<td>0.120140</td>
+<td>3</td>
+<td>-0.0267</td>
+<td>2</td>
+</tr>
+<tr>
+<td>000002.XSHE</td>
+<td>0.105666</td>
+<td>2</td>
+<td>-0.0070</td>
+<td>3</td>
+</tr>
+<tr>
+<td>000060.XSHE</td>
+<td>0.07945</td>
+<td>1</td>
+<td>-0.0547</td>
+<td>1</td>
+</tr>
+<tr>
+<td>000063.XSHE</td>
+<td>0.237343</td>
+<td>5</td>
+<td>0.0269</td>
+<td>5</td>
+</tr>
+<tr>
+<td>000069.XSHE</td>
+<td>0.134598</td>
+<td>4</td>
+<td>0.0057</td>
+<td>4</td>
+</tr>
+</tbody>
+</table>
+<p>(注：下期股票收益为股票下一交易日的涨幅)</p>
+<p>IC值是对因子值和下期股票收益求相关系数，而rank IC值是对因子值排名和下期股票收益排名求相关系数，值为0.8999。</p>
+<p>现在更多的人选择用rank IC来代替普通的IC，这是因为普通的IC求相关系数有一个前提条件，就是数据要服从正态分布，但金融类数据往往并不如此，所以现在更多人采用秩相关系数也就是rank IC来判断因子的有效性。</p>
+<h3 id="常见问题或报错">常见问题或报错</h3>
+<h3 id="valueerrornoobjectstoconcatenate">ValueError: No objects to concatenate</h3>
+<p>检查下得到的因子数据索引的数据类型是否正常，index为日期的DatetimeIndex;可以使用pandas的to_datetime方法转换；</p>
+<h3 id="dataframe">将自有因子值转换成 DataFrame 格式的数据</h3>
+<p><a href="https://github.com/JoinQuant/jqfactor_analyzer">将自有因子值转换成 DataFrame 格式的数据</a></p></div> </div> </div> <script type="text/template" id="treeTemp"> <li class="am-tree-branch am-hide" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder"></span>
+        <span class="am-tree-label"></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader" role="alert"><span class="doc-loading"></span></div>
+  </li>
+  <li class="am-tree-item am-hide" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item"></span>
+      <span class="am-tree-label"></span>
+    </button>
+  </li> </script></div> <div id="leftsead" class="jq-leftsead" draggable="true"> <ul><li class="qiyukf__entry backtotop-popover "> <div class="popover-content" style="width:85px;margin-left:-95px;margin-top:5px">在线客服</div> </li> <li class="backtotop__progress hidden"> <span class="backtotop__progress-count hidden"></span> <div class="backtotop__record-container hidden"></div> </li> <li class="newUser backtotop__newUser hidden backtotop__scroll"> <a href="/post/24debe6786302edc2febfc09b1312a6c" target="_blank"></a> </li> <li class="toTop backtotop__toTop hidden backtotop__scroll" id="top_btn"></li> </ul> <input type="hidden" class="timeStamp" value="17679309750001783575403239"> <input type="hidden" class="js-cdn-path" value="https://cdn.joinquant.com"> </div> <script src="https://cdn.joinquant.com/std/dist/asset/vendor.js?v=17679309750001783575403239"></script> <script>window.tokenData={name:"token",value:"a244ed8dc4e3ed0a3081e6d7977b06ebd2d572ffbdbec91d533d81840368dd5e5b5dba38b3c73ab6d125dc7dd99f06ce"},$.ajaxSetup({data:{token:window.tokenData.value}})</script> <script src="https://cdn.joinquant.com/std/dist/asset/jq-plugin.js?v=17679309750001783575403239"></script> <script src="https://cdn.joinquant.com/std/dist/asset/general/login-dialog.bundle.js?v=17679309750001783575403239"></script> <script src="https://cdn.joinquant.com/std/dist/asset/general/message.bundle.js?v=17679309750001783575403239"></script> <script src="https://cdn.joinquant.com/std/dist/asset/general/wechat-share.bundle.js?v=17679309750001783575403239"></script> <input type="hidden" id="valid-code__token"><script src="https://cdn.joinquant.com/themes/jq/static/dist/asset/general/include.bundle.js?v=17679309750001783575403239"></script> <script src="https://cdn.joinquant.com/themes/jq/static/dist/asset/general/backtotop.bundle.js?v=17679309750001783575403239"></script> <script>!function(c,e,d,n,t){c[d]=c[d]||function(){(c[d].a=c[d].a||[]).push(arguments)},(t=e.createElement("script")).async=!0,t.src="https://qiyukf.com/script/d65beefd7552d92ee02344b3cc6173de.js",e.body.appendChild(t)}(window,document,"ysf")</script><script async="" src="https://qiyukf.com/script/d65beefd7552d92ee02344b3cc6173de.js"></script> <script charset="UTF-8" src="https://cdn.joinquant.com/std/third/MathJax-master/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script> <script charset="UTF-8" src="https://cdn.joinquant.com/std/dist/modules/help/api/help.bundle.js?v=17679309750001783575403239"></script><script src="https://cdn.joinquant.com/themes/jq/static/third/transition-notice.js"></script> <script charset="UTF-8">MathJax.Hub.Config({tex2jax:{inlineMath:[["$","$"],["\\(","\\)"]]}})</script>   <div style="top: 0px; left: 0px; visibility: hidden; position: absolute; width: 1px; height: 1px;"><iframe style="height:0px; width:0px;" src="https://qiyukf.com/webapi/sdkres/delegate.html?k=d65beefd7552d92ee02344b3cc6173de&amp;1784374713198"></iframe></div><div id="YSF-BTN-HOLDER" style="display: none;"><div id="YSF-CUSTOM-ENTRY-0" class="YSF-CUSTOM-ENTRY"><img src="https://xlx03.qiyukf.net/463a7f7a19b9c07a71b61506233233d7.jpg?imageView&amp;thumbnail=300x300"></div><span id="YSF-BTN-CIRCLE"></span><div id="YSF-BTN-BUBBLE"><div id="YSF-BTN-CONTENT"></div><span id="YSF-BTN-ARROW"></span><span id="YSF-BTN-CLOSE"></span></div></div></body></html>

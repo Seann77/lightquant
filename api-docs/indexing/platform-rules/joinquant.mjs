@@ -1,0 +1,16 @@
+export const joinquantRules = {
+  variant: 'web-help',
+  source_role: 'primary',
+  resolution_priority: 100,
+  api_heading: 'formal API, callback, object, indicator, or factor heading',
+  signature_sources: ['fenced prototype under formal heading'],
+  parameter_sources: ['参数 subsection', 'GFM parameter table'],
+  return_sources: ['返回 subsection'],
+  object_field_sources: ['object heading', 'formal object field table'],
+  callbacks: ['initialize', 'process_initialize', 'after_code_changed', 'before_trading_start', 'handle_data', 'handle_tick', 'after_trading_end', 'on_strategy_end'],
+  excluded_document_kinds: ['faq', 'guide-only', 'example-only'],
+  environment_markers: ['研究', '回测', '模拟', '实盘'],
+  document_type_mapping: 'front matter document_type is authoritative',
+  canonical_strategy_source: 'api-docs/raw/joinquant/api/rendered.html',
+  alias_strategy_source: 'api-docs/raw/joinquant/main/rendered.html',
+};

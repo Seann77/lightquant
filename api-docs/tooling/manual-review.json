@@ -1,0 +1,75 @@
+{
+  "complete": true,
+  "reviewed_on": "2026-07-18",
+  "items": [
+    {
+      "name": "PTrade国金主API",
+      "pass": true,
+      "evidence": "get_history：标题、签名、使用场景、限制、参数和来源锚点与 ptradeapi.html 对应。"
+    },
+    {
+      "name": "PTrade国金财务数据",
+      "pass": true,
+      "evidence": "valuation：get_fundamentals 签名、date 说明、限制和字段表保持原文。"
+    },
+    {
+      "name": "PTrade申万数据接口",
+      "pass": true,
+      "evidence": "get_history：独立保存在 shenwan 目录，签名和首个代码块逐字匹配。"
+    },
+    {
+      "name": "PTrade申万交易接口",
+      "pass": true,
+      "evidence": "order_tick：参数、默认值、返回值及示例代码与申万原文匹配。"
+    },
+    {
+      "name": "QMT行情API",
+      "pass": true,
+      "evidence": "get_market_data_ex：运行限制、原型、参数表和原型代码逐字匹配。"
+    },
+    {
+      "name": "QMT下单API",
+      "pass": true,
+      "evidence": "passorder：调用方法、参数说明、注意事项和代码块逐字匹配。"
+    },
+    {
+      "name": "JoinQuant策略API",
+      "pass": true,
+      "evidence": "initialize：原 label 提升为 H3，签名、参数、注意、返回与示例保持原文。"
+    },
+    {
+      "name": "JoinQuant Stock",
+      "pass": true,
+      "evidence": "get_fundamentals：保存在 Stock 来源章节，签名逐字匹配，参数与链接保留。"
+    },
+    {
+      "name": "JoinQuant JQData",
+      "pass": true,
+      "evidence": "get_query_count：签名、返回字段、简单表格、图片和示例逐字对应。"
+    },
+    {
+      "name": "JoinQuant技术指标",
+      "pass": true,
+      "evidence": "MACD：函数签名、参数、返回类型及示例内容与原文一致。"
+    },
+    {
+      "name": "简单表格",
+      "pass": true,
+      "evidence": "QMT 行情字段表保持 3 列：字段名、数据类型、解释。"
+    },
+    {
+      "name": "复杂表格",
+      "pass": true,
+      "evidence": "JQData rowspan/colspan 表保留为 HTML；原文与输出均为 28 行、72 个单元格。"
+    },
+    {
+      "name": "长Python代码示例",
+      "pass": true,
+      "evidence": "QMT 完整示例抽样 25023 字符、33 行，忽略围栏终止换行后逐字匹配，缩进保留。"
+    }
+  ],
+  "notes": [
+    "所有抽样均检查标题、正文、参数/返回、代码、表格、导航残留和 Front Matter 来源追溯。",
+    "JQData 原文中一个带引号的畸形 Markdown 风格链接保持原样，并由 QA warning 登记。"
+  ]
+}

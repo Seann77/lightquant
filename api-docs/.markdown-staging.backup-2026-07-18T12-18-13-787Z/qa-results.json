@@ -1,0 +1,177 @@
+{
+  "generated_at": "2026-07-18T12:17:38.890Z",
+  "staging_root": "/Users/a1-6/Documents/Codex-Restored-Projects/量化平台策略生成/api-docs/.markdown-staging",
+  "automated_pass": false,
+  "manual_review": {
+    "complete": false,
+    "items": [],
+    "notes": [
+      "manual-review.json not yet present"
+    ]
+  },
+  "can_publish": false,
+  "errors": [
+    "table structure validation failed",
+    "image or internal Markdown link validation failed"
+  ],
+  "warnings": [],
+  "checks": {
+    "raw_hashes": {
+      "expected_files": 94,
+      "actual_files": 94,
+      "changed": []
+    },
+    "source_coverage": {
+      "expected": 36,
+      "handled": 36,
+      "missing": [],
+      "unexpected": []
+    },
+    "markdown_files": {
+      "count": 197,
+      "utf8_errors": 0,
+      "replacement_characters": 0,
+      "mojibake_markers": 0,
+      "empty_files": 0,
+      "unclosed_fences": 0,
+      "front_matter_errors": 0,
+      "duplicate_slugs": []
+    },
+    "navigation": {
+      "files_with_obvious_navigation_residuals": 0
+    },
+    "duplicates": {
+      "exact_duplicate_bodies": []
+    },
+    "code": {
+      "multiline_blocks": 1218,
+      "blocks_with_indentation": 1020
+    },
+    "tables": {
+      "markdown_table_column_errors": 17,
+      "markdown_table_error_details": [
+        "ptrade/shenwan/help-third-9583f0ee.md:line 9: expected 5 columns, found 7",
+        "ptrade/shenwan/help-third-9583f0ee.md:line 10: expected 5 columns, found 8",
+        "ptrade/shenwan/help-third-9583f0ee.md:line 12: expected 5 columns, found 6",
+        "ptrade/shenwan/help-third-9583f0ee.md:line 14: expected 5 columns, found 9",
+        "ptrade/shenwan/help-third-9583f0ee.md:line 15: expected 5 columns, found 8",
+        "ptrade/shenwan/help-third-9583f0ee.md:line 16: expected 5 columns, found 12",
+        "ptrade/shenwan/help-third-9583f0ee.md:line 17: expected 5 columns, found 7",
+        "ptrade/shenwan/help-third-9583f0ee.md:line 18: expected 5 columns, found 20",
+        "ptrade/shenwan/help-third-9583f0ee.md:line 19: expected 5 columns, found 10",
+        "ptrade/shenwan/help-third-9583f0ee.md:line 20: expected 5 columns, found 25",
+        "ptrade/shenwan/help-third-9583f0ee.md:line 21: expected 5 columns, found 13",
+        "ptrade/shenwan/help-third-9583f0ee.md:line 23: expected 5 columns, found 23",
+        "ptrade/shenwan/help-third-9583f0ee.md:line 26: expected 5 columns, found 36",
+        "ptrade/shenwan/help-third-9583f0ee.md:line 27: expected 5 columns, found 17",
+        "ptrade/shenwan/help-third-9583f0ee.md:line 28: expected 5 columns, found 7",
+        "ptrade/shenwan/help-third-9583f0ee.md:line 29: expected 5 columns, found 13",
+        "ptrade/shenwan/help-third-9583f0ee.md:line 30: expected 5 columns, found 6"
+      ],
+      "preserved_html_table_structure_errors": 0,
+      "preserved_html_table_error_details": [],
+      "markdown_tables": 573,
+      "preserved_html_tables": 55
+    },
+    "images_and_links": {
+      "missing_relative_images": 0,
+      "missing_relative_image_details": [],
+      "broken_markdown_internal_links": 8,
+      "broken_markdown_internal_link_details": [
+        "ptrade/guojin/strategy-api--api.md:list\\[str\\] (missing file)",
+        "ptrade/guojin/strategy-api--api.md:list\\[str,...\\] (missing file)",
+        "ptrade/guojin/strategy-api--api.md:list\\[str,...\\] (missing file)",
+        "ptrade/guojin/strategy-api--api.md:list\\[str,...\\] (missing file)",
+        "ptrade/guojin/strategy-api--api.md:list\\[str\\]/str (missing file)",
+        "ptrade/guojin/strategy-api--api.md:str/list (missing file)",
+        "qmt/builtin-python/builtin-python--doc-start-now.md:builtin-python--doc-code-examples.md#doc-code_examples (missing anchor)",
+        "joinquant/jqdata-02293f67.md:\"https://www.joinquant.com/help/api/doc?name=logon&id=9830&keyword=%u591A%u8FDB%u7A0B\" (missing file)"
+      ]
+    },
+    "traceability": {
+      "errors": 0
+    },
+    "ptrade_isolation": {
+      "pass": true
+    },
+    "joinquant_categories": {
+      "present": [
+        "factor",
+        "faq",
+        "finance",
+        "market_data",
+        "research_data",
+        "strategy_api"
+      ],
+      "expected": [
+        "strategy_api",
+        "market_data",
+        "factor",
+        "research_data",
+        "finance",
+        "faq"
+      ]
+    },
+    "joinquant_main_api": {
+      "main_status": "alias",
+      "canonical": "api-docs/raw/joinquant/api/rendered.html",
+      "pass": true
+    },
+    "typical_api_search": {
+      "ptrade": {
+        "get_history": true,
+        "get_fundamentals": true,
+        "order": true
+      },
+      "qmt": {
+        "get_market_data_ex": true,
+        "passorder": true
+      },
+      "joinquant": {
+        "initialize": true,
+        "run_daily": true,
+        "get_price": true,
+        "order_target": true,
+        "get_fundamentals": true
+      }
+    },
+    "source_statuses": {
+      "api-docs/raw/ptrade/guojin/ptradeapi.html": "split",
+      "api-docs/raw/ptrade/guojin/财务数据api.html": "split",
+      "api-docs/raw/ptrade/guojin/行业概念分类.html": "split",
+      "api-docs/raw/qmt/innerapi-combined.html": "split",
+      "api-docs/raw/ptrade/shenwan/01_help_introduce.html": "split",
+      "api-docs/raw/ptrade/shenwan/02_help_quickstart.html": "split",
+      "api-docs/raw/ptrade/shenwan/03_help_engine.html": "split",
+      "api-docs/raw/ptrade/shenwan/04_help_third.html": "split",
+      "api-docs/raw/ptrade/shenwan/05_help_backtest_results.html": "split",
+      "api-docs/raw/ptrade/shenwan/06_api_list.html": "converted",
+      "api-docs/raw/ptrade/shenwan/07_api_system.html": "split",
+      "api-docs/raw/ptrade/shenwan/08_api_data.html": "split",
+      "api-docs/raw/ptrade/shenwan/09_api_trade.html": "split",
+      "api-docs/raw/ptrade/shenwan/10_api_stock.html": "split",
+      "api-docs/raw/ptrade/shenwan/11_api_credit.html": "split",
+      "api-docs/raw/ptrade/shenwan/12_api_future.html": "split",
+      "api-docs/raw/ptrade/shenwan/13_api_hks.html": "split",
+      "api-docs/raw/ptrade/shenwan/14_api_factor.html": "converted",
+      "api-docs/raw/ptrade/shenwan/15_demo.html": "split",
+      "api-docs/raw/ptrade/shenwan/16_qa.html": "split",
+      "api-docs/raw/ptrade/shenwan/17_changelog.html": "split",
+      "api-docs/raw/joinquant/main/rendered.html": "alias",
+      "api-docs/raw/joinquant/api/rendered.html": "split",
+      "api-docs/raw/joinquant/Stock/rendered.html": "split",
+      "api-docs/raw/joinquant/fund/rendered.html": "converted",
+      "api-docs/raw/joinquant/Future/rendered.html": "split",
+      "api-docs/raw/joinquant/index/rendered.html": "split",
+      "api-docs/raw/joinquant/plateData/rendered.html": "split",
+      "api-docs/raw/joinquant/factor/rendered.html": "split",
+      "api-docs/raw/joinquant/factor_values/rendered.html": "split",
+      "api-docs/raw/joinquant/technicalanalysis/rendered.html": "split",
+      "api-docs/raw/joinquant/Alpha101/rendered.html": "converted",
+      "api-docs/raw/joinquant/Alpha191/rendered.html": "converted",
+      "api-docs/raw/joinquant/JQData/rendered.html": "split",
+      "api-docs/raw/joinquant/macroData/rendered.html": "converted",
+      "api-docs/raw/joinquant/faq/rendered.html": "converted"
+    }
+  }
+}

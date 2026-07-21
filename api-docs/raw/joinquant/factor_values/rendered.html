@@ -1,0 +1,1998 @@
+<!DOCTYPE html><html><head> <meta charset="UTF-8"> <title>因子库 - JoinQuant</title> <meta charset="utf-8"> <meta name="keywords" content="joinquant,聚宽,量化,宽客,quant,量化交易,量化平台,量化投资,量化策略,程序化交易,量化交易平台,python,金融工程,level2,level1"> <meta name="description" content="聚宽（JoinQuant）量化交易平台是为量化爱好者（宽客）量身打造的云平台，我们为您提供精准的回测功能、高速实盘交易接口、易用的API文档、由易入难的策略库，便于您快速实现、使用自己的量化交易策略。"> <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no"> <link type="text/css" href="https://cdn.joinquant.com/third/bootstrap/css/bootstrap.min.css" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/third/bootstrap/css/bootstrap-dialog.min.css" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/third/awesome/font-awesome.min.css" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/third/jquery-ui/ui.jqgrid.css?v=17679309750001783575403239" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/third/jquery-ui/jqGrid.overrides.css?v=17679309750001783575403239" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/third/jquery-ui/jquery-ui.min.css?v=17679309750001783575403239" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/common/css/common.css?v=17679309750001783575403239" rel="stylesheet"> <link rel="stylesheet" href="https://cdn.joinquant.com/third/silviomoreto-bootstrap-select/dist/css/bootstrap-select.css" type="text/css"> <link type="text/css" href="https://cdn.joinquant.com/third/backtotop/css/style.css?v=17679309750001783575403239" rel="stylesheet"> <link rel="stylesheet" href="https://cdn.joinquant.com/themes/jq/static/common/css/jq-common.css?v=17679309750001783575403239"> <link type="text/css" href="https://cdn.joinquant.com/themes/jq/static/default/css/iconfont.css" rel="stylesheet"> <link rel="stylesheet" href="https://cdn.joinquant.com/themes/jq/static/dist/asset/general/backtotop.bundle.css?v=17679309750001783575403239"> <link rel="icon" href="https://cdn.joinquant.com/common/img/favicon-16-16.png?v=2" type="image/x-icon"> <link rel="stylesheet" type="text/css" href="https://cdn.joinquant.com/themes/jq/static/user/css/loginDialog.css?v=17679309750001783575403239"> <link rel="stylesheet" type="text/css" href="https://cdn.joinquant.com/default/css/slide.css?v=17679309750001783575403239"> <link rel="stylesheet" type="text/css" href="https://cdn.joinquant.com/themes/jq/static/default/css/flexslider.css?v=17679309750001783575403239"> <link type="text/css" href="https://cdn.joinquant.com/themes/jq/static/default/css/style.css?v=17679309750001783575403239" rel="stylesheet"> <style>.tips.isfirst{background-position:calc(50% + 58px) 0}</style> <style>span.new{background:rgba(0,0,0,0)}.side-bar .top .name.user-alias img{width:16px;height:16px;float:none;margin-right:0}.kk_footer .wp20.last img{position:relative;top:-2px}.kk_footer .wp20.last .item>a{position:relative;left:-5px}</style> <style>header#kk_nav .nav .dropdown-menu a{display:block;padding:5px 35px;font-size:13px}.sanjiao.display{display:none}@media(max-width:320px){header#kk_nav .nav a{padding:11px 20px}}@media(min-width:768px){.sanjiao.display{display:block}.dropdown-menu{left:-90px;overflow-y:visible}#kk_nav .nav .dropdown-menu a{color:#333}.sanjiao:after,.sanjiao:before{left:80%}}.last>a,.nav.navbar-nav .help-mobile{padding-bottom:8px!important;outline:0}#kk_nav{position:fixed;width:100%;height:50px;z-index:100}.kk_main>.kk_body{top:50px}.mobile .top_50{top:0}span.new{background:rgba(0,0,0,0)}.side-bar .top .name.user-alias img{width:16px;height:16px;float:none;margin-right:0}.kk_footer .wp20.last img{position:relative;top:-2px}.kk_footer .wp20.last .item>a{position:relative;left:-5px}.kk_main{min-height:auto}</style> <link rel="stylesheet" type="text/css" href="https://cdn.joinquant.com/std/dist/asset/jq-plugin.css?v=17679309750001783575403239"> <link rel="stylesheet" type="text/css" href="https://cdn.joinquant.com/std/dist/asset/general/login-dialog.bundle.css?v=17679309750001783575403239">  <link type="text/css" href="https://cdn.joinquant.com/third/amaze/css/amazeui.min.css" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/third/amaze/css/amazeui.tree.min.css" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/third/markdown/default2.css?v=17679309750001783575403239" rel="stylesheet"> <link type="text/css" href="https://cdn.joinquant.com/std/dist/modules/help/api/help.bundle.css?v=17679309750001783575403239" rel="stylesheet"> <style type="text/css">.MathJax_Hover_Frame {border-radius: .25em; -webkit-border-radius: .25em; -moz-border-radius: .25em; -khtml-border-radius: .25em; box-shadow: 0px 0px 15px #83A; -webkit-box-shadow: 0px 0px 15px #83A; -moz-box-shadow: 0px 0px 15px #83A; -khtml-box-shadow: 0px 0px 15px #83A; border: 1px solid #A6D ! important; display: inline-block; position: absolute}
+.MathJax_Menu_Button .MathJax_Hover_Arrow {position: absolute; cursor: pointer; display: inline-block; border: 2px solid #AAA; border-radius: 4px; -webkit-border-radius: 4px; -moz-border-radius: 4px; -khtml-border-radius: 4px; font-family: 'Courier New',Courier; font-size: 9px; color: #F0F0F0}
+.MathJax_Menu_Button .MathJax_Hover_Arrow span {display: block; background-color: #AAA; border: 1px solid; border-radius: 3px; line-height: 0; padding: 4px}
+.MathJax_Hover_Arrow:hover {color: white!important; border: 2px solid #CCC!important}
+.MathJax_Hover_Arrow:hover span {background-color: #CCC!important}
+</style><style type="text/css">#MathJax_About {position: fixed; left: 50%; width: auto; text-align: center; border: 3px outset; padding: 1em 2em; background-color: #DDDDDD; color: black; cursor: default; font-family: message-box; font-size: 120%; font-style: normal; text-indent: 0; text-transform: none; line-height: normal; letter-spacing: normal; word-spacing: normal; word-wrap: normal; white-space: nowrap; float: none; z-index: 201; border-radius: 15px; -webkit-border-radius: 15px; -moz-border-radius: 15px; -khtml-border-radius: 15px; box-shadow: 0px 10px 20px #808080; -webkit-box-shadow: 0px 10px 20px #808080; -moz-box-shadow: 0px 10px 20px #808080; -khtml-box-shadow: 0px 10px 20px #808080; filter: progid:DXImageTransform.Microsoft.dropshadow(OffX=2, OffY=2, Color='gray', Positive='true')}
+#MathJax_About.MathJax_MousePost {outline: none}
+.MathJax_Menu {position: absolute; background-color: white; color: black; width: auto; padding: 5px 0px; border: 1px solid #CCCCCC; margin: 0; cursor: default; font: menu; text-align: left; text-indent: 0; text-transform: none; line-height: normal; letter-spacing: normal; word-spacing: normal; word-wrap: normal; white-space: nowrap; float: none; z-index: 201; border-radius: 5px; -webkit-border-radius: 5px; -moz-border-radius: 5px; -khtml-border-radius: 5px; box-shadow: 0px 10px 20px #808080; -webkit-box-shadow: 0px 10px 20px #808080; -moz-box-shadow: 0px 10px 20px #808080; -khtml-box-shadow: 0px 10px 20px #808080; filter: progid:DXImageTransform.Microsoft.dropshadow(OffX=2, OffY=2, Color='gray', Positive='true')}
+.MathJax_MenuItem {padding: 1px 2em; background: transparent}
+.MathJax_MenuArrow {position: absolute; right: .5em; padding-top: .25em; color: #666666; font-size: .75em}
+.MathJax_MenuActive .MathJax_MenuArrow {color: white}
+.MathJax_MenuArrow.RTL {left: .5em; right: auto}
+.MathJax_MenuCheck {position: absolute; left: .7em}
+.MathJax_MenuCheck.RTL {right: .7em; left: auto}
+.MathJax_MenuRadioCheck {position: absolute; left: .7em}
+.MathJax_MenuRadioCheck.RTL {right: .7em; left: auto}
+.MathJax_MenuLabel {padding: 1px 2em 3px 1.33em; font-style: italic}
+.MathJax_MenuRule {border-top: 1px solid #DDDDDD; margin: 4px 3px}
+.MathJax_MenuDisabled {color: GrayText}
+.MathJax_MenuActive {background-color: #606872; color: white}
+.MathJax_MenuDisabled:focus, .MathJax_MenuLabel:focus {background-color: #E8E8E8}
+.MathJax_ContextMenu:focus {outline: none}
+.MathJax_ContextMenu .MathJax_MenuItem:focus {outline: none}
+#MathJax_AboutClose {top: .2em; right: .2em}
+.MathJax_Menu .MathJax_MenuClose {top: -10px; left: -10px}
+.MathJax_MenuClose {position: absolute; cursor: pointer; display: inline-block; border: 2px solid #AAA; border-radius: 18px; -webkit-border-radius: 18px; -moz-border-radius: 18px; -khtml-border-radius: 18px; font-family: 'Courier New',Courier; font-size: 24px; color: #F0F0F0}
+.MathJax_MenuClose span {display: block; background-color: #AAA; border: 1.5px solid; border-radius: 18px; -webkit-border-radius: 18px; -moz-border-radius: 18px; -khtml-border-radius: 18px; line-height: 0; padding: 8px 0 6px}
+.MathJax_MenuClose:hover {color: white!important; border: 2px solid #CCC!important}
+.MathJax_MenuClose:hover span {background-color: #CCC!important}
+.MathJax_MenuClose:hover:focus {outline: none}
+</style><style type="text/css">.MathJax_Preview .MJXf-math {color: inherit!important}
+</style><style type="text/css">.MJX_Assistive_MathML {position: absolute!important; top: 0; left: 0; clip: rect(1px, 1px, 1px, 1px); padding: 1px 0 0 0!important; border: 0!important; height: 1px!important; width: 1px!important; overflow: hidden!important; display: block!important; -webkit-touch-callout: none; -webkit-user-select: none; -khtml-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none}
+.MJX_Assistive_MathML.MJX_Assistive_MathML_Block {width: 100%!important}
+</style><style type="text/css">#MathJax_Zoom {position: absolute; background-color: #F0F0F0; overflow: auto; display: block; z-index: 301; padding: .5em; border: 1px solid black; margin: 0; font-weight: normal; font-style: normal; text-align: left; text-indent: 0; text-transform: none; line-height: normal; letter-spacing: normal; word-spacing: normal; word-wrap: normal; white-space: nowrap; float: none; -webkit-box-sizing: content-box; -moz-box-sizing: content-box; box-sizing: content-box; box-shadow: 5px 5px 15px #AAAAAA; -webkit-box-shadow: 5px 5px 15px #AAAAAA; -moz-box-shadow: 5px 5px 15px #AAAAAA; -khtml-box-shadow: 5px 5px 15px #AAAAAA; filter: progid:DXImageTransform.Microsoft.dropshadow(OffX=2, OffY=2, Color='gray', Positive='true')}
+#MathJax_ZoomOverlay {position: absolute; left: 0; top: 0; z-index: 300; display: inline-block; width: 100%; height: 100%; border: 0; padding: 0; margin: 0; background-color: white; opacity: 0; filter: alpha(opacity=0)}
+#MathJax_ZoomFrame {position: relative; display: inline-block; height: 0; width: 0}
+#MathJax_ZoomEventTrap {position: absolute; left: 0; top: 0; z-index: 302; display: inline-block; border: 0; padding: 0; margin: 0; background-color: white; opacity: 0; filter: alpha(opacity=0)}
+</style><style type="text/css">.MathJax_Preview {color: #888}
+#MathJax_Message {position: fixed; left: 1em; bottom: 1.5em; background-color: #E6E6E6; border: 1px solid #959595; margin: 0px; padding: 2px 8px; z-index: 102; color: black; font-size: 80%; width: auto; white-space: nowrap}
+#MathJax_MSIE_Frame {position: absolute; top: 0; left: 0; width: 0px; z-index: 101; border: 0px; margin: 0px; padding: 0px}
+.MathJax_Error {color: #CC0000; font-style: italic}
+</style><style type="text/css">.MJXp-script {font-size: .8em}
+.MJXp-right {-webkit-transform-origin: right; -moz-transform-origin: right; -ms-transform-origin: right; -o-transform-origin: right; transform-origin: right}
+.MJXp-bold {font-weight: bold}
+.MJXp-italic {font-style: italic}
+.MJXp-scr {font-family: MathJax_Script,'Times New Roman',Times,STIXGeneral,serif}
+.MJXp-frak {font-family: MathJax_Fraktur,'Times New Roman',Times,STIXGeneral,serif}
+.MJXp-sf {font-family: MathJax_SansSerif,'Times New Roman',Times,STIXGeneral,serif}
+.MJXp-cal {font-family: MathJax_Caligraphic,'Times New Roman',Times,STIXGeneral,serif}
+.MJXp-mono {font-family: MathJax_Typewriter,'Times New Roman',Times,STIXGeneral,serif}
+.MJXp-largeop {font-size: 150%}
+.MJXp-largeop.MJXp-int {vertical-align: -.2em}
+.MJXp-math {display: inline-block; line-height: 1.2; text-indent: 0; font-family: 'Times New Roman',Times,STIXGeneral,serif; white-space: nowrap; border-collapse: collapse}
+.MJXp-display {display: block; text-align: center; margin: 1em 0}
+.MJXp-math span {display: inline-block}
+.MJXp-box {display: block!important; text-align: center}
+.MJXp-box:after {content: " "}
+.MJXp-rule {display: block!important; margin-top: .1em}
+.MJXp-char {display: block!important}
+.MJXp-mo {margin: 0 .15em}
+.MJXp-mfrac {margin: 0 .125em; vertical-align: .25em}
+.MJXp-denom {display: inline-table!important; width: 100%}
+.MJXp-denom > * {display: table-row!important}
+.MJXp-surd {vertical-align: top}
+.MJXp-surd > * {display: block!important}
+.MJXp-script-box > *  {display: table!important; height: 50%}
+.MJXp-script-box > * > * {display: table-cell!important; vertical-align: top}
+.MJXp-script-box > *:last-child > * {vertical-align: bottom}
+.MJXp-script-box > * > * > * {display: block!important}
+.MJXp-mphantom {visibility: hidden}
+.MJXp-munderover, .MJXp-munder {display: inline-table!important}
+.MJXp-over {display: inline-block!important; text-align: center}
+.MJXp-over > * {display: block!important}
+.MJXp-munderover > *, .MJXp-munder > * {display: table-row!important}
+.MJXp-mtable {vertical-align: .25em; margin: 0 .125em}
+.MJXp-mtable > * {display: inline-table!important; vertical-align: middle}
+.MJXp-mtr {display: table-row!important}
+.MJXp-mtd {display: table-cell!important; text-align: center; padding: .5em 0 0 .5em}
+.MJXp-mtr > .MJXp-mtd:first-child {padding-left: 0}
+.MJXp-mtr:first-child > .MJXp-mtd {padding-top: 0}
+.MJXp-mlabeledtr {display: table-row!important}
+.MJXp-mlabeledtr > .MJXp-mtd:first-child {padding-left: 0}
+.MJXp-mlabeledtr:first-child > .MJXp-mtd {padding-top: 0}
+.MJXp-merror {background-color: #FFFF88; color: #CC0000; border: 1px solid #CC0000; padding: 1px 3px; font-style: normal; font-size: 90%}
+.MJXp-scale0 {-webkit-transform: scaleX(.0); -moz-transform: scaleX(.0); -ms-transform: scaleX(.0); -o-transform: scaleX(.0); transform: scaleX(.0)}
+.MJXp-scale1 {-webkit-transform: scaleX(.1); -moz-transform: scaleX(.1); -ms-transform: scaleX(.1); -o-transform: scaleX(.1); transform: scaleX(.1)}
+.MJXp-scale2 {-webkit-transform: scaleX(.2); -moz-transform: scaleX(.2); -ms-transform: scaleX(.2); -o-transform: scaleX(.2); transform: scaleX(.2)}
+.MJXp-scale3 {-webkit-transform: scaleX(.3); -moz-transform: scaleX(.3); -ms-transform: scaleX(.3); -o-transform: scaleX(.3); transform: scaleX(.3)}
+.MJXp-scale4 {-webkit-transform: scaleX(.4); -moz-transform: scaleX(.4); -ms-transform: scaleX(.4); -o-transform: scaleX(.4); transform: scaleX(.4)}
+.MJXp-scale5 {-webkit-transform: scaleX(.5); -moz-transform: scaleX(.5); -ms-transform: scaleX(.5); -o-transform: scaleX(.5); transform: scaleX(.5)}
+.MJXp-scale6 {-webkit-transform: scaleX(.6); -moz-transform: scaleX(.6); -ms-transform: scaleX(.6); -o-transform: scaleX(.6); transform: scaleX(.6)}
+.MJXp-scale7 {-webkit-transform: scaleX(.7); -moz-transform: scaleX(.7); -ms-transform: scaleX(.7); -o-transform: scaleX(.7); transform: scaleX(.7)}
+.MJXp-scale8 {-webkit-transform: scaleX(.8); -moz-transform: scaleX(.8); -ms-transform: scaleX(.8); -o-transform: scaleX(.8); transform: scaleX(.8)}
+.MJXp-scale9 {-webkit-transform: scaleX(.9); -moz-transform: scaleX(.9); -ms-transform: scaleX(.9); -o-transform: scaleX(.9); transform: scaleX(.9)}
+.MathJax_PHTML .noError {vertical-align: ; font-size: 90%; text-align: left; color: black; padding: 1px 3px; border: 1px solid}
+</style><style type="text/css">#YSF-BTN-HOLDER{position: fixed;max-width:300px;max-height:300px;right: 30px; bottom: 24px; cursor: pointer; overflow: visible; filter: alpha(opacity=100);opacity:1;z-index: 9990} #YSF-BTN-HOLDER:hover{filter: alpha(opacity=95);opacity:.95} #YSF-BTN-HOLDER img{ display: block;overflow: hidden; } #YSF-BTN-CIRCLE{display: none;position: absolute;right: -5px;top: -6px;width: auto;min-width: 12px;height: 20px;padding: 0 4px;background-color: #f00;font-size: 12px;line-height: 20px;color: #fff;text-align: center;white-space: nowrap;font-family: sans-serif;border-radius: 10px;z-index:1;} #YSF-BTN-BUBBLE{display: none;position: absolute;left: -274px;bottom:-15px;width: 278px;height: 80px;box-sizing: border-box;padding: 14px 22px;filter: alpha(opacity=100);opacity:1;background: url(//res.qiyukf.net/sdk/res/img/sdk/bg_floatMsg2x.png)  no-repeat;background:url(//res.qiyukf.net/sdk/res/img/sdk/bg_floatMsg.png); background-size: 278px 80px; z-index: 1;} #YSF-BTN-HOLDER.layer-6{bottom:0;} #YSF-BTN-HOLDER.layer-1 #YSF-BTN-BUBBLE{top:0} #YSF-BTN-HOLDER.layer-6 #YSF-BTN-BUBBLE{bottom:-6px;} #YSF-BTN-BUBBLE:hover{filter: alpha(opacity=95);opacity:.95} #YSF-BTN-CONTENT{height:45px;padding: 0;white-space: normal;word-break: break-all;text-align: left;font-size: 14px;line-height: 1.6;color: #222;overflow: hidden;z-index: 0;} #YSF-BTN-ARROW{ display: none; } #YSF-BTN-CLOSE{position: absolute; width:15px; height:15px;right: 4px;top: -3px; filter: alpha(opacity=90); opacity:.9; cursor: pointer; background: url(//res.qiyukf.net/sdk/res/img/sdk/btn-close.png) no-repeat;z-index: 1} #YSF-BTN-CLOSE:hover{filter: alpha(opacity=100); opacity: 1;} #YSF-PANEL-CORPINFO.ysf-chat-layeropen{ width: 511px; height: 500px; border-radius: 8px; box-shadow: 0 0 20px 0 rgba(0, 0, 0, .15);} #YSF-PANEL-CORPINFO{ position: fixed; bottom: 0px; right: 20px; width: 0; height: 0; z-index: 99999; } #YSF-PANEL-INFO.ysf-chat-layeropen{ width: 360px; height: 500px; border-radius: 8px; filter: alpha(opacity=100);opacity:1; box-shadow: 0 0 20px 0 rgba(0, 0, 0, .15);} #YSF-PANEL-INFO{ position: fixed; bottom: 0px; right: 20px; width: 0px; height: 0px; filter: alpha(opacity=0);opacity:0;z-index: 99999;} #YSF-PANEL-INFO .u-btn{background-color: none;} #YSF-CUSTOM-ENTRY{background-color: #F96868;} #YSF-CUSTOM-ENTRY-0{position: relative;width:auto;background-color: none;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-1{position: relative;width:auto;background-color: none;border-radius: 14px; box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-2{position: relative;width:auto;background-color: none;border-radius: 8px;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-3{position: relative;width:auto;background-color: none;border-radius: 50%;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-4{position: relative;width:auto;background-color: none;border-radius: 50%;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-5{position: relative;width:auto;background-color: none;border-radius: 8px;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-6{position: relative;width:auto;background-color: none;border-radius: 8px;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-7{position: relative;width:auto;background-color: none;border-radius: 50%;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-8{position: relative;width:auto;background-color: none;border-radius: 8px;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);} #YSF-CUSTOM-ENTRY-0 img{max-width: 300px;max-height: 300px;} #YSF-CUSTOM-ENTRY-1 img{width:28px;height:auto;} #YSF-CUSTOM-ENTRY-2 img{width:58px;height:auto;} #YSF-CUSTOM-ENTRY-3 img{width:60px;height:auto;} #YSF-CUSTOM-ENTRY-4 img{width:60px;height:auto;} #YSF-CUSTOM-ENTRY-5 img{width:60px;height:auto;} #YSF-CUSTOM-ENTRY-6 img{width:58px;height:auto;} #YSF-CUSTOM-ENTRY-7 img{width:60px;height:auto;} #YSF-CUSTOM-ENTRY-8 img{width:60px;height:auto;} #YSF-IFRAME-LAYER{ border:0; outline:none; } .ysf-online-invite-wrap{z-index:10001;position:fixed;_position:absolute;top:50%;left:50%;} .ysf-online-invite{position:relative;top:-50%;left:-50%;cursor:pointer;border-radius: 16px;box-shadow: 0 10px 30px 0 rgba(47,56,111,0.15);} .ysf-online-invite img{display:block;width:250px;} .ysf-online-invite .ysf-online-invite-img{width:100%;height:100%} .ysf-online-invite .text{position:absolute;top:-11px;left:0;right:0;overflow:hidden;margin: 36px 20px 0 67px;line-height:140%;color:#526069;font-size:14px;font-family:"Microsoft YaHei","微软雅黑",tahoma,arial,simsun,"宋体";text-align:left;white-space:normal;word-wrap:break-word;} .ysf-online-invite .close{position:absolute;top:12px;right:12px;width:16px;height:16px;background:url("https://ysf.nosdn.127.net/operation/4602027f7e6a0109ac433863d7d0acdf") no-repeat;cursor:pointer;background-size: cover;} #YSF-PANEL-MOBILE{ background: rgba(46,47,49,0.7); position: fixed; bottom: 0px; right: 0px; width: 100%; height: 0px; transition-property: height,bottom; transition-duration: 0.3s; transition-timing-function: ease; transition-delay: 0s; z-index: 99999; } #YSF-PANEL-MOBILE.ysf-chat-layeropen{ width: 100%; height: 100%; transition-property:height,bottom; transition-duration: 0.3s; transition-timing-function: ease; transition-delay: 0s; } #YSF-IFRAME-LAYER.ysf-chat-mobile-layeropen{ height: 90% !important; transition-property: height,bottom; transition-duration: 0.3s; transition-timing-function: ease; transition-delay: 0s; } #YSF-IFRAME-LAYER.ysf-chat-mobile-layeropen.ysf-chat-mobile-invite-layer{ height: 33% !important; } #YSF-IFRAME-LAYER{ position: absolute; bottom: 0px;left: 0; right: 0px; width: 0px; height: 0px; transition-property: height,bottom; transition-duration: 0.3s; transition-timing-function: ease; transition-delay: 0s; z-index: 9999; } .YSF-PANEL-BODY-FIXED{ position: fixed !important; left: 0; right: 0;} .YSF-INVITE-LAYER-WRAPPER {cursor: pointer; position: relative; border: 1px solid #eaf0f6; background: #fff;box-shadow: 0 5px 20px rgba(0,0,0,0.1); border-radius: 4px; width: 220px; padding: 16px; box-sizing: border-box; margin-bottom: 12px; background: #FFFFFF;box-shadow: 0 6px 20px 0 rgba(40,53,75,0.17);border-radius: 8px;} .YSF-INVITE-LAYER-HEADER {display: flex;align-items: center;justify-content: space-between;margin-bottom: 8px;} .YSF-INVITE-LAYER-HEADER-LEFT {display: flex;flex: 1;align-items: center;} .YSF-INVITE-LAYER-RICHTEXT { height: 44px; max-width: 168px; word-break: break-all; overflow: hidden; text-overflow: ellipsis; font-size: 14px; color: #333333; line-height: 22px; text-align: left; } .YSF-INVITE-LAYER-RICHTEXT p { margin: 0;} #YSF-BTN-HOLDER .YSF-INVITE-LAYER-AVATAR { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; } .YSF-INVITE-LAYER-KEFU-NAME { font-size: 12px; color: #999999; margin-left: 4px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; } #YSF-ONLINE-INVITE-LAYER-CLOSE{ width:12px; height:12px; background:url("https://ysf.nosdn.127.net/operation/0e5ee37a71d33e05b74d1a5aa3cdd99a") no-repeat; background-size: cover; cursor:pointer; } #YSF-INVITE-LAYER-WRAPPER-ENTRY { position: relative; float: right; } .YSF-LAYER-ENTRY-CIRCLE { width: auto; min-width: 12px; height: 20px; padding: 0 4px; border-radius: 10px; color: #FFFFFF; background-color: #f00; font-size: 12px; line-height: 20px; white-space: nowrap; z-index:1; background: url("https://ysf.nosdn.127.net/operation/997228b687d805f7a5d6244865615ec9") no-repeat; background-size: cover; position: absolute; top: 6px; right: -8px; } .YSF-INVITE-IMG {background-color: none;box-shadow: 0px 6px 10px 0px rgba(0,0,0,0.25);float: right;} .YSF_INVITE-IMG-0{max-width: 300px; height:auto;} .YSF_INVITE-IMG-1{width:28px; height:auto; border-radius: 14px;} .YSF_INVITE-IMG-2{width:58px; height:auto; border-radius: 8px;} .YSF_INVITE-IMG-3{width:60px; height:auto; border-radius: 50%;} .YSF_INVITE-IMG-4{width:60px; height:auto; border-radius: 50%;} .YSF_INVITE-IMG-5{width:60px; height:auto; border-radius: 8px;} .YSF_INVITE-IMG-6{width:58px; height:auto; border-radius: 8px;} .YSF_INVITE-IMG-7{width:60px; height:auto; border-radius: 50%;} .YSF_INVITE-IMG-8{width:60px; height:auto; border-radius: 8px;} #YSF-BTN-HOLDER .portrait_icon{width: 24px;height: 24px;vertical-align: middle;display: inline-block;}</style></head> <body><div id="MathJax_Message" style="display: none;"></div> <div class="kk_main in_wrap"> <input type="hidden" id="imagePath" value="https://image.joinquant.com"> <input type="hidden" id="cdnPath" value="https://cdn.joinquant.com"> <input type="hidden" id="filePath" value="https://file.joinquant.com"> <input type="hidden" id="version" value="17679309750001783575403239"> <header id="kk_nav" class="kk_nav navbar narbar-static-top"> <div class="kk_nav_container js-jq-header"><div class="navbar-header clear" style="position:relative;z-index:1">  <a href="/" title="joinQuant" class="navbar-brand fleft headerLogBg">  </a>  </div> <nav id="kk_navbar" class="kk_navbar collapse navbar-collapse relative" aria-expanded="false"> <ul class="nav navbar-nav">  <li> <a href="/" class="">   首页   </a>      </li>  <li> <a href="javascript:void(0)" class="">   量化研究平台   </a>    <div class="submenu">  <a href="/research" class="item"> 研究环境   </a>  <a href="/algorithm/index/list" class="item"> 策略回测   </a>  <a href="/algorithm/trade/list?process=1" class="item"> 模拟列表   </a>  <a href="/view/factorlib/list" class="item"> 因子看板   </a>  <a href="/help/api/help?name=api" class="item"> 平台API文档   </a>  <a href="https://www.joinquant.com/data" class="item"> 平台数据字典   </a>  <a href="/post/4589" class="item"> 新手指引   </a>  <a href="https://www.joinquant.com/view/vip/charge" class="item"> 平台会员   </a>  </div>    </li>  <li> <a href="/community/new" class="">   聚宽社区   </a>    <div class="submenu">  <a href="https://www.joinquant.com/view/community/list?listType=5" class="item"> 精选文章   </a>  </div>    </li>  <li> <a href="javascript:void(0)" class="">   帮助   </a>    <div class="submenu">  <a href="/faq" class="item"> 常见问题   </a>  <a href="/view/algorithm/pythonConversion?utm_source=Nav" class="item"> Python 2 to 3   </a>  <a href="https://www.joinquant.com/help/api/help#faq:%E5%AE%9E%E7%9B%98%E8%AF%B4%E6%98%8E" class="item"> 实盘说明   </a>  <a href="/study" class="item"> 量化课堂   </a>  <a href="/help/api/help?name=factor" class="item"> 因子分析   </a>  </div>    </li>  <li> <a href="javascript:void(0)" class="">   JQData本地数据   </a>    <div class="submenu">  <a href="https://www.joinquant.com/default/index/sdk?utm_campaign=JQData%E7%94%B3%E8%AF%B7&amp;utm_medium=%E7%BD%91%E9%A1%B5&amp;utm_source=%E8%81%9A%E5%AE%BD&amp;gio_link_id=xRxqAjP5" class="item"> 申请试用   </a>  <a href="https://www.joinquant.com/help/api/doc?name=JQDatadoc" class="item"> Python版API   </a>  <a href="https://www.joinquant.com/help/api/doc?name=logon&amp;id=9830" class="item"> 试用及购买   </a>  </div>    </li>  <li> <a href="javascript:void(0)" class="">   平台会员   </a>    <div class="submenu">  <a href="https://www.joinquant.com/view/vip/charge" class="item"> 平台会员   </a>  <a href="https://www.joinquant.com/view/credits/list" class="item"> 积分商城   </a>  </div>    </li>  <li> <a href="/user/login/index?type=login" class="">   登录   </a>      </li>  <li> <a href="/user/register/index?type=register" class="">   注册   </a>      </li>  <div class="hidden" id="userInfoForCs" _userid="" _alias="" _mob=""></div> </ul> </nav></div> </header> <div class="kk_body"> <div class="in_body"> </div></div></div> <div class="js-app" style="min-height:450px"> <div class="jq-l-help-api" id="help"> <div class="help-api-search"> <div class="search-input"> <input type="text" placeholder="搜索你想要的数据，如股票分钟数据、十大股东等(Enter搜索)" id="searchInput" autocomplete="off"> <svg class="enter-icon" viewBox="0 0 1024 1024" title="Enter搜索"> <path d="M639.199519 894.900713 253.016039 894.900713l0 0-96.577592 0c-5.27412 0-9.983375-1.539053-14.378475-3.768837-9.168824 1.098008-18.714224-1.381463-25.746384-8.413624l-44.143383-44.175105c-12.18246-12.183484-12.18246-31.933293 0-44.145429l208.851679-273.122471c12.18246-12.17939 31.962969-12.17939 44.145429 0l44.145429 44.146453c12.17939 12.211113 12.17939 31.994692 0 44.173059L249.498936 766.299777l335.880817 0c98.149391-5.276167 176.393429-83.266425 181.228551-181.035146L766.608304 348.34264c0-17.772782 14.377452-32.149211 32.151257-32.149211l64.98813 0c17.772782 0 32.150234 14.376429 32.150234 32.149211l0 33.593096 0 225.27472 0 32.496112C895.897925 780.64653 780.985756 894.900713 639.199519 894.900713z"> </path> </svg> </div> <div class="search-result"> <span id="searchBack">返回</span> <ul class="search-list" id="searchListBody"></ul> </div> </div> <div class="help-api-left"> <div> <ul class="am-tree am-tree-folder-select" role="tree" id="jq-api-tree" style="overflow:initial"> <li class="am-tree-branch am-hide" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder"></span>
+        <span class="am-tree-label"></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li>
+  <li class="am-tree-item am-hide" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item"></span>
+      <span class="am-tree-label"></span>
+    </button>
+  </li> <li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="aboutData" href="#name:aboutData">关于聚宽数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="Stock" href="#name:Stock">股票数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="plateData" href="#name:plateData">行业概念数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="index" href="#name:index">指数数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="macroData" href="#name:macroData">宏观经济数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="Future" href="#name:Future">期货数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="Option" href="#name:Option">期权数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="fund" href="#name:fund">场内基金数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="OTCfund" href="#name:OTCfund">场外基金数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="technicalanalysis" href="#name:technicalanalysis">技术分析指标</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="Alpha101" href="#name:Alpha101">Alphas101</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="Alpha191" href="#name:Alpha191">Alphas191</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch am-tree-open" data-template="treebranch" role="treeitem" aria-expanded="true">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-minus-square-o"></span>
+        <span class="am-tree-label"><a data-name="factor_values" href="#name:factor_values">聚宽因子库</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children am-tree-folder-select" role="group"> <li class="am-tree-branch am-hide" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder"></span>
+        <span class="am-tree-label"></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li>
+  <li class="am-tree-item am-hide" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item"></span>
+      <span class="am-tree-label"></span>
+    </button>
+  </li> <li class="am-tree-branch am-tree-open" data-template="treebranch" role="treeitem" aria-expanded="true" id="first" aria-labelledby="first-label">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-minus-square-o"></span>
+        <span class="am-tree-label" id="first-label"><a href="#使用方法">使用方法</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#获取因子值">获取因子值</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#获取所有因子">获取所有因子</a></span>
+    </button>
+  </li></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch am-tree-open" data-template="treebranch" role="treeitem" aria-expanded="true">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-minus-square-o"></span>
+        <span class="am-tree-label"><a href="#风险模型因子列表">风险模型因子列表</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#风格因子">风格因子</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#行业因子">行业因子</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#风格因子pro仅本地数据jqdatasdk可用">风格因子pro(仅本地数据jqdatasdk可用)</a></span>
+    </button>
+  </li></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch am-tree-open" data-template="treebranch" role="treeitem" aria-expanded="true">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-minus-square-o"></span>
+        <span class="am-tree-label"><a href="#基本面及量价因子列表">基本面及量价因子列表</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"><li class="am-tree-branch am-tree-open" data-template="treebranch" role="treeitem" aria-expanded="true">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-minus-square-o"></span>
+        <span class="am-tree-label"><a href="#财务基本面因子">财务基本面因子</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#质量因子">质量因子</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#基础因子">基础因子</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#成长因子">成长因子</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#每股因子">每股因子</a></span>
+    </button>
+  </li></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch am-tree-open" data-template="treebranch" role="treeitem" aria-expanded="true">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-minus-square-o"></span>
+        <span class="am-tree-label"><a href="#量价因子">量价因子</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#情绪因子">情绪因子</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#风险因子">风险因子</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#技术因子">技术因子</a></span>
+    </button>
+  </li><li class="am-tree-item" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item am-icon-"></span>
+      <span class="am-tree-label"><a href="#动量因子">动量因子</a></span>
+    </button>
+  </li></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="Public" href="#name:Public">舆情数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li><li class="am-tree-branch" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder am-icon-plus-square-o"></span>
+        <span class="am-tree-label"><a data-name="bond" href="#name:bond">债券数据</a></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader am-hide" role="alert"><span class="doc-loading"></span></div>
+  </li></ul> </div> </div> <div class="help-api-right"> <div id="jq-api-subcontent" class="hidden"></div> <div id="jq-api-content"><h2 id="使用方法">使用方法</h2>
+<p><strong>说明：</strong>  </p>
+<ul>
+<li>在单因子分析中可以直接获取因子库中的数据  </li>
+<li>同时也可以通过API的形式，在其他模块中获取这些因子  </li>
+<li>为保证数据的连续性，所有数据基于<code>后复权</code>计算  </li>
+<li>涉及到财务数据的因子，使用对应日期所能获取到的最新一期单季度数据进行计算  </li>
+<li>为了防止单次返回数据时间过长，每次调用 api 请求的因子值不能超过 200000 个  </li>
+<li>频率为天，每天05：00更新前一天数据  </li>
+<li>提供股票的因子数据，不支持期货、指数等  </li>
+<li>因子库中nan值：缺少依赖数据;财务数据中如果标的未披露相关字段,依赖数据不完整的话会返回nan值,请注意到财务报表披露规则变更,标的报表披露形式(金融类,非金融类等) , 以及标的上市时间等  </li>
+<li>有关因子处理：除了因子描述及说明中有解释处理方法的因子，其他的都是原始因子，没有经过处理  </li>
+</ul>
+<h3 id="获取因子值">获取因子值</h3>
+<p>获取因子值:</p>
+<pre><code class="python language-python hljs"><span class="hljs-comment"># 导入函数库</span>
+<span class="hljs-keyword">from</span> jqfactor <span class="hljs-keyword">import</span> get_factor_values
+<span class="hljs-comment"># 取值函数</span>
+get_factor_values(securities, factors, start_date, end_date, count)
+</code></pre>
+<p><strong>参数</strong></p>
+<ul>
+<li>securities:股票池，单只股票（字符串）或一个股票列表</li>
+<li>factors: 因子名称，单个因子（字符串）或一个因子列表</li>
+<li>start_date:开始日期，字符串或 datetime 对象，与 coun t参数二选一</li>
+<li>end_date: 结束日期， 字符串或 datetime 对象，可以与 start_date 或 count 配合使用</li>
+<li>count: 截止 end_date 之前交易日的数量（含 end_date 当日），与 start_date 参数二选一</li>
+</ul>
+<p><strong>返回</strong></p>
+<ul>
+<li>一个 dict： key 是因子名称， value 是 pandas.dataframe。</li>
+<li>dataframe 的 index 是日期， column 是股票代码， value 是因子值</li>
+</ul>
+<p><strong>示例</strong></p>
+<pre><code class="python language-python hljs"><span class="hljs-comment"># 导入函数库</span>
+<span class="hljs-keyword">from</span> jqfactor <span class="hljs-keyword">import</span> get_factor_values
+
+<span class="hljs-comment"># 获取因子Skewness60(个股收益的60日偏度)从 2017-01-01 至 2017-03-04 的因子值</span>
+factor_data = get_factor_values(securities=[<span class="hljs-string">'000001.XSHE'</span>], factors=[<span class="hljs-string">'Skewness60'</span>,<span class="hljs-string">'DEGM'</span>,<span class="hljs-string">'quick_ratio'</span>], start_date=<span class="hljs-string">'2017-01-01'</span>, end_date=<span class="hljs-string">'2017-03-04'</span>)
+<span class="hljs-comment"># 查看因子值</span>
+factor_data[<span class="hljs-string">'Skewness60'</span>]
+</code></pre>
+<h3 id="获取所有因子">获取所有因子</h3>
+<pre><code class="python language-python hljs">get_all_factors()
+</code></pre>
+<p>描述：获取聚宽因子库中所有的因子code和因子名称</p>
+<p><strong>参数</strong>：无</p>
+<p><strong>返回</strong>：pandas.DataFrame，</p>
+<ul>
+<li>factor:因子code</li>
+<li>factor_intro:因子说明 </li>
+<li>category:因子分类名称 </li>
+<li>category_intro:因子分类说明
+<strong>示例</strong>：</li>
+</ul>
+<pre><code class="python language-python hljs"><span class="hljs-comment">#获取聚宽因子库所有因子</span>
+<span class="hljs-keyword">from</span> jqfactor <span class="hljs-keyword">import</span> get_all_factors 
+print(get_all_factors()) 
+
+<span class="hljs-comment">#输出</span>
+                                     factor     factor_intro   category  category_intro
+<span class="hljs-number">0</span>                                      beta             BETA      style  风险因子 - 风格因子
+<span class="hljs-number">1</span>                       book_to_price_ratio            市净率因子      style  风险因子 - 风格因子
+<span class="hljs-number">2</span>                            earnings_yield           盈利预期因子      style  风险因子 - 风格因子
+<span class="hljs-number">3</span>                                    growth             成长因子      style  风险因子 - 风格因子
+<span class="hljs-number">4</span>                                  leverage             杠杆因子      style  风险因子 - 风格因子
+<span class="hljs-number">5</span>                                 liquidity            流动性因子      style  风险因子 - 风格因子
+<span class="hljs-number">6</span>                                  momentum             动量因子      style  风险因子 - 风格因子
+<span class="hljs-number">7</span>                           non_linear_size          非线性市值因子      style  风险因子 - 风格因子
+<span class="hljs-number">8</span>                       residual_volatility           残差波动因子      style  风险因子 - 风格因子
+<span class="hljs-number">9</span>                                      size             市值因子      style  风险因子 - 风格因子
+<span class="hljs-number">10</span>               administration_expense_ttm          管理费用TTM     basics      基础科目及衍生类因子
+<span class="hljs-number">11</span>                asset_impairment_loss_ttm        资产减值损失TTM     basics      基础科目及衍生类因子
+<span class="hljs-number">12</span>                                     EBIT            息税前利润     basics      基础科目及衍生类因子
+...
+...
+</code></pre>
+<h2 id="风险模型因子列表">风险模型因子列表</h2>
+
+<h3 id="风格因子">风格因子</h3>
+<h4 id="">风格因子简介</h4>
+<table>
+<thead>
+<tr>
+<th>因子 code</th>
+<th>因子名称</th>
+<th>简介</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>size</td>
+<td>市值</td>
+<td>捕捉大盘股和小盘股之间的收益差异</td>
+</tr>
+<tr>
+<td>beta</td>
+<td>贝塔</td>
+<td>表征股票相对于市场的波动敏感度</td>
+</tr>
+<tr>
+<td>momentum</td>
+<td>传统动量</td>
+<td>描述了过去两年里相对强势的股票与弱势股票之间的差异</td>
+</tr>
+<tr>
+<td>residual_volatility</td>
+<td>残差波动率</td>
+<td>解释了剥离了市场风险后的波动率高低产生的收益率差异</td>
+</tr>
+<tr>
+<td>non_linear_size</td>
+<td>非线性市值</td>
+<td>描述了无法由规模因子解释的但与规模有关的收益差异，通常代表中盘股</td>
+</tr>
+<tr>
+<td>book_to_price_ratio</td>
+<td>账面市值比</td>
+<td>描述了股票估值高低不同而产生的收益差异, 即价值因子</td>
+</tr>
+<tr>
+<td>liquidity</td>
+<td>流动性</td>
+<td>解释了由股票相对的交易活跃度不同而产生的收益率差异</td>
+</tr>
+<tr>
+<td>earnings_yield</td>
+<td>盈利能力</td>
+<td>描述了由盈利收益导致的收益差异</td>
+</tr>
+<tr>
+<td>growth</td>
+<td>成长</td>
+<td>描述了对销售或盈利增长预期不同而产生的收益差异</td>
+</tr>
+<tr>
+<td>leverage</td>
+<td>杠杆</td>
+<td>描述了高杠杆股票与低杠杆股票之间的收益差异</td>
+</tr>
+</tbody>
+</table>
+<p>除了上面的风格因子，在计算风格因子过程中的描述因子daily_standard_deviation、cumulative_range等也可以通过get_factor_values、get_all_factors以及get_factor_kanban_values获取；描述因子是原始值，没有进行数据处理。</p>
+<p><br></p>
+<h4 id="-1">风格因子数据处理说明</h4>
+<p>对描述因子和风格因子的数据分别进行正规化的处理，步骤如下：</p>
+<ul>
+<li>对描述因子分别进行去极值和标准化<br>
+去极值为将2.5倍标准差之外的值，赋值成2.5倍标准差的边界值<br>
+标准化为市值加权标准化<br>
+x=(x- mean(x))/(std(x))<br>
+其中，均值的计算使用股票的市值加权，标准差为正常标准差。</li>
+<li>对描述因子按照权重加权求和<br>
+按照公式给出的权重对描述因子加权求和。如果某个因子的值为nan，则对不为nan的因子加权求和，同时权重重新归一化；如果所有因子都为nan，则结果为nan。</li>
+<li>对风格因子市值加权标准化  </li>
+<li>缺失值填充<br>
+按照聚宽一级行业分行业，以不缺失的股票因子值相对于市值的对数进行回归，对缺失值进行填充</li>
+<li>对风格因子去极值，去极值方法同上面去极值描述</li>
+</ul>
+<h4 id="-2">风格因子计算说明</h4>
+<ul>
+<li><p>市值因子 size      </p>
+<ul>
+<li>定义：1•natural_log_of_market_cap  </li>
+<li>解释<br><ul>
+<li>对数市值 natural_log_of_market_cap：公司的总市值的自然对数。  </li></ul></li></ul></li>
+<li><p>贝塔因子 beta</p>
+<ul>
+<li>定义：1•raw_beta  </li>
+<li>解释<br><ul>
+<li>raw_beta：CAPM 模型中的β，过去252个交易日股票的收益与市场收益（全A股票收益按流通市值加权）进行时间序列指数加权回归后的斜率系数。指数加权的半衰期为63个交易日。
+停牌股票收益率为0，股票上市需超过21个交易日，否则beta为nan。</li></ul></li></ul></li>
+<li><p>动量因子 momentum</p>
+<ul>
+<li>定义：1•relative_strength  </li>
+<li>解释<br><ul>
+<li>相对强弱 relative_strength：滞后21个交易日的过去504个交易日股票超额对数收益率的指数加权之和。其中指数权重半衰期为126个交易日。停牌股票收益率为0，上市之前收益率为nan。  </li></ul></li></ul></li>
+<li><p>残差波动率因子 residual_volatility</p>
+<ul>
+<li>定义：0.74•daily_standard_deviation + 0.16•cumulative_range + 0.10•historical_sigma  </li>
+<li>解释<br><ul>
+<li>日收益率标准差 daily_standard_deviation：日标准差，过去252日的超额收益的指数加权标准差，以42个交易日为半衰期。</li>
+<li>收益离差 cumulative_range：过去12个月中月收益率（以21个交易日为一个月）的最大值和最小值之间的差异。股票需上市需超过6个月，否则结果为nan。</li>
+<li>残差历史波动率 historical_sigma：计算beta时的回归残差项的过去252个交易日的标准差。股票上市需超过21个交易日，否则结果为nan。  </li>
+<li>用 daily_standard_deviation、cumulative_range、historical_sigma 加权求和得到的 residual_volatility，之后 关于 beta 和 size 因子做正交化以消除共线性。</li></ul></li></ul></li>
+<li><p>非线性市值因子 non_linear_size</p>
+<ul>
+<li>定义：1•cube_of_size</li>
+<li>解释<br><ul>
+<li>市值立方因子 cube_of_size：首先对标准化后的市值因子size暴露值求立方，将得到的结果与市值进行加权回归的正交化处理。</li></ul></li></ul></li>
+<li><p>账面市值比因子 book_to_price_ratio</p>
+<ul>
+<li>定义：book_to_price_ratio</li>
+<li>解释<ul>
+<li>最新一季财报的账面价值与当前市值的比值（pb_ratio的倒数）。其中小于0的值设置为nan。</li></ul></li></ul></li>
+<li><p>流动性因子 liquidity</p>
+<ul>
+<li>定义：0.35•share_turnover_monthly + 0.35•average_share_turnover_quarterly + 0.3•average_share_turnover_annual</li>
+<li>解释<br><ul>
+<li>月换手率 share_turnover_monthly：股票一个月换手率，过去21日的股票换手率之和的对数。</li>
+<li>季度平均平均月换手率 average_share_turnover_quarterly：过去3个月平均换手率，计算过去3个月的平均换手率，并取对数。</li>
+<li>年度平均月换手率 average_share_turnover_annual：过去12个月平均换手率，计算过去12个月的平均换手率，并取对数。</li>
+<li>用 share_turnover_monthly、average_share_turnover_quarterly、average_share_turnover_annual 加权求和得到的 liquidity 关于对数市值做正交化以消除共线性。</li></ul></li></ul></li>
+<li><p>盈利能力因子 earnings_yield</p>
+<ul>
+<li>定义：0.68•predicted_earnings_to_price_ratio + 0.21•cash_earnings_to_price_ratio + 0.11•earnings_to_price_ratio</li>
+<li>解释<br><ul>
+<li>预期利润市值比 predicted_earnings_to_price_ratio：用未来12个月的净利预测值除以当前市值。</li>
+<li>现金流量市值比 cash_earnings_to_price_ratio：过去12个月的净经营现金流除以当前股票市值。</li>
+<li>利润市值比 earnings_to_price_ratio：过去12个月的归母净利润除以当前股票市值。</li></ul></li></ul></li>
+<li><p>成长因子 growth</p>
+<ul>
+<li>定义：0.18•long_term_predicted_earnings_growth + 0.11•short_term_predicted_earnings_growth + 0.24•earnings_growth + 0.47•sales_growth</li>
+<li>解释<br><ul>
+<li>预期长期盈利增长率 long_term_predicted_earnings_growth：未来三年净利润分析师一致预期相对于净利润(不含少数股东损益)最新年报值的平均增长率。一个分析师预测的股票值为nan。</li>
+<li>预期短期盈利增长率 short_term_predicted_earnings_growth：未来一年净利润分析师一致预期相对于净利润(不含少数股东损益)最新年报值的平均增长率，只有一个分析师预测的股票值为nan。</li>
+<li>5年盈利增长率 earnings_growth：盈利增长率，过去5年的基本每股收益（basic_eps）关于[0,1,2,3,4]回归的斜率系数，然后再除以过去 5 年基本每股收益绝对值的均值。</li>
+<li>5年营业收入增长率 sales_growth：营收增长率，过去 5 年每股营业收入关于[0,1,2,3,4]回归的斜率系数，然后再除以过去 5 年每股营业收入绝对值的均值。对于保险行业的股票，使用“已赚保费”代替“销售收入”计算每股营业收入，对于银行业的股票，sales_growth为nan。</li>
+<li>earnings_growth和sales_growth至少需要有4年的财务数据，否则为nan。</li></ul></li></ul></li>
+<li><p>杠杆因子 leverage</p>
+<ul>
+<li>定义：0.38•market_leverage + 0.35•debt_to_assets + 0.27•book_leverage</li>
+<li>解释<br><ul>
+<li>市场杠杆 market_leverage：(当前的普通股市值+优先股账面价值+长期债务账面价值)/当前的普通股市值。</li>
+<li>资产负债比 debt_to_assets：总负债的账面价值/总资产的账面价值。</li>
+<li>账面杠杆 book_leverage：(普通股账面价値+优先股账面价值+长期债务账面价值)/普通股账面价值。账面杠杆需在0到100之间，否则结果为nan。</li></ul></li></ul></li>
+</ul>
+<p><br></p>
+<h3 id="行业因子">行业因子</h3>
+<p>可以获取以下行业的分类因子，股票属于这个行业则为赋值为1，否则赋值为0<br>
+1.<a href="https://www.joinquant.com/help/api/help#plateData:%E8%AF%81%E7%9B%91%E4%BC%9A%E8%A1%8C%E4%B8%9A">证监会行业</a><br>
+2.<a href="https://www.joinquant.com/help/api/help#plateData:%E8%81%9A%E5%AE%BD%E8%A1%8C%E4%B8%9A">聚宽行业(一二级)</a><br>
+3.<a href="https://www.joinquant.com/help/api/help#plateData:%E7%94%B3%E4%B8%87%E8%A1%8C%E4%B8%9A">申万行业(一二三级)</a>  </p>
+<pre><code class="python language-python hljs"><span class="hljs-meta">&gt;&gt;&gt; </span>df_dic = get_factor_values(<span class="hljs-string">'000001.XSHE'</span>,[<span class="hljs-string">'A01'</span>,<span class="hljs-string">'HY007'</span>,<span class="hljs-string">'801780'</span>,<span class="hljs-string">'801723'</span>] ,end_date=<span class="hljs-string">'2023-02-23'</span>,count=<span class="hljs-number">1</span>)
+print(df_dic)
+<span class="hljs-meta">&gt;&gt;&gt; </span> {<span class="hljs-string">'A01'</span>:             <span class="hljs-number">000001.</span>XSHE
+    <span class="hljs-number">2023</span><span class="hljs-number">-02</span><span class="hljs-number">-23</span>            <span class="hljs-number">0</span>, 
+<span class="hljs-string">'HY007'</span>:             <span class="hljs-number">000001.</span>XSHE
+    <span class="hljs-number">2023</span><span class="hljs-number">-02</span><span class="hljs-number">-23</span>            <span class="hljs-number">1</span>, 
+<span class="hljs-string">'801780'</span>:             <span class="hljs-number">000001.</span>XSHE
+    <span class="hljs-number">2023</span><span class="hljs-number">-02</span><span class="hljs-number">-23</span>            <span class="hljs-number">1</span>, 
+<span class="hljs-string">'801723'</span>:             <span class="hljs-number">000001.</span>XSHE
+    <span class="hljs-number">2023</span><span class="hljs-number">-02</span><span class="hljs-number">-23</span>            <span class="hljs-number">0</span>}
+</code></pre>
+<h3 id="风格因子pro仅本地数据jqdatasdk可用">风格因子pro(仅本地数据jqdatasdk可用)</h3>
+<h4 id="pro">风格因子PRO简介</h4>
+<p>风格因子pro在原有的风格因子基础上，对底层的因子进一步细分和扩充。目前仅jqdatasdk提供，如有需求可<a href="https://www.joinquant.com/help/api/doc?name=logon&amp;id=9831">咨询运营开通</a></p>
+<table>
+<thead>
+<tr>
+<th>因子 code</th>
+<th>因子名称</th>
+<th>简介</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>btop</td>
+<td>市净率因子</td>
+<td>描述了股票估值高低不同而产生的收益差异, 即价值因子</td>
+</tr>
+<tr>
+<td>divyild</td>
+<td>分红因子</td>
+<td>股票历史和预测的股息价格比的股票回报差异</td>
+</tr>
+<tr>
+<td>earnqlty</td>
+<td>盈利质量因子</td>
+<td>股票收益因其收益的应计部分而产生的差异</td>
+</tr>
+<tr>
+<td>earnvar</td>
+<td>盈利变动率因子</td>
+<td>解释由于收益、销售额和现金流的可变性而导致的股票回报差异，以及分析师预测的收益与价格之比。</td>
+</tr>
+<tr>
+<td>earnyild</td>
+<td>收益因子</td>
+<td>描述了由盈利收益导致的收益差异</td>
+</tr>
+<tr>
+<td>financial_leverage</td>
+<td>财务杠杆因子</td>
+<td>描述了高杠杆股票与低杠杆股票之间的收益差异</td>
+</tr>
+<tr>
+<td>invsqlty</td>
+<td>投资能力因子</td>
+<td>衡量当股票价格过高/过低时，公司对资产扩张/紧缩的的倾向以及管理观点</td>
+</tr>
+<tr>
+<td>liquidty</td>
+<td>流动性因子</td>
+<td>解释了由股票相对的交易活跃度不同而产生的收益率差异</td>
+</tr>
+<tr>
+<td>long_growth</td>
+<td>长期成长因子</td>
+<td>描述了对销售或盈利增长预期不同而产生的收益差异</td>
+</tr>
+<tr>
+<td>ltrevrsl</td>
+<td>长期反转因子</td>
+<td>解释与长期股票价格行为相关的常见回报变化</td>
+</tr>
+<tr>
+<td>market_beta</td>
+<td>市场波动率因子</td>
+<td>表征股票相对于市场的波动敏感度</td>
+</tr>
+<tr>
+<td>market_size</td>
+<td>市值规模因子</td>
+<td>捕捉大盘股和小盘股之间的收益差异</td>
+</tr>
+<tr>
+<td>midcap</td>
+<td>中等市值因子</td>
+<td>捕捉中等市值股票与大盘股或者小盘股之间的收益差异</td>
+</tr>
+<tr>
+<td>profit</td>
+<td>盈利能力因子</td>
+<td>表征公司运营的效率，盈利能力指标的组合</td>
+</tr>
+<tr>
+<td>relative_momentum</td>
+<td>相对动量因子</td>
+<td>解释与最近（12个月，滞后1个月）股价行为相关的股票回报的常见变化</td>
+</tr>
+<tr>
+<td>resvol</td>
+<td>残余波动率因子</td>
+<td>捕捉股票回报的相对波动性，这种波动性不能用股票对市场回报的敏感性差异来解释（市场波动率因子）</td>
+</tr>
+</tbody>
+</table>
+<h2 id="基本面及量价因子列表">基本面及量价因子列表</h2>
+
+<h3 id="财务基本面因子">财务基本面因子</h3>
+
+<h4 id="质量因子">质量因子</h4>
+<table>
+<thead>
+<tr>
+<th>因子 code</th>
+<th>因子名称</th>
+<th>计算方法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>net_profit_to_total_operate_revenue_ttm</td>
+<td>净利润与营业总收入之比</td>
+<td>净利润与营业总收入之比=净利润（TTM）/营业总收入（TTM）</td>
+</tr>
+<tr>
+<td>cfo_to_ev</td>
+<td>经营活动产生的现金流量净额与企业价值之比TTM</td>
+<td>经营活动产生的现金流量净额TTM / 企业价值。其中，企业价值=司市值+负债合计-货币资金</td>
+</tr>
+<tr>
+<td>accounts_payable_turnover_days</td>
+<td>应付账款周转天数</td>
+<td>应付账款周转天数 = 360 / 应付账款周转率</td>
+</tr>
+<tr>
+<td>net_profit_ratio</td>
+<td>销售净利率</td>
+<td>售净利率=净利润（TTM）/营业收入（TTM）</td>
+</tr>
+<tr>
+<td>net_non_operating_income_to_total_profit</td>
+<td>营业外收支利润净额/利润总额</td>
+<td>营业外收支利润净额/利润总额</td>
+</tr>
+<tr>
+<td>fixed_asset_ratio</td>
+<td>固定资产比率</td>
+<td>固定资产比率=(固定资产+工程物资+在建工程)/总资产</td>
+</tr>
+<tr>
+<td>account_receivable_turnover_days</td>
+<td>应收账款周转天数</td>
+<td>应收账款周转天数=360/应收账款周转率</td>
+</tr>
+<tr>
+<td>DEGM</td>
+<td>毛利率增长</td>
+<td>毛利率增长=(今年毛利率（TTM）/去年毛利率（TTM）)-1</td>
+</tr>
+<tr>
+<td>sale_expense_to_operating_revenue</td>
+<td>营业费用与营业总收入之比</td>
+<td>营业费用与营业总收入之比=销售费用（TTM）/营业总收入（TTM）</td>
+</tr>
+<tr>
+<td>operating_tax_to_operating_revenue_ratio_ttm</td>
+<td>销售税金率</td>
+<td>销售税金率=营业税金及附加（TTM）/营业收入（TTM）</td>
+</tr>
+<tr>
+<td>inventory_turnover_days</td>
+<td>存货周转天数</td>
+<td>存货周转天数=360/存货周转率</td>
+</tr>
+<tr>
+<td>OperatingCycle</td>
+<td>营业周期</td>
+<td>应收账款周转天数+存货周转天数</td>
+</tr>
+<tr>
+<td>net_operate_cash_flow_to_operate_income</td>
+<td>经营活动产生的现金流量净额与经营活动净收益之比</td>
+<td>经营活动产生的现金流量净额（TTM）/(营业总收入（TTM）-营业总成本（TTM））</td>
+</tr>
+<tr>
+<td>net_operating_cash_flow_coverage</td>
+<td>净利润现金含量</td>
+<td>经营活动产生的现金流量净额/归属于母公司所有者的净利润</td>
+</tr>
+<tr>
+<td>quick_ratio</td>
+<td>速动比率</td>
+<td>速动比率=(流动资产合计-存货)/ 流动负债合计</td>
+</tr>
+<tr>
+<td>intangible_asset_ratio</td>
+<td>无形资产比率</td>
+<td>无形资产比率=(无形资产+研发支出+商誉)/总资产</td>
+</tr>
+<tr>
+<td>MLEV</td>
+<td>市场杠杆</td>
+<td>市场杠杆=非流动负债合计/(非流动负债合计+总市值)</td>
+</tr>
+<tr>
+<td>debt_to_equity_ratio</td>
+<td>产权比率</td>
+<td>产权比率=负债合计/归属母公司所有者权益合计</td>
+</tr>
+<tr>
+<td>super_quick_ratio</td>
+<td>超速动比率</td>
+<td>（货币资金+交易性金融资产+应收票据+应收帐款+其他应收款）／流动负债合计</td>
+</tr>
+<tr>
+<td>inventory_turnover_rate</td>
+<td>存货周转率</td>
+<td>存货周转率=营业成本（TTM）/AvgQ(存货,4,0)</td>
+</tr>
+<tr>
+<td>operating_profit_growth_rate</td>
+<td>营业利润增长率</td>
+<td>营业利润增长率=(今年营业利润（TTM）/去年营业利润（TTM）)-1</td>
+</tr>
+<tr>
+<td>long_debt_to_working_capital_ratio</td>
+<td>长期负债与营运资金比率</td>
+<td>长期负债与营运资金比率=非流动负债合计/(流动资产合计-流动负债合计)</td>
+</tr>
+<tr>
+<td>current_ratio</td>
+<td>流动比率(单季度)</td>
+<td>流动比率=流动资产合计/流动负债合计</td>
+</tr>
+<tr>
+<td>net_operate_cash_flow_to_net_debt</td>
+<td>经营活动产生现金流量净额/净债务</td>
+<td>经营活动产生现金流量净额/净债务</td>
+</tr>
+<tr>
+<td>net_operate_cash_flow_to_asset</td>
+<td>总资产现金回收率</td>
+<td>经营活动产生的现金流量净额(ttm) / 总资产</td>
+</tr>
+<tr>
+<td>non_current_asset_ratio</td>
+<td>非流动资产比率</td>
+<td>非流动资产比率=非流动资产合计/总资产</td>
+</tr>
+<tr>
+<td>total_asset_turnover_rate</td>
+<td>总资产周转率</td>
+<td>总资产周转率=营业收入(ttm)/总资产</td>
+</tr>
+<tr>
+<td>long_debt_to_asset_ratio</td>
+<td>长期借款与资产总计之比</td>
+<td>长期借款与资产总计之比=长期借款/总资产</td>
+</tr>
+<tr>
+<td>debt_to_tangible_equity_ratio</td>
+<td>有形净值债务率</td>
+<td>负债合计/有形净值  其中有形净值=股东权益-无形资产净值，无形资产净值= 商誉+无形资产</td>
+</tr>
+<tr>
+<td>ROAEBITTTM</td>
+<td>总资产报酬率</td>
+<td>（利润总额（TTM）+利息支出（TTM）） / 总资产在过去12个月的平均</td>
+</tr>
+<tr>
+<td>operating_profit_ratio</td>
+<td>营业利润率</td>
+<td>营业利润率=营业利润（TTM）/营业收入（TTM）</td>
+</tr>
+<tr>
+<td>long_term_debt_to_asset_ratio</td>
+<td>长期负债与资产总计之比</td>
+<td>长期负债与资产总计之比=非流动负债合计/总资产</td>
+</tr>
+<tr>
+<td>current_asset_turnover_rate</td>
+<td>流动资产周转率TTM</td>
+<td>过去12个月的营业收入/过去12个月的平均流动资产合计</td>
+</tr>
+<tr>
+<td>financial_expense_rate</td>
+<td>财务费用与营业总收入之比</td>
+<td>财务费用（TTM） / 营业总收入（TTM）</td>
+</tr>
+<tr>
+<td>operating_profit_to_total_profit</td>
+<td>经营活动净收益/利润总额</td>
+<td>经营活动净收益/利润总额</td>
+</tr>
+<tr>
+<td>debt_to_asset_ratio</td>
+<td>债务总资产比</td>
+<td>债务总资产比=负债合计/总资产</td>
+</tr>
+<tr>
+<td>equity_to_fixed_asset_ratio</td>
+<td>股东权益与固定资产比率</td>
+<td>股东权益与固定资产比率=股东权益/(固定资产+工程物资+在建工程)</td>
+</tr>
+<tr>
+<td>net_operate_cash_flow_to_total_liability</td>
+<td>经营活动产生的现金流量净额/负债合计</td>
+<td>经营活动产生的现金流量净额/负债合计</td>
+</tr>
+<tr>
+<td>cash_rate_of_sales</td>
+<td>经营活动产生的现金流量净额与营业收入之比</td>
+<td>经营活动产生的现金流量净额（TTM） / 营业收入（TTM）</td>
+</tr>
+<tr>
+<td>operating_profit_to_operating_revenue</td>
+<td>营业利润与营业总收入之比</td>
+<td>营业利润与营业总收入之比=营业利润（TTM）/营业总收入（TTM）</td>
+</tr>
+<tr>
+<td>roa_ttm</td>
+<td>资产回报率TTM</td>
+<td>资产回报率=净利润（TTM）/期末总资产</td>
+</tr>
+<tr>
+<td>admin_expense_rate</td>
+<td>管理费用与营业总收入之比</td>
+<td>管理费用与营业总收入之比=管理费用（TTM）/营业总收入（TTM）</td>
+</tr>
+<tr>
+<td>fixed_assets_turnover_rate</td>
+<td>固定资产周转率</td>
+<td>等于过去12个月的营业收入/过去12个月的平均（固定资产+工程物资+在建工程）</td>
+</tr>
+<tr>
+<td>invest_income_associates_to_total_profit</td>
+<td>对联营和合营公司投资收益/利润总额</td>
+<td>对联营和营公司投资收益/利润总额</td>
+</tr>
+<tr>
+<td>equity_to_asset_ratio</td>
+<td>股东权益比率</td>
+<td>股东权益比率=股东权益/总资产</td>
+</tr>
+<tr>
+<td>goods_service_cash_to_operating_revenue_ttm</td>
+<td>销售商品提供劳务收到的现金与营业收入之比</td>
+<td>销售商品提供劳务收到的现金与营业收入之比=销售商品和提供劳务收到的现金（TTM）/营业收入（TTM）</td>
+</tr>
+<tr>
+<td>cash_to_current_liability</td>
+<td>现金比率</td>
+<td>期末现金及现金等价物余额/流动负债合计的12个月均值</td>
+</tr>
+<tr>
+<td>net_operate_cash_flow_to_total_current_liability</td>
+<td>现金流动负债比</td>
+<td>现金流动负债比=经营活动产生的现金流量净额（TTM）/流动负债合计</td>
+</tr>
+<tr>
+<td>ACCA</td>
+<td>现金流资产比和资产回报率之差</td>
+<td>现金流资产比-资产回报率,其中现金流资产比=经营活动产生的现金流量净额/总资产</td>
+</tr>
+<tr>
+<td>roe_ttm</td>
+<td>权益回报率TTM</td>
+<td>权益回报率=净利润（TTM）/期末股东权益</td>
+</tr>
+<tr>
+<td>accounts_payable_turnover_rate</td>
+<td>应付账款周转率</td>
+<td>TTM(营业成本,0)/（AvgQ(应付账款,4,0) + AvgQ(应付票据,4,0) ）</td>
+</tr>
+<tr>
+<td>gross_income_ratio</td>
+<td>销售毛利率</td>
+<td>销售毛利率=(营业收入（TTM）-营业成本（TTM）)/营业收入（TTM）</td>
+</tr>
+<tr>
+<td>adjusted_profit_to_total_profit</td>
+<td>扣除非经常损益后的净利润/利润总额</td>
+<td>扣除非经常损益后的净利润/利润总额</td>
+</tr>
+<tr>
+<td>account_receivable_turnover_rate</td>
+<td>应收账款周转率</td>
+<td>即，TTM(营业收入,0)/（AvgQ(应收账款,4,0)+ AvgQ(应收票据,4,0)）</td>
+</tr>
+<tr>
+<td>equity_turnover_rate</td>
+<td>股东权益周转率</td>
+<td>股东权益周转率=营业收入(ttm)/股东权益</td>
+</tr>
+<tr>
+<td>total_profit_to_cost_ratio</td>
+<td>成本费用利润率</td>
+<td>成本费用利润率=利润总额/(营业成本+财务费用+销售费用+管理费用)，以上科目使用的都是TTM的数值</td>
+</tr>
+<tr>
+<td>operating_cost_to_operating_revenue_ratio</td>
+<td>销售成本率</td>
+<td>销售成本率=营业成本（TTM）/营业收入（TTM）</td>
+</tr>
+<tr>
+<td>LVGI</td>
+<td>财务杠杆指数</td>
+<td>本期(年报)资产负债率/上期(年报)资产负债率</td>
+</tr>
+<tr>
+<td>SGI</td>
+<td>营业收入指数</td>
+<td>本期(年报)营业收入/上期(年报)营业收入</td>
+</tr>
+<tr>
+<td>GMI</td>
+<td>毛利率指数</td>
+<td>上期(年报)毛利率/本期(年报)毛利率</td>
+</tr>
+<tr>
+<td>DSRI</td>
+<td>应收账款指数</td>
+<td>本期(年报)应收账款占营业收入比例/上期(年报)应收账款占营业收入比例</td>
+</tr>
+<tr>
+<td>rnoa_ttm</td>
+<td>经营资产回报率TTM</td>
+<td>销售利润率*经营资产周转率</td>
+</tr>
+<tr>
+<td>profit_margin_ttm</td>
+<td>销售利润率TTM</td>
+<td>营业利润/营业收入</td>
+</tr>
+<tr>
+<td>roe_ttm_8y</td>
+<td>长期权益回报率TTM</td>
+<td>8年(1+roe_ttm)的累乘 ^ (1/8) - 1  # 至少要有近4年的数据，否则为 nan</td>
+</tr>
+<tr>
+<td>asset_turnover_ttm</td>
+<td>经营资产周转率TTM</td>
+<td>营业收入TTM/近4个季度期末净经营性资产均值; 净经营性资产=经营资产-经营负债</td>
+</tr>
+<tr>
+<td>roic_ttm</td>
+<td>投资资本回报率TTM</td>
+<td>权益回报率=归属于母公司股东的净利润（TTM）/ 前四个季度投资资本均值; 投资资本=股东权益+负债合计-无息流动负债-无息非流动负债;             无息流动负债=应付账款+预收款项+应付职工薪酬+应交税费+其他应付款+一年内的递延收益+其它流动负债;             无息非流动负债=非流动负债合计-长期借款-应付债券；</td>
+</tr>
+<tr>
+<td>roa_ttm_8y</td>
+<td>长期资产回报率TTM</td>
+<td>8年(1+roa_ttm)的乘积 ^ (1/8) - 1  # 至少要有近4年的数据，否则为 nan</td>
+</tr>
+<tr>
+<td>SGAI</td>
+<td>销售管理费用指数</td>
+<td>本期(年报)销售管理费用占营业收入的比例/上期(年报)销售管理费用占营业收入的比例</td>
+</tr>
+<tr>
+<td>DEGM_8y</td>
+<td>长期毛利率增长</td>
+<td>过去8年(1+DEGM)的累成 ^ (1/8) - 1</td>
+</tr>
+<tr>
+<td>maximum_margin</td>
+<td>最大盈利水平</td>
+<td>max(margin_stability, DEGM_8y)</td>
+</tr>
+<tr>
+<td>margin_stability</td>
+<td>盈利能力稳定性</td>
+<td>mean(GM)/std(GM); GM 为过去8年毛利率ttm</td>
+</tr>
+</tbody>
+</table>
+<h4 id="基础因子">基础因子</h4>
+<table>
+<thead>
+<tr>
+<th>因子 code</th>
+<th>因子名称</th>
+<th>计算方法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>net_working_capital</td>
+<td>净运营资本</td>
+<td>流动资产 － 流动负债</td>
+</tr>
+<tr>
+<td>total_operating_revenue_ttm</td>
+<td>营业总收入TTM</td>
+<td>计算过去12个月的 营业总收入 之和</td>
+</tr>
+<tr>
+<td>operating_profit_ttm</td>
+<td>营业利润TTM</td>
+<td>计算过去12个月 营业利润 之和</td>
+</tr>
+<tr>
+<td>net_operate_cash_flow_ttm</td>
+<td>经营活动现金流量净额TTM</td>
+<td>计算过去12个月 经营活动产生的现金流量净值 之和</td>
+</tr>
+<tr>
+<td>operating_revenue_ttm</td>
+<td>营业收入TTM</td>
+<td>计算过去12个月的 营业收入 之和</td>
+</tr>
+<tr>
+<td>interest_carry_current_liability</td>
+<td>带息流动负债</td>
+<td>流动负债合计 - 无息流动负债</td>
+</tr>
+<tr>
+<td>sale_expense_ttm</td>
+<td>销售费用TTM</td>
+<td>计算过去12个月 销售费用 之和</td>
+</tr>
+<tr>
+<td>gross_profit_ttm</td>
+<td>毛利TTM</td>
+<td>过去12个月的 毛利润 之和</td>
+</tr>
+<tr>
+<td>retained_earnings</td>
+<td>留存收益</td>
+<td>盈余公积金+未分配利润</td>
+</tr>
+<tr>
+<td>total_operating_cost_ttm</td>
+<td>营业总成本TTM</td>
+<td>计算过去12个月的 营业总成本 之和</td>
+</tr>
+<tr>
+<td>non_operating_net_profit_ttm</td>
+<td>营业外收支净额TTM</td>
+<td>营业外收入（TTM） - 营业外支出（TTM）</td>
+</tr>
+<tr>
+<td>net_invest_cash_flow_ttm</td>
+<td>投资活动现金流量净额TTM</td>
+<td>计算过去12个月 投资活动现金流量净额 之和</td>
+</tr>
+<tr>
+<td>financial_expense_ttm</td>
+<td>财务费用TTM</td>
+<td>计算过去12个月 财务费用 之和</td>
+</tr>
+<tr>
+<td>administration_expense_ttm</td>
+<td>管理费用TTM</td>
+<td>计算过去12个月 管理费用 之和</td>
+</tr>
+<tr>
+<td>net_interest_expense</td>
+<td>净利息费用</td>
+<td>利息支出-利息收入</td>
+</tr>
+<tr>
+<td>value_change_profit_ttm</td>
+<td>价值变动净收益TTM</td>
+<td>计算过去12个月 价值变动净收益 之和</td>
+</tr>
+<tr>
+<td>total_profit_ttm</td>
+<td>利润总额TTM</td>
+<td>计算过去12个月 利润总额 之和</td>
+</tr>
+<tr>
+<td>net_finance_cash_flow_ttm</td>
+<td>筹资活动现金流量净额TTM</td>
+<td>计算过去12个月 筹资活动现金流量净额 之和</td>
+</tr>
+<tr>
+<td>interest_free_current_liability</td>
+<td>无息流动负债</td>
+<td>应付票据+应付账款+预收账款(用 预售款项 代替)+应交税费+应付利息+其他应付款+其他流动负债</td>
+</tr>
+<tr>
+<td>EBIT</td>
+<td>息税前利润</td>
+<td>净利润+所得税+财务费用</td>
+</tr>
+<tr>
+<td>net_profit_ttm</td>
+<td>净利润TTM</td>
+<td>计算过去12个月 净利润 之和</td>
+</tr>
+<tr>
+<td>OperateNetIncome</td>
+<td>经营活动净收益</td>
+<td>经营活动净收益/利润总额(%) * 利润总额</td>
+</tr>
+<tr>
+<td>EBITDA</td>
+<td>息税折旧摊销前利润（报告期）</td>
+<td>一般企业：（营业总收入-营业税金及附加）-（营业成本+利息支出+手续费及佣金支出+销售费用+管理费用+研发费用+资产减值损失）+（固定资产折旧、油气资产折耗、生产性生物资产折旧）+无形资产摊销+长期待摊费用摊销;<br>银行业：（营业总收入-营业税金及附加）-（营业成本+管理费用+资产减值损失）+（固定资产折旧、油气资产折耗、生产性生物资产折旧+无形资产摊销+长期待摊费用摊销）</td>
+</tr>
+<tr>
+<td>asset_impairment_loss_ttm</td>
+<td>资产减值损失TTM</td>
+<td>计算过去12个月 资产减值损失 之和</td>
+</tr>
+<tr>
+<td>np_parent_company_owners_ttm</td>
+<td>归属于母公司股东的净利润TTM</td>
+<td>计算过去12个月 归属于母公司股东的净利润 之和</td>
+</tr>
+<tr>
+<td>operating_cost_ttm</td>
+<td>营业成本TTM</td>
+<td>计算过去12个月的 营业成本 之和</td>
+</tr>
+<tr>
+<td>net_debt</td>
+<td>净债务</td>
+<td>总债务-期末现金及现金等价物余额</td>
+</tr>
+<tr>
+<td>non_recurring_gain_loss</td>
+<td>非经常性损益</td>
+<td>归属于母公司股东的净利润-扣除非经常损益后的净利润(元)</td>
+</tr>
+<tr>
+<td>goods_sale_and_service_render_cash_ttm</td>
+<td>销售商品提供劳务收到的现金</td>
+<td>计算过去12个月 销售商品提供劳务收到的现金 之和</td>
+</tr>
+<tr>
+<td>market_cap</td>
+<td>市值</td>
+<td>市值</td>
+</tr>
+<tr>
+<td>cash_flow_to_price_ratio</td>
+<td>现金流市值比</td>
+<td>1 / pcf_ratio (ttm)</td>
+</tr>
+<tr>
+<td>sales_to_price_ratio</td>
+<td>营收市值比</td>
+<td>1 / ps_ratio (ttm)</td>
+</tr>
+<tr>
+<td>circulating_market_cap</td>
+<td>流通市值</td>
+<td>流通市值</td>
+</tr>
+<tr>
+<td>operating_assets</td>
+<td>经营性资产</td>
+<td>总资产 - 金融资产</td>
+</tr>
+<tr>
+<td>financial_assets</td>
+<td>金融资产</td>
+<td>货币资金 + 交易性金融资产 + 应收票据 + 应收利息 + 应收股利 + 可供出售金融资产 + 持有至到期投资</td>
+</tr>
+<tr>
+<td>operating_liability</td>
+<td>经营性负债</td>
+<td>总负债 - 金融负债</td>
+</tr>
+<tr>
+<td>financial_liability</td>
+<td>金融负债</td>
+<td>(流动负债合计-无息流动负债)+(有息非流动负债)=(流动负债合计-应付账款-预收款项-应付职工薪酬-应交税费-其他应付款-一年内的递延收益-其它流动负债)+(长期借款+应付债券)</td>
+</tr>
+</tbody>
+</table>
+<h4 id="成长因子">成长因子</h4>
+<table>
+<thead>
+<tr>
+<th>因子 code</th>
+<th>因子名称</th>
+<th>计算方法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>operating_revenue_growth_rate</td>
+<td>营业收入增长率</td>
+<td>营业收入增长率=（今年营业收入（TTM）/去年营业收入（TTM））-1</td>
+</tr>
+<tr>
+<td>total_asset_growth_rate</td>
+<td>总资产增长率</td>
+<td>总资产 / 总资产_4 -1</td>
+</tr>
+<tr>
+<td>net_operate_cashflow_growth_rate</td>
+<td>经营活动产生的现金流量净额增长率</td>
+<td>(今年经营活动产生的现金流量净额（TTM）/去年经营活动产生的现金流量净额（TTM）)-1</td>
+</tr>
+<tr>
+<td>total_profit_growth_rate</td>
+<td>利润总额增长率</td>
+<td>利润总额增长率=(今年利润总额（TTM）/去年利润总额（TTM）)-1</td>
+</tr>
+<tr>
+<td>np_parent_company_owners_growth_rate</td>
+<td>归属母公司股东的净利润增长率</td>
+<td>(今年归属于母公司所有者的净利润（TTM）/去年归属于母公司所有者的净利润（TTM）)-1</td>
+</tr>
+<tr>
+<td>financing_cash_growth_rate</td>
+<td>筹资活动产生的现金流量净额增长率</td>
+<td>过去12个月的筹资现金流量净额 / 4季度前的12个月的筹资现金流量净额 - 1</td>
+</tr>
+<tr>
+<td>net_profit_growth_rate</td>
+<td>净利润增长率</td>
+<td>净利润增长率=(今年净利润（TTM）/去年净利润（TTM）)-1</td>
+</tr>
+<tr>
+<td>net_asset_growth_rate</td>
+<td>净资产增长率</td>
+<td>（当季的股东权益/三季度前的股东权益）-1</td>
+</tr>
+<tr>
+<td>PEG</td>
+<td>市盈率相对盈利增长比率</td>
+<td>PEG = PE / (归母公司净利润(TTM)增长率 * 100)  # 如果 PE 或 增长率为负，则为 nan</td>
+</tr>
+</tbody>
+</table>
+<h4 id="每股因子">每股因子</h4>
+<table>
+<thead>
+<tr>
+<th>因子 code</th>
+<th>因子名称</th>
+<th>计算方法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>total_operating_revenue_per_share_ttm</td>
+<td>每股营业总收入TTM</td>
+<td>营业总收入（TTM）除以总股本</td>
+</tr>
+<tr>
+<td>cash_and_equivalents_per_share</td>
+<td>每股现金及现金等价物余额</td>
+<td>每股现金及现金等价物余额</td>
+</tr>
+<tr>
+<td>surplus_reserve_fund_per_share</td>
+<td>每股盈余公积金</td>
+<td>每股盈余公积金</td>
+</tr>
+<tr>
+<td>retained_profit_per_share</td>
+<td>每股未分配利润</td>
+<td>每股未分配利润</td>
+</tr>
+<tr>
+<td>operating_revenue_per_share_ttm</td>
+<td>每股营业收入TTM</td>
+<td>营业收入（TTM）除以总股本</td>
+</tr>
+<tr>
+<td>net_asset_per_share</td>
+<td>每股净资产</td>
+<td>(归属母公司所有者权益合计-其他权益工具)除以总股本</td>
+</tr>
+<tr>
+<td>total_operating_revenue_per_share</td>
+<td>每股营业总收入</td>
+<td>每股营业总收入</td>
+</tr>
+<tr>
+<td>retained_earnings_per_share</td>
+<td>每股留存收益</td>
+<td>每股留存收益</td>
+</tr>
+<tr>
+<td>operating_revenue_per_share</td>
+<td>每股营业收入</td>
+<td>每股营业收入</td>
+</tr>
+<tr>
+<td>net_operate_cash_flow_per_share</td>
+<td>每股经营活动产生的现金流量净额</td>
+<td>每股经营活动产生的现金流量净额</td>
+</tr>
+<tr>
+<td>operating_profit_per_share_ttm</td>
+<td>每股营业利润TTM</td>
+<td>营业利润（TTM）除以总股本</td>
+</tr>
+<tr>
+<td>eps_ttm</td>
+<td>每股收益TTM</td>
+<td>过去12个月归属母公司所有者的净利润（TTM）除以总股本</td>
+</tr>
+<tr>
+<td>cashflow_per_share_ttm</td>
+<td>每股现金流量净额，根据当时日期来获取最近变更日的总股本</td>
+<td>现金流量净额（TTM）除以总股本</td>
+</tr>
+<tr>
+<td>operating_profit_per_share</td>
+<td>每股营业利润</td>
+<td>每股营业利润</td>
+</tr>
+<tr>
+<td>capital_reserve_fund_per_share</td>
+<td>每股资本公积金</td>
+<td>每股资本公积金</td>
+</tr>
+</tbody>
+</table>
+<h3 id="量价因子">量价因子</h3>
+
+<h4 id="情绪因子">情绪因子</h4>
+<table>
+<thead>
+<tr>
+<th>因子 code</th>
+<th>因子名称</th>
+<th>计算方法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>VROC12</td>
+<td>12日量变动速率指标</td>
+<td>成交量减N日前的成交量，再除以N日前的成交量，放大100倍，得到VROC值 ，n=12</td>
+</tr>
+<tr>
+<td>TVMA6</td>
+<td>6日成交金额的移动平均值</td>
+<td>6日成交金额的移动平均值</td>
+</tr>
+<tr>
+<td>VEMA10</td>
+<td>成交量的10日指数移动平均</td>
+<td></td>
+</tr>
+<tr>
+<td>VR</td>
+<td>成交量比率（Volume Ratio）</td>
+<td>VR=（AVS+1/2CVS）/（BVS+1/2CVS）</td>
+</tr>
+<tr>
+<td>VOL5</td>
+<td>5日平均换手率</td>
+<td>5日换手率的均值,单位为%</td>
+</tr>
+<tr>
+<td>BR</td>
+<td>意愿指标</td>
+<td>BR=N日内（当日最高价－昨日收盘价）之和 / N日内（昨日收盘价－当日最低价）之和×100 n设定为26</td>
+</tr>
+<tr>
+<td>VEMA12</td>
+<td>12日成交量的移动平均值</td>
+<td></td>
+</tr>
+<tr>
+<td>TVMA20</td>
+<td>20日成交金额的移动平均值</td>
+<td>20日成交金额的移动平均值</td>
+</tr>
+<tr>
+<td>DAVOL5</td>
+<td>5日平均换手率与120日平均换手率</td>
+<td>5日平均换手率 / 120日平均换手率</td>
+</tr>
+<tr>
+<td>VDIFF</td>
+<td>计算VMACD因子的中间变量</td>
+<td>EMA(VOLUME，SHORT)-EMA(VOLUME，LONG) short设置为12，long设置为26，M设置为9</td>
+</tr>
+<tr>
+<td>WVAD</td>
+<td>威廉变异离散量</td>
+<td>(收盘价－开盘价)/(最高价－最低价)×成交量，再做加和，使用过去6个交易日的数据</td>
+</tr>
+<tr>
+<td>MAWVAD</td>
+<td>因子WVAD的6日均值</td>
+<td></td>
+</tr>
+<tr>
+<td>VSTD10</td>
+<td>10日成交量标准差</td>
+<td>10日成交量标准差</td>
+</tr>
+<tr>
+<td>ATR14</td>
+<td>14日均幅指标</td>
+<td>真实振幅的14日移动平均</td>
+</tr>
+<tr>
+<td>VOL10</td>
+<td>10日平均换手率</td>
+<td>10日换手率的均值,单位为%</td>
+</tr>
+<tr>
+<td>DAVOL10</td>
+<td>10日平均换手率与120日平均换手率之比</td>
+<td>10日平均换手率 / 120日平均换手率</td>
+</tr>
+<tr>
+<td>VDEA</td>
+<td>计算VMACD因子的中间变量</td>
+<td>EMA(VDIFF，M)    short设置为12，long设置为26，M设置为9</td>
+</tr>
+<tr>
+<td>VSTD20</td>
+<td>20日成交量标准差</td>
+<td>20日成交量标准差</td>
+</tr>
+<tr>
+<td>ATR6</td>
+<td>6日均幅指标</td>
+<td>真实振幅的6日移动平均</td>
+</tr>
+<tr>
+<td>VOL20</td>
+<td>20日平均换手率</td>
+<td>20日换手率的均值,单位为%</td>
+</tr>
+<tr>
+<td>DAVOL20</td>
+<td>20日平均换手率与120日平均换手率之比</td>
+<td>20日平均换手率 / 120日平均换手率</td>
+</tr>
+<tr>
+<td>VMACD</td>
+<td>成交量指数平滑异同移动平均线</td>
+<td>快的指数移动平均线（EMA12）减去慢的指数移动平均线（EMA26）得到快线DIFF, 由DIFF的M日移动平均得到DEA，由DIFF-DEA的值得到MACD</td>
+</tr>
+<tr>
+<td>AR</td>
+<td>人气指标</td>
+<td>AR=N日内（当日最高价—当日开市价）之和 / N日内（当日开市价—当日最低价）之和 * 100，n设定为26</td>
+</tr>
+<tr>
+<td>VOL60</td>
+<td>60日平均换手率</td>
+<td>60日换手率的均值,单位为%</td>
+</tr>
+<tr>
+<td>turnover_volatility</td>
+<td>换手率相对波动率</td>
+<td>取20个交易日个股换手率的标准差</td>
+</tr>
+<tr>
+<td>VOL120</td>
+<td>120日平均换手率</td>
+<td>120日换手率的均值,单位为%</td>
+</tr>
+<tr>
+<td>VROC6</td>
+<td>6日量变动速率指标</td>
+<td>成交量减N日前的成交量，再除以N日前的成交量，放大100倍，得到VROC值 ，n=6</td>
+</tr>
+<tr>
+<td>TVSTD20</td>
+<td>20日成交金额的标准差</td>
+<td>20日成交额的标准差</td>
+</tr>
+<tr>
+<td>ARBR</td>
+<td>ARBR</td>
+<td>因子 AR 与因子 BR 的差</td>
+</tr>
+<tr>
+<td>money_flow_20</td>
+<td>20日资金流量</td>
+<td>用收盘价、最高价及最低价的均值乘以当日成交量即可得到该交易日的资金流量</td>
+</tr>
+<tr>
+<td>VEMA5</td>
+<td>成交量的5日指数移动平均</td>
+<td></td>
+</tr>
+<tr>
+<td>VOL240</td>
+<td>240日平均换手率</td>
+<td>240日换手率的均值,单位为%</td>
+</tr>
+<tr>
+<td>VEMA26</td>
+<td>成交量的26日指数移动平均</td>
+<td></td>
+</tr>
+<tr>
+<td>VOSC</td>
+<td>成交量震荡</td>
+<td>'VEMA12'和'VEMA26'两者的差值，再求差值与'VEMA12'的比，最后将比值放大100倍，得到VOSC值</td>
+</tr>
+<tr>
+<td>TVSTD6</td>
+<td>6日成交金额的标准差</td>
+<td>6日成交额的标准差</td>
+</tr>
+<tr>
+<td>PSY</td>
+<td>心理线指标</td>
+<td>12日内上涨的天数/12 *100</td>
+</tr>
+</tbody>
+</table>
+<h4 id="风险因子">风险因子</h4>
+<table>
+<thead>
+<tr>
+<th>因子 code</th>
+<th>因子名称</th>
+<th>计算方法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Variance20</td>
+<td>20日年化收益方差</td>
+<td>20日年化收益方差</td>
+</tr>
+<tr>
+<td>Skewness20</td>
+<td>个股收益的20日偏度</td>
+<td>个股收益的20日偏度</td>
+</tr>
+<tr>
+<td>Kurtosis20</td>
+<td>个股收益的20日峰度</td>
+<td>个股收益的20日峰度</td>
+</tr>
+<tr>
+<td>sharpe_ratio_20</td>
+<td>20日夏普比率</td>
+<td>（Rp - Rf）/Sigma p 其中，Rp是个股的年化收益率，Rf是无风险利率（在这里设置为0.04），Sigma p是个股的收益波动率（标准差）</td>
+</tr>
+<tr>
+<td>Variance60</td>
+<td>60日年化收益方差</td>
+<td>60日年化收益方差</td>
+</tr>
+<tr>
+<td>Skewness60</td>
+<td>个股收益的60日偏度</td>
+<td>个股收益的60日偏度</td>
+</tr>
+<tr>
+<td>Kurtosis60</td>
+<td>个股收益的60日峰度</td>
+<td>个股收益的60日峰度</td>
+</tr>
+<tr>
+<td>sharpe_ratio_60</td>
+<td>60日夏普比率</td>
+<td>（Rp - Rf）/Sigma p 其中，Rp是个股的年化收益率，Rf是无风险利率（在这里设置为0.04），Sigma p是个股的收益波动率（标准差）</td>
+</tr>
+<tr>
+<td>Variance120</td>
+<td>120日年化收益方差</td>
+<td>120日年化收益方差</td>
+</tr>
+<tr>
+<td>Skewness120</td>
+<td>个股收益的120日偏度</td>
+<td>个股收益的120日偏度</td>
+</tr>
+<tr>
+<td>Kurtosis120</td>
+<td>个股收益的120日峰度</td>
+<td>个股收益的120日峰度</td>
+</tr>
+<tr>
+<td>sharpe_ratio_120</td>
+<td>120日夏普比率</td>
+<td>（Rp - Rf）/Sigma p 其中，Rp是个股的年化收益率，Rf是无风险利率（在这里设置为0.04），Sigma p是个股的收益波动率（标准差）</td>
+</tr>
+</tbody>
+</table>
+<h4 id="技术因子">技术因子</h4>
+<table>
+<thead>
+<tr>
+<th>因子 code</th>
+<th>因子名称</th>
+<th>计算方法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>boll_down</td>
+<td>下轨线（布林线）指标</td>
+<td>(MA(CLOSE,M)-2*STD(CLOSE,M)) / 今日收盘价; M=20</td>
+</tr>
+<tr>
+<td>boll_up</td>
+<td>上轨线（布林线）指标</td>
+<td>(MA(CLOSE,M)+2*STD(CLOSE,M)) / 今日收盘价; M=20</td>
+</tr>
+<tr>
+<td>EMA5</td>
+<td>5日指数移动均线</td>
+<td>5日指数移动均线 / 今日收盘价</td>
+</tr>
+<tr>
+<td>EMAC10</td>
+<td>10日指数移动均线</td>
+<td>10日指数移动均线 / 今日收盘价</td>
+</tr>
+<tr>
+<td>EMAC12</td>
+<td>12日指数移动均线</td>
+<td>12日指数移动均线 / 今日收盘价</td>
+</tr>
+<tr>
+<td>EMAC20</td>
+<td>20日指数移动均线</td>
+<td>20日指数移动均线 / 今日收盘价</td>
+</tr>
+<tr>
+<td>EMAC26</td>
+<td>26日指数移动均线</td>
+<td>26日指数移动均线 / 今日收盘价</td>
+</tr>
+<tr>
+<td>EMAC120</td>
+<td>120日指数移动均线</td>
+<td>120日指数移动均线 / 今日收盘价</td>
+</tr>
+<tr>
+<td>MAC5</td>
+<td>5日移动均线</td>
+<td>5日移动均线 / 今日收盘价</td>
+</tr>
+<tr>
+<td>MAC10</td>
+<td>10日移动均线</td>
+<td>10日移动均线 / 今日收盘价</td>
+</tr>
+<tr>
+<td>MAC20</td>
+<td>20日移动均线</td>
+<td>20日移动均线 / 今日收盘价</td>
+</tr>
+<tr>
+<td>MAC60</td>
+<td>60日移动均线</td>
+<td>60日移动均线 / 今日收盘价</td>
+</tr>
+<tr>
+<td>MAC120</td>
+<td>120日移动均线</td>
+<td>120日移动均线 / 今日收盘价</td>
+</tr>
+<tr>
+<td>MACDC</td>
+<td>平滑异同移动平均线</td>
+<td>MACD(SHORT=12, LONG=26, MID=9) / 今日收盘价</td>
+</tr>
+<tr>
+<td>MFI14</td>
+<td>资金流量指标</td>
+<td>①求得典型价格（当日最高价，最低价和收盘价的均值）<br>②根据典型价格高低判定正负向资金流（资金流=典型价格*成交量）<br>③计算MR= 正向/负向 ④MFI=100-100/（1+MR）</td>
+</tr>
+<tr>
+<td>price_no_fq</td>
+<td>不复权价格</td>
+<td>不复权价格</td>
+</tr>
+</tbody>
+</table>
+<h4 id="动量因子">动量因子</h4>
+<table>
+<thead>
+<tr>
+<th>因子 code</th>
+<th>因子名称</th>
+<th>计算方法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>arron_up_25</td>
+<td>Aroon指标上轨</td>
+<td>Aroon(上升)=[(计算期天数-最高价后的天数)/计算期天数]*100</td>
+</tr>
+<tr>
+<td>arron_down_25</td>
+<td>Aroon指标下轨</td>
+<td>Aroon(下降)=[(计算期天数-最低价后的天数)/计算期天数]*100</td>
+</tr>
+<tr>
+<td>BBIC</td>
+<td>BBI 动量</td>
+<td>BBI(3, 6, 12, 24) / 收盘价 （BBI 为常用技术指标类因子“多空均线”）</td>
+</tr>
+<tr>
+<td>bear_power</td>
+<td>空头力道</td>
+<td>(最低价-EMA(close,13)) / close</td>
+</tr>
+<tr>
+<td>BIAS5</td>
+<td>5日乖离率</td>
+<td>（收盘价-收盘价的N日简单平均）/ 收盘价的N日简单平均*100，在此n取5</td>
+</tr>
+<tr>
+<td>BIAS10</td>
+<td>10日乖离率</td>
+<td>（收盘价-收盘价的N日简单平均）/ 收盘价的N日简单平均*100，在此n取10</td>
+</tr>
+<tr>
+<td>BIAS20</td>
+<td>20日乖离率</td>
+<td>（收盘价-收盘价的N日简单平均）/ 收盘价的N日简单平均*100，在此n取20</td>
+</tr>
+<tr>
+<td>BIAS60</td>
+<td>60日乖离率</td>
+<td>（收盘价-收盘价的N日简单平均）/ 收盘价的N日简单平均*100，在此n取60</td>
+</tr>
+<tr>
+<td>bull_power</td>
+<td>多头力道</td>
+<td>(最高价-EMA(close,13)) / close</td>
+</tr>
+<tr>
+<td>CCI10</td>
+<td>10日顺势指标</td>
+<td>CCI:=(TYP-MA(TYP,N))/(0.015*AVEDEV(TYP,N)); TYP:=(HIGH+LOW+CLOSE)/3; N:=10</td>
+</tr>
+<tr>
+<td>CCI15</td>
+<td>15日顺势指标</td>
+<td>CCI:=(TYP-MA(TYP,N))/(0.015*AVEDEV(TYP,N)); TYP:=(HIGH+LOW+CLOSE)/3; N:=15</td>
+</tr>
+<tr>
+<td>CCI20</td>
+<td>20日顺势指标</td>
+<td>CCI:=(TYP-MA(TYP,N))/(0.015*AVEDEV(TYP,N)); TYP:=(HIGH+LOW+CLOSE)/3; N:=20</td>
+</tr>
+<tr>
+<td>CCI88</td>
+<td>88日顺势指标</td>
+<td>CCI:=(TYP-MA(TYP,N))/(0.015*AVEDEV(TYP,N)); TYP:=(HIGH+LOW+CLOSE)/3; N:=88</td>
+</tr>
+<tr>
+<td>CR20</td>
+<td>CR指标</td>
+<td>①中间价=1日前的最高价+最低价/2<br>②上升值=今天的最高价-前一日的中间价（负值记0）<br>③下跌值=前一日的中间价-今天的最低价（负值记0）<br>④多方强度=20天的上升值的和，空方强度=20天的下跌值的和<br>⑤CR=（多方强度÷空方强度）×100</td>
+</tr>
+<tr>
+<td>fifty_two_week_close_rank</td>
+<td>当前价格处于过去1年股价的位置</td>
+<td>取过去的250个交易日各股的收盘价时间序列，每只股票按照从大到小排列，并找出当日所在的位置</td>
+</tr>
+<tr>
+<td>MASS</td>
+<td>梅斯线</td>
+<td>MASS(N1=9, N2=25, M=6)</td>
+</tr>
+<tr>
+<td>PLRC12</td>
+<td>12日收盘价格与日期线性回归系数</td>
+<td>计算 12 日收盘价格，与日期序号（1-12）的线性回归系数，(close / mean(close)) = beta * t + alpha</td>
+</tr>
+<tr>
+<td>PLRC24</td>
+<td>24日收盘价格与日期线性回归系数</td>
+<td>计算 24 日收盘价格，与日期序号（1-24）的线性回归系数， (close / mean(close)) = beta * t + alpha</td>
+</tr>
+<tr>
+<td>PLRC6</td>
+<td>6日收盘价格与日期线性回归系数</td>
+<td>计算 6 日收盘价格，与日期序号（1-6）的线性回归系数，(close / mean(close)) = beta * t + alpha</td>
+</tr>
+<tr>
+<td>Price1M</td>
+<td>当前股价除以过去一个月股价均值再减1</td>
+<td>当日收盘价 / mean(过去一个月(21天)的收盘价) -1</td>
+</tr>
+<tr>
+<td>Price3M</td>
+<td>当前股价除以过去三个月股价均值再减1</td>
+<td>当日收盘价 / mean(过去三个月(61天)的收盘价) -1</td>
+</tr>
+<tr>
+<td>Price1Y</td>
+<td>当前股价除以过去一年股价均值再减1</td>
+<td>当日收盘价 / mean(过去一年(250天)的收盘价) -1</td>
+</tr>
+<tr>
+<td>Rank1M</td>
+<td>1减去 过去一个月收益率排名与股票总数的比值</td>
+<td>1-(Rank(个股20日收益) / 股票总数)</td>
+</tr>
+<tr>
+<td>ROC12</td>
+<td>12日变动速率（Price Rate of Change）</td>
+<td>①AX=今天的收盘价—12天前的收盘价<br>②BX=12天前的收盘价<br>③ROC=AX/BX*100</td>
+</tr>
+<tr>
+<td>ROC120</td>
+<td>120日变动速率（Price Rate of Change）</td>
+<td>①AX=今天的收盘价—120天前的收盘价<br>②BX=120天前的收盘价<br>③ROC=AX/BX*100</td>
+</tr>
+<tr>
+<td>ROC20</td>
+<td>20日变动速率（Price Rate of Change）</td>
+<td>①AX=今天的收盘价—20天前的收盘价<br>②BX=20天前的收盘价<br>③ROC=AX/BX*100</td>
+</tr>
+<tr>
+<td>ROC6</td>
+<td>6日变动速率（Price Rate of Change）</td>
+<td>①AX=今天的收盘价—6天前的收盘价<br>②BX=6天前的收盘价<br>③ROC=AX/BX*100</td>
+</tr>
+<tr>
+<td>ROC60</td>
+<td>60日变动速率（Price Rate of Change）</td>
+<td>①AX=今天的收盘价—60天前的收盘价<br>②BX=60天前的收盘价<br>③ROC=AX/BX*100</td>
+</tr>
+<tr>
+<td>single_day_VPT</td>
+<td>单日价量趋势</td>
+<td>（今日收盘价 - 昨日收盘价）/ 昨日收盘价 * 当日成交量  # (复权方法为基于当日前复权)</td>
+</tr>
+<tr>
+<td>single_day_VPT_12</td>
+<td>单日价量趋势12均值</td>
+<td>MA(single_day_VPT, 12)</td>
+</tr>
+<tr>
+<td>single_day_VPT_6</td>
+<td>单日价量趋势6日均值</td>
+<td>MA(single_day_VPT, 6)</td>
+</tr>
+<tr>
+<td>TRIX10</td>
+<td>10日终极指标TRIX</td>
+<td>MTR=收盘价的10日指数移动平均的10日指数移动平均的10日指数移动平均(求三次ema10);<br>TRIX=(MTR-1日前的MTR)/1日前的MTR*100</td>
+</tr>
+<tr>
+<td>TRIX5</td>
+<td>5日终极指标TRIX</td>
+<td>MTR=收盘价的5日指数移动平均的5日指数移动平均的5日指数移动平均(求三次ema5);<br>TRIX=(MTR-1日前的MTR)/1日前的MTR*100</td>
+</tr>
+<tr>
+<td>Volume1M</td>
+<td>当前交易量相比过去1个月日均交易量 与过去过去20日日均收益率乘积</td>
+<td>当日交易量 / 过去20日交易量MEAN * 过去20日收益率MEAN</td>
+</tr>
+</tbody>
+</table></div> </div> </div> <script type="text/template" id="treeTemp"> <li class="am-tree-branch am-hide" data-template="treebranch" role="treeitem" aria-expanded="false">
+    <div class="am-tree-branch-header">
+      <button class="am-tree-icon am-tree-icon-caret am-icon-caret-right"><span class="am-sr-only">Open</span></button>
+      <button class="am-tree-branch-name">
+        <span class="am-tree-icon am-tree-icon-folder"></span>
+        <span class="am-tree-label"></span>
+      </button>
+    </div>
+    <ul class="am-tree-branch-children" role="group"></ul>
+    <div class="am-tree-loader" role="alert"><span class="doc-loading"></span></div>
+  </li>
+  <li class="am-tree-item am-hide" data-template="treeitem" role="treeitem">
+    <button class="am-tree-item-name">
+      <span class="am-tree-icon am-tree-icon-item"></span>
+      <span class="am-tree-label"></span>
+    </button>
+  </li> </script></div> <div id="leftsead" class="jq-leftsead" draggable="true"> <ul><li class="qiyukf__entry backtotop-popover "> <div class="popover-content" style="width:85px;margin-left:-95px;margin-top:5px">在线客服</div> </li> <li class="backtotop__progress hidden"> <span class="backtotop__progress-count hidden"></span> <div class="backtotop__record-container hidden"></div> </li> <li class="newUser backtotop__newUser hidden backtotop__scroll"> <a href="/post/24debe6786302edc2febfc09b1312a6c" target="_blank"></a> </li> <li class="toTop backtotop__toTop hidden backtotop__scroll" id="top_btn"></li> </ul> <input type="hidden" class="timeStamp" value="17679309750001783575403239"> <input type="hidden" class="js-cdn-path" value="https://cdn.joinquant.com"> </div> <script src="https://cdn.joinquant.com/std/dist/asset/vendor.js?v=17679309750001783575403239"></script> <script>window.tokenData={name:"token",value:"ef9afc47976ec44d99070904a84bb1bf9b4ac2889641c3efc40590a71f800e5835e02eb852bcc01c54ebba0e7ae6b475"},$.ajaxSetup({data:{token:window.tokenData.value}})</script> <script src="https://cdn.joinquant.com/std/dist/asset/jq-plugin.js?v=17679309750001783575403239"></script> <script src="https://cdn.joinquant.com/std/dist/asset/general/login-dialog.bundle.js?v=17679309750001783575403239"></script> <script src="https://cdn.joinquant.com/std/dist/asset/general/message.bundle.js?v=17679309750001783575403239"></script> <script src="https://cdn.joinquant.com/std/dist/asset/general/wechat-share.bundle.js?v=17679309750001783575403239"></script> <input type="hidden" id="valid-code__token"><script src="https://cdn.joinquant.com/themes/jq/static/dist/asset/general/include.bundle.js?v=17679309750001783575403239"></script> <script src="https://cdn.joinquant.com/themes/jq/static/dist/asset/general/backtotop.bundle.js?v=17679309750001783575403239"></script> <script>!function(c,e,d,n,t){c[d]=c[d]||function(){(c[d].a=c[d].a||[]).push(arguments)},(t=e.createElement("script")).async=!0,t.src="https://qiyukf.com/script/d65beefd7552d92ee02344b3cc6173de.js",e.body.appendChild(t)}(window,document,"ysf")</script><script async="" src="https://qiyukf.com/script/d65beefd7552d92ee02344b3cc6173de.js"></script> <script charset="UTF-8" src="https://cdn.joinquant.com/std/third/MathJax-master/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script> <script charset="UTF-8" src="https://cdn.joinquant.com/std/dist/modules/help/api/help.bundle.js?v=17679309750001783575403239"></script><script src="https://cdn.joinquant.com/themes/jq/static/third/transition-notice.js"></script> <script charset="UTF-8">MathJax.Hub.Config({tex2jax:{inlineMath:[["$","$"],["\\(","\\)"]]}})</script>   <div style="top: 0px; left: 0px; visibility: hidden; position: absolute; width: 1px; height: 1px;"><iframe style="height:0px; width:0px;" src="https://qiyukf.com/webapi/sdkres/delegate.html?k=d65beefd7552d92ee02344b3cc6173de&amp;1784374719704"></iframe></div><div id="YSF-BTN-HOLDER" style="display: none;"><div id="YSF-CUSTOM-ENTRY-0" class="YSF-CUSTOM-ENTRY"><img src="https://xlx03.qiyukf.net/463a7f7a19b9c07a71b61506233233d7.jpg?imageView&amp;thumbnail=300x300"></div><span id="YSF-BTN-CIRCLE"></span><div id="YSF-BTN-BUBBLE"><div id="YSF-BTN-CONTENT"></div><span id="YSF-BTN-ARROW"></span><span id="YSF-BTN-CLOSE"></span></div></div></body></html>

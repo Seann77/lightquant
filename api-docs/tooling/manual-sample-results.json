@@ -1,0 +1,191 @@
+[
+  {
+    "name": "PTrade国金主API",
+    "pass": true,
+    "source_file": "api-docs/raw/ptrade/guojin/ptradeapi.html",
+    "markdown_file": ".markdown-staging/normalized/ptrade/guojin/strategy-api--api.md",
+    "heading": "get_history - 获取历史行情",
+    "source_anchor": "#get_history",
+    "source_table_count": 4,
+    "source_code_exact": null,
+    "missing_sample_tokens": [],
+    "source_excerpt": "get_history - 获取历史行情get_history(count, frequency='1d', field='close', security_list=None, fq=None, include=False, fill='nan', is_dict=False)使用场景该函数仅在回测、交易、研究模块可用接口说明该接口用于获取最近N条历史行情K线数据。支持多股票、多行情字段获取。注意事项： 该接口只能获取2005年后的数据。 针对停牌场景，我们没有跳过停牌的日期，无论对单只股票还是多只股票进行调用，时间轴均为二级市场交易日日历， 停牌时使用停牌前的数据填充，成交量为0，日K线可使用成交量为0的逻辑进行停牌日过滤。 证监会行业、聚源行业、概念板块、地域板块所对应标的的行情数据为非标准的交易所下发数据，是由数据源自行按照成分股分类规则进行计算的，存在与三方数据源不一致的情况。如用户需要在策略中使用，应自行评估该数据的合理性。 该接口与get_price接口不支持多线程同时调用，即在run_daily或run_interval等函数中不要与handle_data等框架模块同一",
+    "markdown_excerpt": "<a id=\"get_history\"></a> #### get\\_history - 获取历史行情 ```python get_history(count, frequency='1d', field='close', security_list=None, fq=None, include=False, fill='nan', is_dict=False) ``` ##### 使用场景 该函数仅在回测、交易、研究模块可用 ##### 接口说明 该接口用于获取最近N条历史行情K线数据。支持多股票、多行情字段获取。 注意事项： 1.  该接口只能获取2005年后的数据。 2.  针对停牌场景，我们没有跳过停牌的日期，无论对单只股票还是多只股票进行调用，时间轴均为二级市场交易日日历， 停牌时使用停牌前的数据填充，成交量为0，日K线可使用成交量为0的逻辑进行停牌日过滤。 3.  证监会行业、聚源行业、概念板块、地域板块所对应标的的行情数据为非标准的交易所下发数据，是由数据源自行按照成分股分类规则进行计算的，存在与三方数据源不一致的情况。如用户需要在策略中使用，应自行评估该数据的合理性。 4.  该接口与get\\_price接口不支持多线程同时调用，即在run\\_daily或run\\_interval等函数中不要与handle\\_data等框架模块同一时刻调用get\\_history或get\\_price接口，否则会偶现获取数据为空的现象 ##### 参数 count： K线数量，大"
+  },
+  {
+    "name": "PTrade国金财务数据",
+    "pass": true,
+    "source_file": "api-docs/raw/ptrade/guojin/财务数据api.html",
+    "markdown_file": ".markdown-staging/normalized/ptrade/guojin/finance--valuation.md",
+    "heading": "valuation-估值数据",
+    "source_anchor": "#valuation",
+    "source_table_count": 0,
+    "source_code_exact": null,
+    "missing_sample_tokens": [
+      "估值数据接口说明"
+    ],
+    "source_excerpt": "valuation-估值数据接口说明get_fundamentals(security, 'valuation', fields=None, date=None) 注意事项： 一、该接口只支持按天查询模式，返回查询日期对应股票相关数据。查询此表不支持输入的参数有：start_year, end_year, report_types, date_type, merge_type。 二、换手率（turnover_rate）和滚动股息率（dividend_ratio）两个字段数据源返回的是带%的字符串。比如turnover_rate：20%，用户需要自行转换成0.2的float格式。 关于date字段的说明 场景一：date字段不入参。回测中默认是获取context.blotter.current_dt交易日收盘后更新的数据，因此会产生未来函数，交易和研究会返回当日数据，若在盘中时间由于数据未更新将返回字段为NAN的数据，因此建议获取最新数据的场景都使用date参数入参上一个交易日日期。 场景二：date字段入参日期。回测和交易中若date为非交易日，将返回字段为NAN的数据；研究中若dat",
+    "markdown_excerpt": "<a id=\"valuation\"></a> ## valuation-估值数据 ### 接口说明 ```python get_fundamentals(security, 'valuation', fields=None, date=None) ``` 注意事项： 一、该接口只支持按天查询模式，返回查询日期对应股票相关数据。查询此表不支持输入的参数有：start\\_year, end\\_year, report\\_types, date\\_type, merge\\_type。 二、换手率（turnover\\_rate）和滚动股息率（dividend\\_ratio）两个字段数据源返回的是带%的字符串。比如turnover\\_rate：20%，用户需要自行转换成0.2的float格式。 关于date字段的说明 场景一：date字段不入参。回测中默认是获取context.blotter.current\\_dt交易日收盘后更新的数据，因此会产生未来函数，交易和研究会返回当日数据，若在盘中时间由于数据未更新将返回字段为NAN的数据，因此建议获取最新数据的场景都使用date参数入参上一个交易日日期。 场景二：date字段入参日期。回测和交易中若date为非交易日，将返回字段为NAN的数据；研究中若date为非交易日，将返回往前最近一个交易日的数据，注意回测和交易中是可以取到未来的数据，需要规避。 ```python                turnover_rate     pb  "
+  },
+  {
+    "name": "PTrade申万数据接口",
+    "pass": true,
+    "source_file": "api-docs/raw/ptrade/shenwan/08_api_data.html",
+    "markdown_file": ".markdown-staging/normalized/ptrade/shenwan/api-data-550d561d.md",
+    "heading": "get_history",
+    "source_anchor": "#get_history",
+    "source_table_count": 0,
+    "source_code_exact": true,
+    "missing_sample_tokens": [
+      "历史行情查询接口说明",
+      "pythonget_history"
+    ],
+    "source_excerpt": "get_history 中文名 历史行情查询接口说明 获取股票历史行情K线数据，支持多股票、多周期、多字段的历史数据查询。接口定义 pythonget_history(count, frequency='1d', field=None, security_list=None, fq=None, include=False, fill='nan', is_dict=False)1使用场景 ✅研究 ✅回测 ✅交易注意事项该接口只能获取2005年后的数据。针对停牌场景，我们没有跳过停牌的日期，无论对单只股票还是多只股票进行调用，时间轴均为二级市场交易日日历， 停牌时使用停牌前的数据填充，成交量为0，日K线可使用成交量为0的逻辑进行停牌日过滤。证监会行业、聚源行业、概念板块、地域板块所对应标的的行情数据为非标准的交易所下发数据，是由数据源自行按照成分股分类规则进行计算的，存在与三方数据源不一致的情况。如用户需要在策略中使用，应自行评估该数据的合理性。该接口与get_price接口不支持多线程同时调用，即在run_daily或run_interval等函数中不要与handle_data等框架模块",
+    "markdown_excerpt": "<a id=\"get_history\"></a> ### `get_history` <a id=\"中文名-20\"></a> #### 中文名 历史行情查询 <a id=\"接口说明-20\"></a> #### 接口说明 获取股票历史行情K线数据，支持多股票、多周期、多字段的历史数据查询。 <a id=\"接口定义-20\"></a> #### 接口定义 python ```python get_history(count, frequency='1d', field=None, security_list=None, fq=None, include=False, fill='nan', is_dict=False) ``` <a id=\"使用场景-20\"></a> #### 使用场景 ✅研究 ✅回测 ✅交易 注意事项 -   该接口只能获取2005年后的数据。 -   针对停牌场景，我们没有跳过停牌的日期，无论对单只股票还是多只股票进行调用，时间轴均为二级市场交易日日历， 停牌时使用停牌前的数据填充，成交量为0，日K线可使用成交量为0的逻辑进行停牌日过滤。 -   证监会行业、聚源行业、概念板块、地域板块所对应标的的行情数据为非标准的交易所下发数据，是由数据源自行按照成分股分类规则进行计算的，存在与三方数据源不一致的情况。如用户需要在策略中使用，应自行评估该数据的合理性。 -   该接口与get\\_price接口不支持多线程同时调用，即在run\\_daily或run\\_interv"
+  },
+  {
+    "name": "PTrade申万交易接口",
+    "pass": true,
+    "source_file": "api-docs/raw/ptrade/shenwan/09_api_trade.html",
+    "markdown_file": ".markdown-staging/normalized/ptrade/shenwan/api-trade-74a4b542.md",
+    "heading": "order_tick",
+    "source_anchor": "#order_tick",
+    "source_table_count": 0,
+    "source_code_exact": true,
+    "missing_sample_tokens": [
+      "行情触发买卖接口说明",
+      "可设定价格档位进行委托接口定义",
+      "pythonorder_tick"
+    ],
+    "source_excerpt": "order_tick 中文名 tick行情触发买卖接口说明 该接口用于在tick_data模块中进行买卖股票下单，可设定价格档位进行委托接口定义 pythonorder_tick(sid, amount, priceGear='1', limit_price=None)1使用场景 ❌研究 ❌回测 ✅交易注意事项该函数只能在tick_data模块中使用。参数 sid类型： str股票代码，必填参数amount类型： int交易数量，正数表示买入，负数表示卖出，必填参数priceGear类型： str默认： 1盘口档位，level1:1~5买档/-1~-5卖档，level2:1~10买档/-1~-10卖档，选填参数limit_price类型： float默认： None买卖限价，当输入参数中也包含priceGear时，下单价格以limit_price为主，选填参数返回 str:返回一个委托流水编号示例 pythonimport ast def initialize(context): g.security = \"600570.XSHG\" set_universe(g.security) d",
+    "markdown_excerpt": "<a id=\"order_tick\"></a> ### `order_tick` <a id=\"中文名-3\"></a> #### 中文名 tick行情触发买卖 <a id=\"接口说明-3\"></a> #### 接口说明 该接口用于在tick\\_data模块中进行买卖股票下单，可设定价格档位进行委托 <a id=\"接口定义-3\"></a> #### 接口定义 python ```python order_tick(sid, amount, priceGear='1', limit_price=None) ``` <a id=\"使用场景-3\"></a> #### 使用场景 ❌研究 ❌回测 ✅交易 注意事项 1.  该函数只能在tick\\_data模块中使用。 <a id=\"参数-3\"></a> #### 参数 **`sid`** -   类型： `str` 股票代码，必填参数 **`amount`** -   类型： `int` 交易数量，正数表示买入，负数表示卖出，必填参数 **`priceGear`** -   类型： `str` -   默认： `1` 盘口档位，level1:1~5买档/-1~-5卖档，level2:1~10买档/-1~-10卖档，选填参数 **`limit_price`** -   类型： `float` -   默认： `None` 买卖限价，当输入参数中也包含priceGear时，下单价格以limit\\_price为主，选填参数 <a id=\"返回-3\""
+  },
+  {
+    "name": "QMT行情API",
+    "pass": true,
+    "source_file": "api-docs/raw/qmt/innerapi-combined.html",
+    "markdown_file": ".markdown-staging/normalized/qmt/builtin-python/builtin-python--doc-data-function.md",
+    "heading": "ContextInfo.get_market_data_ex - 获取行情数据",
+    "source_anchor": "#data_function--contextinfo-get-market-data-ex-获取行情数据",
+    "source_table_count": 0,
+    "source_code_exact": true,
+    "missing_sample_tokens": [
+      "获取行情数据注意该函数不建议在",
+      "中运行时仅能取到本地数据关于获取行情函数之间的区别与注意事项可在",
+      "查看除实时行情外",
+      "如资金流向数据",
+      "订单流数据等"
+    ],
+    "source_excerpt": "ContextInfo.get_market_data_ex - 获取行情数据注意该函数不建议在init中运行,在init中运行时仅能取到本地数据关于获取行情函数之间的区别与注意事项可在 - 常见问题-行情相关在新窗口打开 查看除实时行情外，该函数还可用于获取特色数据，如资金流向数据,订单流数据等，获取方式见数据字典在新窗口打开原型ContextInfo.get_market_data_ex( fields=[], stock_code=[], period='follow', start_time='', end_time='', count=-1, dividend_type='follow', fill_data=True, subscribe=True) 释义获取实时行情与历史行情数据参数名称类型描述fieldlist数据字段，详情见下方field字段表stock_listlist合约代码列表periodstr数据周期，可选字段为:\"tick\"\"1m\"：1分钟线\"5m\"：5分钟线；\"15m\"：15分钟线；\"30m\"：30分钟线 \"1h\"小时线 \"1d\"：日线 \"1w\"：周线 \"",
+    "markdown_excerpt": "<a id=\"data_function--contextinfo-get-market-data-ex-获取行情数据\"></a> ### ContextInfo.get\\_market\\_data\\_ex - 获取行情数据 注意 1.  **该函数不建议在`init`中运行,在`init`中运行时仅能取到本地数据** 2.  关于获取行情函数之间的区别与注意事项可在 - [常见问题-行情相关在新窗口打开](builtin-python--doc-question-answer.md#question_answer--行情相关) 查看 3.  除实时行情外，该函数还可用于获取特色数据，如`资金流向数据`,`订单流数据`等，获取方式见[数据字典在新窗口打开](https://dict.thinktrader.net/dictionary/) **原型** ```python ContextInfo.get_market_data_ex(     fields=[],      stock_code=[],      period='follow',      start_time='',      end_time='',      count=-1,      dividend_type='follow',      fill_data=True,      subscribe=True) ``` **释义** 获取实时行情与历史行情数据 **参数** | 名称 | 类型 | 描"
+  },
+  {
+    "name": "QMT下单API",
+    "pass": true,
+    "source_file": "api-docs/raw/qmt/innerapi-combined.html",
+    "markdown_file": ".markdown-staging/normalized/qmt/builtin-python/builtin-python--doc-trading-function.md",
+    "heading": "passorder - 综合下单函数",
+    "source_anchor": "#trading_function--passorder-综合下单函数",
+    "source_table_count": 0,
+    "source_code_exact": true,
+    "missing_sample_tokens": [
+      "综合下单函数综合下单函数",
+      "融资融券等交易操作推荐使用提示推荐使用可覆盖多品种下单注意参数的变化调用方法"
+    ],
+    "source_excerpt": "passorder - 综合下单函数综合下单函数，用于股票、期货、期权等下单和新股、新债申购、融资融券等交易操作推荐使用提示推荐使用可覆盖多品种下单注意参数的变化调用方法：passorder( opType, orderType, accountid , orderCode, prType, price, volume , strategyName, quickTrade, userOrderId , ContextInfo ) ''' passorder( 2 #opType 操作号 , 1101 #orderType 组合方式 , '1000044' #accountid 资金账号 , 'cu2403.SF' #orderCode 品种代码 , 14 #prType 报价类型 , 0.0 #price 价格 , 2 #volume 下单量 , '示例下单' #strategyName 策略名称 , 1 #quickTrade 快速下单标记 , '投资备注' #userOrderId 投资备注 , C #ContextInfo 策略上下文 ) ''' #coding:gbk ''' ",
+    "markdown_excerpt": "<a id=\"trading_function--passorder-综合下单函数\"></a> ### passorder - 综合下单函数 综合下单函数，用于股票、期货、期权等下单和新股、新债申购、融资融券等交易操作**推荐使用** 提示 1.  推荐使用 2.  可覆盖多品种下单 3.  注意参数的变化 **调用方法：** ```python passorder(     opType, orderType, accountid     , orderCode, prType, price, volume     , strategyName, quickTrade, userOrderId     , ContextInfo ) ''' passorder(     2 #opType 操作号     , 1101 #orderType 组合方式     , '1000044' #accountid 资金账号     , 'cu2403.SF' #orderCode 品种代码     , 14 #prType 报价类型     , 0.0 #price 价格     , 2 #volume 下单量     , '示例下单' #strategyName 策略名称     , 1 #quickTrade 快速下单标记     , '投资备注' #userOrderId 投资备注     , C #ContextInfo 策略上下文 ) ''' ``` ```python #co"
+  },
+  {
+    "name": "JoinQuant策略API",
+    "pass": true,
+    "source_file": "api-docs/raw/joinquant/api/rendered.html",
+    "markdown_file": ".markdown-staging/normalized/joinquant/api-c071ddc3.md",
+    "heading": "initialize",
+    "source_anchor": "#initialize",
+    "source_table_count": 0,
+    "source_code_exact": true,
+    "missing_sample_tokens": [],
+    "source_excerpt": "initialize 初始化函数 initialize(context) 初始化方法，在整个回测、模拟中最开始执行一次，用于初始一些全局变量 参数 context: Context对象, 存放有当前的账户/股票持仓信息 注意 该函数只在开始模拟交易的时候运行一次, 直接替换/修改代码导致的初始化函数变动并不会在模拟盘中生效 , 应该使用after_code_changed等函数 返回 None 示例def initialize(context): # g为全局变量 g.security = \"000001.XSHE\"",
+    "markdown_excerpt": "<a id=\"initialize\"></a> ### initialize **初始化函数** ```python initialize(context) ``` 初始化方法，在整个回测、模拟中最开始执行一次，用于初始一些全局变量 **参数** context: [Context](api--api--814c0653.md#Context)对象, 存放有当前的账户/股票持仓信息 **注意** 该函数只在开始模拟交易的时候运行一次, 直接替换/修改代码导致的初始化函数变动并不会在模拟盘中生效 , 应该使用after\\_code\\_changed等函数 **返回** None **示例** ```python def initialize(context):     # g为全局变量     g.security = \"000001.XSHE\" ``` ### run\\_daily/run\\_weekly/run\\_monthly **定时运行策略(可选)** -   run\\_monthly -   run\\_weekly -   run\\_daily ```python def initialize(context):     ## func是您自己定义的函数     # 按月运行     run_monthly(func, monthday, time='9:30', reference_security, force=False)     # 按周运行     run_w"
+  },
+  {
+    "name": "JoinQuant Stock",
+    "pass": true,
+    "source_file": "api-docs/raw/joinquant/Stock/rendered.html",
+    "markdown_file": ".markdown-staging/normalized/joinquant/stock-ccc91371.md",
+    "heading": "get_fundamentals",
+    "source_anchor": "#get_fundamentals",
+    "source_table_count": 0,
+    "source_code_exact": true,
+    "missing_sample_tokens": [
+      "详细的财务数据表及字段描述请点击财务数据文档查看",
+      "查询指定日期"
+    ],
+    "source_excerpt": "get_fundamentals 查询财务数据 get_fundamentals(query_object, date=None, statDate=None) 查询财务数据，详细的财务数据表及字段描述请点击财务数据文档查看，Query 对象的使用方法请参考Query的简单教程 date和statDate参数只能传入一个: 传入date时, 查询指定日期date收盘后所能看到的最近(对市值表来说, 最近一天, 对其他表来说, 最近一个季度)的数据, 默认我们会查找上市公司在当前日期之前发布的数据, 不会有未来函数.不要传递当天的日期取获取估值表,pe/市值等依赖收盘价的指标是盘后更新的。 传入statDate时, 查询 statDate 指定的季度或者年份的财务数据. 注意: 由于公司发布财报不及时, 一般是看不到当季度或年份的财务报表的, 回测中使用这个数据可能会有未来函数, 请注意规避. 由于估值表每天更新, 当按季度或者年份查询时, 返回季度或者年份最后一天的数据 由于“资产负债数据”这个表是存量性质的， 查询年度数据是返回第四季度的数据。 银行业、券商、保险专项数据只有年报数据",
+    "markdown_excerpt": "<a id=\"get_fundamentals\"></a> ### get\\_fundamentals **查询财务数据** ```python get_fundamentals(query_object, date=None, statDate=None) ``` 查询财务数据，详细的财务数据表及字段描述请点击[财务数据文档](#获取单季度年度财务数据)查看，Query 对象的使用方法请参考[Query的简单教程](https://www.joinquant.com/view/community/detail/433d0e9ed9fed11fc9f7772eab8d9376) date和statDate参数只能传入一个: -   传入date时, 查询**指定日期date收盘后所能看到的最近(对市值表来说, 最近一天, 对其他表来说, 最近一个季度)的数据**, 默认我们会查找上市公司在当前日期之前发布的数据, 不会有未来函数.不要传递当天的日期取获取估值表,pe/市值等依赖收盘价的指标是盘后更新的。 -   传入statDate时, 查询 **statDate 指定的季度或者年份的财务数据**. 注意: 1.  由于公司发布财报不及时, 一般是看不到当季度或年份的财务报表的, 回测中使用这个数据可能会有未来函数, 请注意规避. 2.  由于估值表每天更新, 当按季度或者年份查询时, 返回季度或者年份最后一天的数据 3.  由于“资产负债数据”这个表是存量性质的， 查询年度数据"
+  },
+  {
+    "name": "JoinQuant JQData",
+    "pass": true,
+    "source_file": "api-docs/raw/joinquant/JQData/rendered.html",
+    "markdown_file": ".markdown-staging/normalized/joinquant/jqdata--jqdata.md",
+    "heading": "get_query_count",
+    "source_anchor": "#get_query_count",
+    "source_table_count": 1,
+    "source_code_exact": true,
+    "missing_sample_tokens": [],
+    "source_excerpt": "get_query_count 查询当日剩余可调用条数 get_query_count() 描述：查看当日剩余可调用条数，试用账号默认是每日50万条；正式账号是每日2亿条。 说明：一行表示一条，如下图；如果不确定的话，可以在调用前后分别查询下可调用条数 返回 一个dict，字段说明如下： 字段名 说明 total 当日可调用数据总条数 spare 当日剩余可调用条数 示例 #查询当日剩余可调用数据条数 count=get_query_count() print(count) >>>{'total': 1000000,'spare': 996927}",
+    "markdown_excerpt": "<a id=\"get_query_count\"></a> ### get\\_query\\_count **查询当日剩余可调用条数** ```python get_query_count() ``` 描述：查看当日剩余可调用条数，试用账号默认是每日50万条；正式账号是每日2亿条。 说明：**一行表示一条，如下图；如果不确定的话，可以在调用前后分别查询下可调用条数** ![img](https://image.joinquant.com/4dee2952abb2bf6a75ba3fedae3d5da2) **返回** 一个dict，字段说明如下： | 字段名 | 说明 | | --- | --- | | total | 当日可调用数据总条数 | | spare | 当日剩余可调用条数 | **示例** ```python #查询当日剩余可调用数据条数 count=get_query_count() print(count) >>>{'total': 1000000,'spare': 996927} ``` "
+  },
+  {
+    "name": "JoinQuant技术指标",
+    "pass": true,
+    "source_file": "api-docs/raw/joinquant/technicalanalysis/rendered.html",
+    "markdown_file": ".markdown-staging/normalized/joinquant/technicalanalysis-dfa445d1.md",
+    "heading": "MACD-平滑异同平均",
+    "source_anchor": "#MACD-平滑异同平均",
+    "source_table_count": 0,
+    "source_code_exact": null,
+    "missing_sample_tokens": [],
+    "source_excerpt": "MACD-平滑异同平均MACD(security_list, check_date, SHORT = 12, LONG = 26, MID = 9, unit = '1d', include_now = True, fq_ref_date = None) 参数： security_list：标的列表 check_date：要查询数据的日期 SHORT：统计的天数 SHORT LONG：统计的天数 LONG MID：统计的天数 MID unit：统计周期，默认为 '1d', 支持如下周期: '1m', '5m', '15m', '30m', '60m', '120m', '1d', '1w', '1M'. '1w' 表示一周, ‘1M' 表示一月 include_now：是否包含当前周期，默认为 True fq_ref_date：复权基准日，默认为 None 返回： DIF, DEA和MACD的值 返回结果类型： 字典(dict)：键(key)为标的代码，值(value)为数据。 如：({'000001.XSHE': 0.024474457964069884, '603177.XSHG'",
+    "markdown_excerpt": "<a id=\"MACD-平滑异同平均\"></a> ### MACD-平滑异同平均 ```python MACD(security_list, check_date, SHORT = 12, LONG = 26, MID = 9, unit = '1d', include_now = True, fq_ref_date = None) ``` **参数：** -   security\\_list：标的列表 -   check\\_date：要查询数据的日期 -   SHORT：统计的天数 SHORT -   LONG：统计的天数 LONG -   MID：统计的天数 MID -   unit：统计周期，默认为 '1d', 支持如下周期: '1m', '5m', '15m', '30m', '60m', '120m', '1d', '1w', '1M'. '1w' 表示一周, ‘1M' 表示一月 -   include\\_now：是否包含当前周期，默认为 True -   fq\\_ref\\_date：复权基准日，默认为 None **返回：** -   DIF, DEA和MACD的值 **返回结果类型：** -   字典(dict)：键(key)为标的代码，值(value)为数据。 -   如：({'000001.XSHE': 0.024474457964069884, '603177.XSHG': nan, '000002.XSHE': 1.9534717416190936, '60"
+  },
+  {
+    "name": "简单表格",
+    "pass": true,
+    "source_file": "api-docs/raw/qmt/innerapi-combined.html",
+    "markdown_file": "normalized/qmt/builtin-python/builtin-python--doc-data-function.md",
+    "evidence": {
+      "columns": [
+        "字段名",
+        "数据类型",
+        "解释"
+      ],
+      "markdown_header": "| 字段名 | 数据类型 | 解释 |"
+    }
+  },
+  {
+    "name": "复杂表格",
+    "pass": true,
+    "source_file": "api-docs/raw/joinquant/JQData/rendered.html",
+    "markdown_file": ".markdown-staging/normalized/joinquant/jqdata--jqdata.md",
+    "evidence": {
+      "sourceRows": 28,
+      "markdownRows": 28,
+      "sourceCells": 72,
+      "markdownCells": 72,
+      "sampleText": "普通试用账号 正式账号 金融机构特色试用权限 账号功能 数据种类&可用时间范围 基础数据 按需采买 按需申请 有效期 3个月 1年 连接数（auth lisen"
+    }
+  },
+  {
+    "name": "长Python代码示例",
+    "pass": true,
+    "source_file": "api-docs/raw/qmt/innerapi-combined.html",
+    "markdown_file": "normalized/qmt/builtin-python/builtin-python--doc-code-examples.md",
+    "evidence": {
+      "characters": 25023,
+      "lines": 33,
+      "exact_match": true
+    }
+  }
+]

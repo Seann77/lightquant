@@ -1,0 +1,247 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - link "joinQuant" [ref=e5] [cursor=pointer]:
+        - /url: /
+      - navigation [ref=e6]:
+        - list [ref=e7]:
+          - listitem [ref=e8]:
+            - link "首页" [ref=e9] [cursor=pointer]:
+              - /url: /
+          - listitem [ref=e10]:
+            - link "量化研究平台" [ref=e11] [cursor=pointer]:
+              - /url: javascript:void(0)
+          - listitem [ref=e12]:
+            - link "聚宽社区" [ref=e13] [cursor=pointer]:
+              - /url: /community/new
+          - listitem [ref=e14]:
+            - link "帮助" [ref=e15] [cursor=pointer]:
+              - /url: javascript:void(0)
+          - listitem [ref=e16]:
+            - link "JQData本地数据" [ref=e17] [cursor=pointer]:
+              - /url: javascript:void(0)
+          - listitem [ref=e18]:
+            - link "平台会员" [ref=e19] [cursor=pointer]:
+              - /url: javascript:void(0)
+          - listitem [ref=e20]:
+            - link "登录" [ref=e21] [cursor=pointer]:
+              - /url: /user/login/index?type=login
+          - listitem [ref=e22]:
+            - link "注册" [ref=e23] [cursor=pointer]:
+              - /url: /user/register/index?type=register
+  - tree [ref=e28]:
+    - treeitem [expanded] [ref=e29]:
+      - generic [ref=e30]:
+        - text: 
+        - button [ref=e31] [cursor=pointer]:
+          - text: 
+          - link "API新" [ref=e33]:
+            - /url: "#name:api"
+      - group [ref=e34]:
+        - treeitem [ref=e35] [cursor=pointer]:
+          - button [ref=e36]:
+            - link "API文档" [ref=e38]:
+              - /url: "#API文档"
+        - treeitem [expanded] [ref=e39]:
+          - generic [ref=e40]:
+            - text: 
+            - button [ref=e41] [cursor=pointer]:
+              - text: 
+              - link "开始写策略" [ref=e43]:
+                - /url: "#开始写策略"
+          - group [ref=e44]:
+            - treeitem [ref=e45] [cursor=pointer]:
+              - button [ref=e46]:
+                - link "简单但是完整的策略" [ref=e48]:
+                  - /url: "#简单但是完整的策略"
+            - treeitem [ref=e49] [cursor=pointer]:
+              - button [ref=e50]:
+                - link "实用的策略" [ref=e52]:
+                  - /url: "#实用的策略"
+        - treeitem [expanded] [ref=e53]:
+          - generic [ref=e54]:
+            - text: 
+            - button [ref=e55] [cursor=pointer]:
+              - text: 
+              - link "策略引擎介绍" [ref=e57]:
+                - /url: "#策略引擎介绍"
+          - group [ref=e58]:
+            - treeitem [ref=e59] [cursor=pointer]:
+              - button [ref=e60]:
+                - link "安全" [ref=e62]:
+                  - /url: "#安全"
+            - treeitem [ref=e63] [cursor=pointer]:
+              - button [ref=e64]:
+                - link "数据" [ref=e66]:
+                  - /url: "#数据"
+            - treeitem [ref=e67] [cursor=pointer]:
+              - button [ref=e68]:
+                - link "运行频率" [ref=e70]:
+                  - /url: "#运行频率"
+            - treeitem [ref=e71] [cursor=pointer]:
+              - button [ref=e72]:
+                - link "运行时间" [ref=e74]:
+                  - /url: "#运行时间"
+            - treeitem [ref=e75] [cursor=pointer]:
+              - button [ref=e76]:
+                - link "订单处理" [ref=e78]:
+                  - /url: "#订单处理"
+            - treeitem [ref=e79] [cursor=pointer]:
+              - button [ref=e80]:
+                - link "拆分合并与分红" [ref=e82]:
+                  - /url: "#拆分合并与分红"
+            - treeitem [ref=e83] [cursor=pointer]:
+              - button [ref=e84]:
+                - link "股息红利税的计算" [ref=e86]:
+                  - /url: "#股息红利税的计算"
+            - treeitem [ref=e87] [cursor=pointer]:
+              - button [ref=e88]:
+                - link "滑点" [ref=e90]:
+                  - /url: "#滑点"
+            - treeitem [ref=e91] [cursor=pointer]:
+              - button [ref=e92]:
+                - link "交易税费" [ref=e94]:
+                  - /url: "#交易税费"
+            - treeitem [ref=e95] [cursor=pointer]:
+              - button [ref=e96]:
+                - link "风险指标" [ref=e98]:
+                  - /url: "#风险指标"
+            - treeitem [ref=e99] [cursor=pointer]:
+              - button [ref=e100]:
+                - link "回测环境" [ref=e102]:
+                  - /url: "#回测环境"
+            - treeitem [ref=e103] [cursor=pointer]:
+              - button [ref=e104]:
+                - link "回测过程" [ref=e106]:
+                  - /url: "#回测过程"
+            - treeitem [ref=e107] [cursor=pointer]:
+              - button [ref=e108]:
+                - link "模拟盘注意事项" [ref=e110]:
+                  - /url: "#模拟盘注意事项"
+            - treeitem [ref=e111] [cursor=pointer]:
+              - button [ref=e112]:
+                - link "模拟交易和回测的差别" [ref=e114]:
+                  - /url: "#模拟交易和回测的差别"
+            - treeitem [ref=e115] [cursor=pointer]:
+              - button [ref=e116]:
+                - link "期货交割日" [ref=e118]:
+                  - /url: "#期货交割日"
+            - treeitem [ref=e119] [cursor=pointer]:
+              - button [ref=e120]:
+                - link "还券细则" [ref=e122]:
+                  - /url: "#还券细则"
+            - treeitem [ref=e123] [cursor=pointer]:
+              - button [ref=e124]:
+                - link "投资组合优化器" [ref=e126]:
+                  - /url: "#投资组合优化器"
+        - treeitem [ref=e127] [cursor=pointer]:
+          - button [ref=e128]:
+            - link "策略程序架构♠" [ref=e130]:
+              - /url: "#策略程序架构♠"
+        - treeitem [expanded] [ref=e131]:
+          - generic [ref=e132]:
+            - text: 
+            - button [ref=e133] [cursor=pointer]:
+              - text: 
+              - link "策略API介绍" [ref=e135]:
+                - /url: "#策略API介绍"
+          - group [ref=e136]:
+            - treeitem [ref=e137] [cursor=pointer]:
+              - button [ref=e138]:
+                - link "注意事项" [ref=e140]:
+                  - /url: "#注意事项"
+            - treeitem [ref=e141] [cursor=pointer]:
+              - button [ref=e142]:
+                - link "策略设置函数" [ref=e144]:
+                  - /url: "#策略设置函数"
+            - treeitem [ref=e145] [cursor=pointer]:
+              - button [ref=e146]:
+                - link "数据获取函数" [ref=e148]:
+                  - /url: "#数据获取函数"
+            - treeitem [ref=e149] [cursor=pointer]:
+              - button [ref=e150]:
+                - link "jqlib" [ref=e152]:
+                  - /url: "#jqlib"
+            - treeitem [ref=e153] [cursor=pointer]:
+              - button [ref=e154]:
+                - link "数据处理函数" [ref=e156]:
+                  - /url: "#数据处理函数"
+            - treeitem [ref=e157] [cursor=pointer]:
+              - button [ref=e158]:
+                - link "组合优化函数" [ref=e160]:
+                  - /url: "#组合优化函数"
+            - treeitem [ref=e161] [cursor=pointer]:
+              - button [ref=e162]:
+                - link "交易函数" [ref=e164]:
+                  - /url: "#交易函数"
+            - treeitem [ref=e165] [cursor=pointer]:
+              - button [ref=e166]:
+                - link "对象♠" [ref=e168]:
+                  - /url: "#对象♠"
+            - treeitem [ref=e169] [cursor=pointer]:
+              - button [ref=e170]:
+                - link "其他函数" [ref=e172]:
+                  - /url: "#其他函数"
+            - treeitem [ref=e173] [cursor=pointer]:
+              - button [ref=e174]:
+                - link "策略组合操作" [ref=e176]:
+                  - /url: "#策略组合操作"
+            - treeitem [ref=e177] [cursor=pointer]:
+              - button [ref=e178]:
+                - link "Tick 级策略专用函数" [ref=e180]:
+                  - /url: "#Tick级策略专用函数"
+            - treeitem [ref=e181] [cursor=pointer]:
+              - button [ref=e182]:
+                - link "融资融券专用函数" [ref=e184]:
+                  - /url: "#融资融券专用函数"
+            - treeitem [ref=e185] [cursor=pointer]:
+              - button [ref=e186]:
+                - link "期货策略专用函数" [ref=e188]:
+                  - /url: "#期货策略专用函数"
+            - treeitem [expanded] [ref=e189]:
+              - generic [ref=e190]:
+                - text: 
+                - button [ref=e191] [cursor=pointer]:
+                  - text: 
+                  - link "归因分析说明" [ref=e193]:
+                    - /url: "#归因分析说明"
+              - group [ref=e194]:
+                - treeitem [ref=e195] [cursor=pointer]:
+                  - button [ref=e196]:
+                    - link "净值分析" [ref=e198]:
+                      - /url: "#净值分析"
+                - treeitem [ref=e199] [cursor=pointer]:
+                  - button [ref=e200]:
+                    - link "Brinson 归因" [ref=e202]:
+                      - /url: "#Brinson归因"
+                - treeitem [ref=e203] [cursor=pointer]:
+                  - button [ref=e204]:
+                    - link "因子分析" [ref=e206]:
+                      - /url: "#因子分析"
+        - treeitem [expanded] [ref=e207]:
+          - generic [ref=e208]:
+            - text: 
+            - button [ref=e209] [cursor=pointer]:
+              - text: 
+              - link "策略示例" [ref=e211]:
+                - /url: "#策略示例"
+          - group [ref=e212]:
+            - treeitem [ref=e213] [cursor=pointer]:
+              - button [ref=e214]:
+                - link "均线策略" [ref=e216]:
+                  - /url: "#均线策略"
+            - treeitem [ref=e217] [cursor=pointer]:
+              - button [ref=e218]:
+                - link "多股票持仓示例" [ref=e220]:
+                  - /url: "#多股票持仓示例"
+            - treeitem [ref=e221] [cursor=pointer]:
+              - button [ref=e222]:
+                - link "多股票追涨策略" [ref=e224]:
+                  - /url: "#多股票追涨策略"
+            - treeitem [ref=e225] [cursor=pointer]:
+              - button [ref=e226]:
+                - link "万圣节效应策略" [ref=e228]:
+                  - /url: "#万圣节效应策略"
+  - generic [ref=e232]:
+    - list:
+      - listitem [ref=e233] [cursor=pointer]

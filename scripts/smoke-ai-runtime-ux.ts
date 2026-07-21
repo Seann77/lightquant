@@ -3,6 +3,7 @@ import path from "node:path";
 import {
   getCachedClientRequestStartedAt,
   getCachedTaskStartedAt,
+  formatElapsedDuration,
   getTaskElapsedSeconds,
   migrateTaskStartedAt,
   pickEarliestValidIso,
@@ -123,6 +124,7 @@ async function main() {
     startedAt: "2026-07-12T10:00:00.000Z",
     finishedAt: "2026-07-12T10:02:05.000Z"
   }) === 125);
+  expect("elapsed formatter uses mm:ss", formatElapsedDuration(86) === "01:26");
 
   const openFenceBlocks = parseStreamingMarkdownBlocks([
     "说明",
@@ -171,7 +173,10 @@ async function main() {
   expect("strategy billing tag only appears after completion", /const billingTag = status === "succeeded" \? getBillingTag/.test(chatClient) && /const billingTag = completed \? getBillingTag/.test(chatClient));
   expect("final answer stream no longer accepts billing props", !/billingLabel|billingWaived/.test(thinkingMessage));
   expect("final floating cost style removed", !/lq-final-floating-cost/.test(thinkingMessage) && !/lq-final-floating-cost/.test(globalsCss));
-  expect("strategy elapsed formatter supports minute display", /return `\$\{minutes\}m \$\{seconds\}s`;/.test(chatClient));
+  expect("workbench elapsed formatter uses clock display", /formatElapsedDuration/.test(chatClient) && !/`(?:转换|解析)中 \$\{elapsedSeconds\}s`/.test(`${chatClient}\n${analysisClient}`));
+  expect("conversion uses stop button and terminal lock", /handleCancelConversionTask/.test(chatClient) && /已完成转换/.test(chatClient) && /readOnly=\{conversionInputLocked\}/.test(chatClient));
+  expect("analysis uses cancel task and terminal lock", /cancelAiTask\(taskId\)/.test(analysisClient) && /readOnly=\{analysisInputLocked\}/.test(analysisClient));
+  expect("single task modules remove clear content buttons", !/清空内容/.test(analysisClient) && !/清空内容/.test(chatClient.slice(chatClient.indexOf("function ConvertModeContent"))));
   expect("strategy stop task button uses restrained blue styling", /\.lq-stop-task-btn/.test(globalsCss) && /#0b4fc7/.test(globalsCss) && !/\.lq-stop-task-btn[\s\S]{0,900}(#b42318|217,\s*45,\s*32|248,\s*113,\s*113)/.test(globalsCss));
   expect("strategy job status has one-way merge", /function mergeJobStatus/.test(chatClient) && /getJobStatusRank\(nextStatus\) >= getJobStatusRank\(previousStatus\)/.test(chatClient));
   expect("pending no longer overrides running display branch", !/activeJob\?\.status === "queued"/.test(chatClient));

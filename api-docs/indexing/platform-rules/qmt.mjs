@@ -1,0 +1,15 @@
+export const qmtRules = {
+  variant: 'builtin-python',
+  source_role: 'primary',
+  resolution_priority: 100,
+  api_heading: 'formal function or ContextInfo method heading',
+  signature_sources: ['fenced call prototype', 'explicit 调用方法 inline code'],
+  parameter_sources: ['参数 table', 'formal parameter list'],
+  return_sources: ['返回 subsection'],
+  object_field_sources: ['数据类 heading', 'field definition table'],
+  callbacks: ['init', 'after_init', 'handlebar', 'account_callback', 'task_callback', 'order_callback', 'deal_callback', 'position_callback', 'orderError_callback'],
+  excluded_documents: ['code-examples', 'question-answer', 'interface-operation', 'start-now'],
+  environment_markers: ['回测', '实盘', '策略'],
+  document_type_mapping: 'front matter document_type is authoritative',
+  vba_included: false,
+};
