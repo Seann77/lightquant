@@ -27,6 +27,12 @@ import {
   type AiOutputIntegrityDecision
 } from "@/server/ai/output-integrity";
 import { getSingleTaskConversationConflict } from "@/server/ai/single-task-conversation";
+import { getStrategyExplanationMode } from "@/server/ai/strategy-explanation-intent";
+import {
+  resolveConversationStrategyCodeArtifact,
+  shouldResolveConversationStrategyCodeReference,
+  type ConversationStrategyCodeArtifact
+} from "@/server/ai/conversation-strategy-code";
 
 type CreateAiTaskRequest = {
   type: string;
@@ -162,10 +168,49 @@ export async function createAiTask(userId: string, input: CreateAiTaskRequest, r
     taskType: type,
     hasInputFile: Boolean(providerInput.inputFileId)
   }, () => resolveInputFile(userId, type, providerInput));
+  const shouldResolveReferenceStrategyCode = shouldResolveConversationStrategyCodeReference({
+    type,
+    prompt: resolvedInput.prompt,
+    inputCode: resolvedInput.inputCode
+  });
+  const referenceStrategyCode = shouldResolveReferenceStrategyCode
+    ? await measureAiPerf("create_task.resolve_reference_strategy_code", {
+        requestId,
+        taskType: type,
+        conversationId: conversationDraft?.conversation?.id ?? null
+      }, () => resolveConversationStrategyCodeArtifact({
+        repository,
+        userId,
+        conversationId: conversationDraft?.conversation?.id,
+        currentInputCode: resolvedInput.inputCode,
+        sourcePlatform: resolvedInput.sourcePlatform,
+        targetPlatform: resolvedInput.targetPlatform
+      }))
+    : null;
+
+  if (
+    shouldResolveReferenceStrategyCode &&
+    !referenceStrategyCode
+  ) {
+    throw new ApiError(
+      "VALIDATION_ERROR",
+      "当前会话中没有可用的完整策略代码，请先粘贴完整策略代码后再修改。",
+      400
+    );
+  }
 
   const limitInput = {
     ...resolvedInput,
-    inputCode: appendContextForLimit(resolvedInput.inputCode, conversationDraft?.contextText)
+    inputCode: buildInputCodeForLimit({
+      inputCode: resolvedInput.inputCode,
+      contextText: conversationDraft?.contextText,
+      referenceStrategyCode,
+      maxTotalInputChars: config.maxTotalInputChars,
+      baseInputChars: getTotalInputChars({
+        ...resolvedInput,
+        inputCode: null
+      })
+    })
   };
   const assertStartedAt = getAiPerfNow();
   assertInputWithinLimit(config, {
@@ -431,7 +476,12 @@ export async function runAiTask(taskId: string, requestId: string) {
     });
 
     const taskConfig = getAiTaskConfig(runningProviderTask.type);
-    const conversationContext = await buildProviderConversationContext(runningProviderTask, taskConfig.maxTotalInputChars);
+    const referenceStrategyCode = await resolveReferenceStrategyCodeForTask(runningProviderTask);
+    const conversationContext = await buildProviderConversationContext(
+      runningProviderTask,
+      taskConfig.maxTotalInputChars,
+      referenceStrategyCode
+    );
     const providerAttachments = await buildProviderAttachmentsForTask(runningProviderTask);
     await appendRunEvent(runningProviderTask, {
       type: "generate_plan",
@@ -444,6 +494,8 @@ export async function runAiTask(taskId: string, requestId: string) {
         sourcePlatform: runningProviderTask.sourcePlatform,
         targetPlatform: runningProviderTask.targetPlatform,
         hasConversationContext: Boolean(conversationContext),
+        hasReferenceStrategyCode: Boolean(referenceStrategyCode),
+        referenceStrategyCodeSource: referenceStrategyCode?.source ?? null,
         attachmentCount: providerAttachments.length
       }
     });
@@ -473,7 +525,8 @@ export async function runAiTask(taskId: string, requestId: string) {
           runningProviderTask,
           conversationContext,
           undefined,
-          providerAttachments
+          providerAttachments,
+          referenceStrategyCode ?? undefined
         );
         completedProviderResult = providerStream.result;
         providerFinalAnswerMarkdown = providerStream.finalAnswerMarkdown;
@@ -484,7 +537,8 @@ export async function runAiTask(taskId: string, requestId: string) {
           async (progress) => {
             await recordAiTaskProgress(runningProviderTask, progress);
           },
-          providerAttachments
+          providerAttachments,
+          referenceStrategyCode ?? undefined
         );
         completedProviderResult = applyGeneratedCodeArtifact(providerResult, {
           task: runningProviderTask,
@@ -533,6 +587,7 @@ export async function runAiTask(taskId: string, requestId: string) {
     providerResult = await repairProviderResultIfNeeded({
       task: runningProviderTask,
       conversationContext,
+      referenceStrategyCode,
       attachments: providerAttachments,
       result: providerResult
     });
@@ -883,12 +938,22 @@ async function runAiTaskStreaming(
     }));
 
     const taskConfig = getAiTaskConfig(runningTask.type);
+    const referenceStrategyCode = await measureAiPerf("run_stream.resolve_reference_strategy_code", {
+      requestId,
+      taskId: runningTask.id,
+      taskType: runningTask.type,
+      hasConversation: Boolean(runningTask.conversationId)
+    }, () => resolveReferenceStrategyCodeForTask(runningTask));
     const conversationContext = await measureAiPerf("run_stream.build_conversation_context", {
       requestId,
       taskId: runningTask.id,
       taskType: runningTask.type,
       hasConversation: Boolean(runningTask.conversationId)
-    }, () => buildProviderConversationContext(runningTask, taskConfig.maxTotalInputChars));
+    }, () => buildProviderConversationContext(
+      runningTask,
+      taskConfig.maxTotalInputChars,
+      referenceStrategyCode
+    ));
     const providerAttachments = await measureAiPerf("run_stream.build_attachments", {
       requestId,
       taskId: runningTask.id,
@@ -911,6 +976,8 @@ async function runAiTaskStreaming(
       detailJson: {
         provider: providerDiagnostics.provider,
         model: providerDiagnostics.model,
+        hasReferenceStrategyCode: Boolean(referenceStrategyCode),
+        referenceStrategyCodeSource: referenceStrategyCode?.source ?? null,
         visionAttachments: providerAttachments.length
       }
     }));
@@ -938,14 +1005,21 @@ async function runAiTaskStreaming(
               return emit(delta);
             }
 
-            if (runningTask.type === "strategy_generation" && delta.type === "final_delta") {
+            if (
+              delta.type === "final_delta" &&
+              (
+                runningTask.type === "strategy_generation" ||
+                getStrategyExplanationMode(runningTask) === "focused_explanation"
+              )
+            ) {
               return emit(delta);
             }
 
             return undefined;
           }
         },
-        providerAttachments
+        providerAttachments,
+        referenceStrategyCode ?? undefined
       ));
       completedProviderStream = providerStream;
     } catch (error) {
@@ -995,6 +1069,7 @@ async function runAiTaskStreaming(
     providerStream = await repairProviderStreamIfNeeded({
       task: runningTask,
       conversationContext,
+      referenceStrategyCode,
       attachments: providerAttachments,
       stream: providerStream,
       emit
@@ -1179,6 +1254,7 @@ async function runAiTaskStreaming(
 async function repairProviderResultIfNeeded(input: {
   task: AiTask;
   conversationContext?: string;
+  referenceStrategyCode?: ConversationStrategyCodeArtifact | null;
   attachments: AiProviderAttachment[];
   result: Awaited<ReturnType<typeof runAiProvider>>;
 }) {
@@ -1212,7 +1288,8 @@ async function repairProviderResultIfNeeded(input: {
         repairTask,
         input.conversationContext,
         undefined,
-        input.attachments
+        input.attachments,
+        input.referenceStrategyCode ?? undefined
       )).result
     : applyGeneratedCodeArtifact(await runAiProvider(
         repairTask,
@@ -1223,7 +1300,8 @@ async function repairProviderResultIfNeeded(input: {
             statusMessage: progress.statusMessage || "正在整理最终结果。"
           });
         },
-        input.attachments
+        input.attachments,
+        input.referenceStrategyCode ?? undefined
       ), {
         task: repairTask,
         conversationContext: input.conversationContext
@@ -1255,6 +1333,7 @@ async function repairProviderResultIfNeeded(input: {
 async function repairProviderStreamIfNeeded(input: {
   task: AiTask;
   conversationContext?: string;
+  referenceStrategyCode?: ConversationStrategyCodeArtifact | null;
   attachments: AiProviderAttachment[];
   stream: Awaited<ReturnType<typeof runAiProviderStream>>;
   emit: (event: AiTaskStreamEvent) => void | Promise<void>;
@@ -1304,7 +1383,8 @@ async function repairProviderStreamIfNeeded(input: {
     {
       onDelta: (delta) => delta.type === "thinking_delta" ? input.emit(delta) : undefined
     },
-    input.attachments
+    input.attachments,
+    input.referenceStrategyCode ?? undefined
   );
   const repairDecision = inspectAiOutputIntegrity({
     task: input.task,
@@ -2878,7 +2958,37 @@ async function safeGetAiSupportsVision() {
   }
 }
 
-async function buildProviderConversationContext(task: AiTask, maxTotalInputChars: number) {
+async function resolveReferenceStrategyCodeForTask(task: AiTask) {
+  if (!shouldResolveConversationStrategyCodeReference(task)) {
+    return null;
+  }
+
+  const artifact = await resolveConversationStrategyCodeArtifact({
+    repository: getRepository(),
+    userId: task.userId,
+    conversationId: task.conversationId,
+    currentTask: task,
+    currentInputCode: task.inputCode,
+    sourcePlatform: task.sourcePlatform,
+    targetPlatform: task.targetPlatform
+  });
+
+  if (!artifact) {
+    throw new ApiError(
+      "VALIDATION_ERROR",
+      "当前会话中没有可用的完整策略代码，请先粘贴完整策略代码后再修改。",
+      400
+    );
+  }
+
+  return artifact;
+}
+
+async function buildProviderConversationContext(
+  task: AiTask,
+  maxTotalInputChars: number,
+  referenceStrategyCode?: ConversationStrategyCodeArtifact | null
+) {
   if (!task.conversationId) {
     return undefined;
   }
@@ -2888,13 +2998,21 @@ async function buildProviderConversationContext(task: AiTask, maxTotalInputChars
     ascending: true
   });
   const baseChars = getTotalInputChars(task);
-  const maxContextChars = Math.max(0, Math.min(MAX_CONTEXT_CHARS, maxTotalInputChars - baseChars));
+  const referenceChars = referenceStrategyCode?.source === "current_input"
+    ? 0
+    : referenceStrategyCode?.code.length ?? 0;
+  const maxContextChars = Math.max(
+    0,
+    Math.min(MAX_CONTEXT_CHARS, maxTotalInputChars - baseChars - referenceChars)
+  );
 
   if (maxContextChars === 0) {
     return undefined;
   }
 
-  return trimToMaxChars(buildConversationContextText(messages), maxContextChars);
+  return trimToMaxChars(buildConversationContextText(messages, {
+    includeGeneratedCode: !referenceStrategyCode
+  }), maxContextChars);
 }
 
 async function buildProviderAttachmentsForTask(task: AiTask): Promise<AiProviderAttachment[]> {
@@ -2926,7 +3044,10 @@ async function buildProviderAttachmentsForTask(task: AiTask): Promise<AiProvider
   ];
 }
 
-function buildConversationContextText(messages: AiMessage[]) {
+function buildConversationContextText(
+  messages: AiMessage[],
+  options: { includeGeneratedCode?: boolean } = {}
+) {
   return messages
     .map((message) => {
       const label = message.role === "user" ? "用户" : message.role === "assistant" ? "助手" : "系统";
@@ -2944,7 +3065,7 @@ function buildConversationContextText(messages: AiMessage[]) {
         parts.push(`说明摘要：${truncateForContext(explanation, 1200)}`);
       }
 
-      if (generatedCode) {
+      if (generatedCode && options.includeGeneratedCode !== false) {
         const artifactLabel = artifactSha
           ? `代码 artifact：sha256=${artifactSha}${artifactLines ? `，行数=${artifactLines}` : ""}`
           : "生成/修改代码摘要";
@@ -2960,12 +3081,29 @@ function buildConversationContextText(messages: AiMessage[]) {
     .join("\n\n");
 }
 
-function appendContextForLimit(inputCode: string | null, contextText: string | null | undefined) {
-  if (!contextText) {
-    return inputCode;
-  }
+function buildInputCodeForLimit(input: {
+  inputCode: string | null;
+  contextText?: string | null;
+  referenceStrategyCode?: ConversationStrategyCodeArtifact | null;
+  maxTotalInputChars: number;
+  baseInputChars: number;
+}) {
+  const referenceCode = input.referenceStrategyCode?.source === "current_input"
+    ? null
+    : input.referenceStrategyCode?.code ?? null;
+  const reservedChars =
+    input.baseInputChars +
+    (input.inputCode?.length ?? 0) +
+    (referenceCode?.length ?? 0);
+  const contextBudget = Math.max(
+    0,
+    Math.min(MAX_CONTEXT_CHARS, input.maxTotalInputChars - reservedChars)
+  );
+  const contextText = contextBudget > 0 && input.contextText
+    ? trimToMaxChars(input.contextText, contextBudget)
+    : null;
 
-  return [inputCode, contextText].filter(Boolean).join("\n\n");
+  return [input.inputCode, referenceCode, contextText].filter(Boolean).join("\n\n") || null;
 }
 
 function getConversationModeForTaskType(type: AiTaskType): AiConversationMode {

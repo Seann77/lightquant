@@ -1,8 +1,10 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import type { AiTask } from "@/server/domain";
 import type { AiTaskConfig } from "@/server/ai/ai-task-config";
 import type { AiSkill } from "@/server/ai/skills";
+
+const nodeRequire = eval("require") as NodeRequire;
+const fs = (nodeRequire("fs") as typeof import("fs")).promises;
+const path = nodeRequire("path") as typeof import("path");
 
 type Platform = "ptrade" | "qmt" | "joinquant";
 

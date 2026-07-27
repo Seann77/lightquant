@@ -9,12 +9,17 @@ import { runMockAiProvider, runMockAiProviderStream } from "@/server/ai/provider
 import { runOpenAiCompatibleProvider, runOpenAiCompatibleProviderStream } from "@/server/ai/providers/openai-compatible-provider";
 import type { AiProviderAttachment, AiProviderInput, AiProviderResult, AiProviderStreamCallbacks, AiProviderStreamResult } from "@/server/ai/providers/types";
 import { ApiDocumentKnowledgeBaseError, retrieveApiDocumentContext } from "@/server/ai/api-document-retrieval";
+import {
+  withConversationStrategyCodeMetadata,
+  type ConversationStrategyCodeArtifact
+} from "@/server/ai/conversation-strategy-code";
 
 export async function runAiProvider(
   task: AiTask,
   conversationContext?: string,
   progressReporter?: AiProviderInput["progressReporter"],
-  attachments?: AiProviderAttachment[]
+  attachments?: AiProviderAttachment[],
+  referenceStrategyCode?: ConversationStrategyCodeArtifact
 ): Promise<AiProviderResult> {
   const runtimeConfig = await readRuntimeConfig();
   const skill = getAiSkill(task.type);
@@ -23,7 +28,7 @@ export async function runAiProvider(
     task,
     skill,
     config,
-    conversationContext,
+    conversationContext: buildApiRetrievalContext(conversationContext, referenceStrategyCode),
     modelMaxOutputTokens: runtimeConfig.modelMaxOutputTokens
   });
   const input = {
@@ -31,23 +36,31 @@ export async function runAiProvider(
     skill,
     config,
     conversationContext,
+    referenceStrategyCode,
     attachments,
     apiDocumentContext,
     progressReporter
   };
 
   if (shouldUseChunkedCodeProcessing(input)) {
-    return runChunkedCodeProcessing(input, (chunkInput) => runSingleAiProvider(runtimeConfig, chunkInput));
+    return withConversationStrategyCodeMetadata(
+      await runChunkedCodeProcessing(input, (chunkInput) => runSingleAiProvider(runtimeConfig, chunkInput)),
+      referenceStrategyCode
+    );
   }
 
-  return runSingleAiProvider(runtimeConfig, input);
+  return withConversationStrategyCodeMetadata(
+    await runSingleAiProvider(runtimeConfig, input),
+    referenceStrategyCode
+  );
 }
 
 export async function runAiProviderStream(
   task: AiTask,
   conversationContext?: string,
   callbacks?: AiProviderStreamCallbacks,
-  attachments?: AiProviderAttachment[]
+  attachments?: AiProviderAttachment[],
+  referenceStrategyCode?: ConversationStrategyCodeArtifact
 ): Promise<AiProviderStreamResult> {
   const runtimeConfig = await readRuntimeConfig();
   const skill = getAiSkill(task.type);
@@ -56,7 +69,7 @@ export async function runAiProviderStream(
     task,
     skill,
     config,
-    conversationContext,
+    conversationContext: buildApiRetrievalContext(conversationContext, referenceStrategyCode),
     modelMaxOutputTokens: runtimeConfig.modelMaxOutputTokens
   });
   const input = {
@@ -64,19 +77,30 @@ export async function runAiProviderStream(
     skill,
     config,
     conversationContext,
+    referenceStrategyCode,
     attachments,
     apiDocumentContext
   };
 
   if (runtimeConfig.provider === "mock") {
-    return runMockAiProviderStream(input, callbacks, {
+    const stream = await runMockAiProviderStream(input, callbacks, {
       model: runtimeConfig.model
     });
+
+    return {
+      ...stream,
+      result: withConversationStrategyCodeMetadata(stream.result, referenceStrategyCode)
+    };
   }
 
-  return runOpenAiCompatibleProviderStream(input, {
+  const stream = await runOpenAiCompatibleProviderStream(input, {
     runtimeConfig
   }, callbacks);
+
+  return {
+    ...stream,
+    result: withConversationStrategyCodeMetadata(stream.result, referenceStrategyCode)
+  };
 }
 
 function runSingleAiProvider(runtimeConfig: AiRuntimeConfig, input: AiProviderInput) {
@@ -113,4 +137,15 @@ async function readApiDocumentContext(input: Parameters<typeof retrieveApiDocume
 
     throw error;
   }
+}
+
+function buildApiRetrievalContext(
+  conversationContext?: string,
+  referenceStrategyCode?: ConversationStrategyCodeArtifact
+) {
+  const referenceCode = referenceStrategyCode?.source === "current_input"
+    ? undefined
+    : referenceStrategyCode?.code;
+
+  return [conversationContext, referenceCode].filter(Boolean).join("\n\n") || undefined;
 }

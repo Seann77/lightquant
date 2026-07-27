@@ -21,6 +21,7 @@ function main() {
   testUnclosedCodeFenceStillFailsForFullCode();
   testAbruptPythonTailFailsForFullCode();
   testExplicitOmissionMarkersOnlyFailFullCodeDelivery();
+  testContextualModificationRequiresCompleteCode();
   testOriginalInputTodoDoesNotFail();
   testAutoRepairScope();
   testRepairPromptCarriesFullSource();
@@ -38,6 +39,7 @@ function main() {
       "unclosed code fence remains repairable for full-code tasks",
       "abrupt Python tail remains hard-protected for full-code tasks",
       "explicit omission markers fail only full-code delivery, while ordinary continuation text does not",
+      "contextual modification without repeated input still requires complete code",
       "TODO in original user input does not trigger hard protection",
       "auto repair scope is strategy_generation and code_conversion only",
       "repair prompt includes full source when under single-call input limit and is not old 12K truncateMiddle"
@@ -313,6 +315,32 @@ function testOriginalInputTodoDoesNotFail() {
   });
 
   expect("original input TODO does not fail", !decision.partial);
+}
+
+function testContextualModificationRequiresCompleteCode() {
+  const task = createTask("strategy_generation", {
+    sourcePlatform: "PTrade",
+    targetPlatform: null,
+    prompt: "把买入时间从 14:50 改成 14:52，其他逻辑不变。",
+    inputCode: null
+  });
+  const result = createResult(
+    "strategy_generation",
+    "def buy(context):\n    return None\n# 其余代码保持不变",
+    {
+      finish_reason: "stop",
+      streamCompleted: true
+    }
+  );
+  const decision = inspectAiOutputIntegrity({
+    task,
+    result,
+    finalAnswerMarkdown: "```python\ndef buy(context):\n    return None\n# 其余代码保持不变\n```"
+  });
+
+  expect("contextual modification requires full code", decision.requiresCompleteCode);
+  expect("contextual modification omission marker is partial", decision.partial);
+  expect("contextual modification omission marker reason", decision.reason === "truncation_marker");
 }
 
 function testAutoRepairScope() {

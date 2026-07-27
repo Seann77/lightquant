@@ -2,7 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Bot, ChevronDown, ChevronRight, LoaderCircle } from "lucide-react";
-import { CopyableCodeBlock, InlineMarkdownText, isStrategyAnswerShortHeading } from "@/components/ai/WorkbenchResultViews";
+import {
+  CopyableCodeBlock,
+  formatMarkdownTableRowAsText,
+  InlineMarkdownText,
+  isMarkdownDisplayNoiseLine,
+  isStrategyAnswerShortHeading
+} from "@/components/ai/WorkbenchResultViews";
 
 export type AssistantThinkingStatus = "idle" | "thinking" | "answering" | "completed" | "failed";
 
@@ -236,17 +242,37 @@ export function parseStreamingMarkdownBlocks(markdown: string): StreamingMarkdow
     list = [];
   }
 
+  function pushCodeBlock(value: { language?: string; lines: string[] }, open: boolean) {
+    if (/^(?:text|txt|markdown|md)$/i.test(value.language ?? "")) {
+      const text = value.lines
+        .filter((line) => !isMarkdownDisplayNoiseLine(line))
+        .map((line) => formatMarkdownTableRowAsText(line) ?? line.replace(/^#{1,6}\s+/, ""))
+        .join("\n")
+        .trim();
+
+      if (text) {
+        blocks.push({
+          type: "paragraph",
+          text
+        });
+      }
+      return;
+    }
+
+    blocks.push({
+      type: "code",
+      code: value.lines.join("\n").trim(),
+      language: value.language,
+      open
+    });
+  }
+
   for (const line of lines) {
     const fence = line.match(/^```([\w+-]*)\s*$/);
 
     if (fence) {
       if (code) {
-        blocks.push({
-          type: "code",
-          code: code.lines.join("\n").trim(),
-          language: code.language,
-          open: false
-        });
+        pushCodeBlock(code, false);
         code = null;
       } else {
         flushParagraph();
@@ -264,7 +290,13 @@ export function parseStreamingMarkdownBlocks(markdown: string): StreamingMarkdow
       continue;
     }
 
-    const heading = line.match(/^(##|###)\s+(.+?)\s*$/);
+    if (isMarkdownDisplayNoiseLine(line)) {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+
+    const heading = line.match(/^(#{2,6})\s+(.+?)\s*$/);
 
     if (heading) {
       flushParagraph();
@@ -302,23 +334,15 @@ export function parseStreamingMarkdownBlocks(markdown: string): StreamingMarkdow
     }
 
     flushList();
-    paragraph.push(line);
+    paragraph.push(formatMarkdownTableRowAsText(line) ?? line);
   }
 
   if (code) {
-    blocks.push({
-      type: "code",
-      code: code.lines.join("\n").trim(),
-      language: code.language,
-      open: true
-    });
+    pushCodeBlock(code, true);
   }
 
   flushParagraph();
   flushList();
 
-  return blocks.length > 0 ? blocks : [{
-    type: "paragraph",
-    text: markdown
-  }];
+  return blocks;
 }

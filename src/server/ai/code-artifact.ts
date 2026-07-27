@@ -2,6 +2,10 @@ import { createHash } from "node:crypto";
 import type { AiTask, AiTaskType } from "@/server/domain";
 import type { AiProviderResult } from "@/server/ai/providers/types";
 import { looksLikeCompleteStrategyCode } from "@/lib/ai/strategy-result-format";
+import {
+  requestsPartialStrategyModificationOutput,
+  shouldResolveConversationStrategyCodeReference
+} from "@/server/ai/conversation-strategy-code";
 
 export type GeneratedCodeSource = "none" | "markdown_code_block" | "structured_generated_code";
 
@@ -56,6 +60,13 @@ export function shouldUseStreamingMarkdownForTask(input: {
     return false;
   }
 
+  if (
+    shouldResolveConversationStrategyCodeReference(input.task) &&
+    !requestsPartialStrategyModificationOutput(input.task.prompt)
+  ) {
+    return true;
+  }
+
   const prompt = input.task.prompt ?? "";
   const inputCode = input.task.inputCode ?? "";
   const context = input.conversationContext ?? "";
@@ -75,6 +86,10 @@ export function shouldExpectFullGeneratedCode(input: {
 
   if (input.task.type !== "strategy_generation") {
     return false;
+  }
+
+  if (shouldResolveConversationStrategyCodeReference(input.task)) {
+    return !requestsPartialStrategyModificationOutput(input.task.prompt);
   }
 
   return COMPLETE_CODE_INTENT_PATTERN.test(input.task.prompt ?? "") ||

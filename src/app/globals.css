@@ -1510,6 +1510,59 @@ textarea {
   margin-top: 4px;
 }
 
+.lq-explanation-block {
+  border-left: 3px solid rgba(37, 99, 235, 0.24);
+  background: rgba(239, 246, 255, 0.58);
+  padding: 10px 12px;
+  color: #40506a;
+  line-height: 1.72;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.lq-thinking-message.is-dark .lq-explanation-block {
+  border-left-color: rgba(96, 165, 250, 0.4);
+  background: rgba(30, 58, 95, 0.36);
+  color: #c6d4e9;
+}
+
+.lq-markdown-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.lq-markdown-table {
+  width: 100%;
+  min-width: 520px;
+  border-collapse: collapse;
+  color: #40506a;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.lq-markdown-table th,
+.lq-markdown-table td {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.lq-markdown-table th {
+  background: rgba(241, 245, 249, 0.9);
+  color: #1f2b3d;
+  font-weight: 780;
+  white-space: nowrap;
+}
+
+.lq-markdown-table tr:last-child td {
+  border-bottom: 0;
+}
+
 .lq-thinking-message.is-dark .lq-streaming-markdown {
   color: #c8d5ea;
 }
@@ -1529,6 +1582,25 @@ textarea {
   border-color: rgba(147, 197, 253, 0.25);
   background: rgba(96, 165, 250, 0.16);
   color: #bfdbfe;
+}
+
+.lq-thinking-message.is-dark .lq-markdown-table-wrap {
+  border-color: rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.lq-thinking-message.is-dark .lq-markdown-table {
+  color: #c8d5ea;
+}
+
+.lq-thinking-message.is-dark .lq-markdown-table th {
+  background: rgba(30, 41, 59, 0.78);
+  color: #f4f7ff;
+}
+
+.lq-thinking-message.is-dark .lq-markdown-table th,
+.lq-thinking-message.is-dark .lq-markdown-table td {
+  border-bottom-color: rgba(148, 163, 184, 0.18);
 }
 
 .lq-code-preview .lq-thinking-message {

@@ -406,6 +406,22 @@ export function CodeAnalysisResultView({
   report: Record<string, unknown> | null | undefined;
   result: NonNullable<AiTaskData["result"]>;
 }) {
+  const focusedAnswer = report?.responseMode === "focused_explanation"
+    ? typeof report.finalAnswerMarkdown === "string"
+      ? report.finalAnswerMarkdown.trim()
+      : typeof report.focusedAnswer === "string"
+        ? report.focusedAnswer.trim()
+        : result.explanation?.trim() ?? ""
+    : "";
+
+  if (focusedAnswer) {
+    return (
+      <div className="lq-analysis-output app-scrollbar">
+        <StrategyMarkdownResult markdown={focusedAnswer} textClassName="lq-answer-text" />
+      </div>
+    );
+  }
+
   const content = getCodeAnalysisTabContent(activeTab, report, result);
 
   return (
@@ -789,7 +805,7 @@ type StrategyMarkdownBlock =
   | { type: "list"; items: string[] }
   | { type: "code"; code: string; language?: string };
 
-const STRATEGY_SHORT_HEADING_PATTERN = /^(?:结论|止损规则|止盈规则|规则说明|触发条件|执行动作|相关函数|关键参数|总结)[:：]\s*$/;
+const STRATEGY_SHORT_HEADING_PATTERN = /^(?:直接结论|结论|买入逻辑|卖出逻辑|止损逻辑|止损规则|止盈逻辑|止盈规则|调仓逻辑|选股逻辑|仓位分配|关键限制|规则说明|触发条件|执行动作|相关函数|关键参数|总结)[:：]\s*$/;
 
 function StrategyMarkdownResult({ markdown, textClassName }: { markdown: string; textClassName: string }) {
   const blocks = parseStrategyMarkdownBlocks(markdown);
@@ -956,16 +972,36 @@ function parseStrategyMarkdownBlocks(markdown: string): StrategyMarkdownBlock[] 
     list = [];
   }
 
+  function pushCodeBlock(value: { language?: string; lines: string[] }) {
+    if (/^(?:text|txt|markdown|md)$/i.test(value.language ?? "")) {
+      const text = value.lines
+        .filter((line) => !isMarkdownDisplayNoiseLine(line))
+        .map((line) => formatMarkdownTableRowAsText(line) ?? line.replace(/^#{1,6}\s+/, ""))
+        .join("\n")
+        .trim();
+
+      if (text) {
+        blocks.push({
+          type: "paragraph",
+          text
+        });
+      }
+      return;
+    }
+
+    blocks.push({
+      type: "code",
+      code: value.lines.join("\n").trim(),
+      language: value.language
+    });
+  }
+
   for (const line of lines) {
     const fence = line.match(/^```([\w+-]*)\s*$/);
 
     if (fence) {
       if (code) {
-        blocks.push({
-          type: "code",
-          code: code.lines.join("\n").trim(),
-          language: code.language
-        });
+        pushCodeBlock(code);
         code = null;
       } else {
         flushParagraph();
@@ -983,7 +1019,13 @@ function parseStrategyMarkdownBlocks(markdown: string): StrategyMarkdownBlock[] 
       continue;
     }
 
-    const heading = line.match(/^(##|###)\s+(.+?)\s*$/);
+    if (isMarkdownDisplayNoiseLine(line)) {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+
+    const heading = line.match(/^(#{2,6})\s+(.+?)\s*$/);
 
     if (heading) {
       flushParagraph();
@@ -1021,28 +1063,52 @@ function parseStrategyMarkdownBlocks(markdown: string): StrategyMarkdownBlock[] 
     }
 
     flushList();
-    paragraph.push(line);
+    paragraph.push(formatMarkdownTableRowAsText(line) ?? line);
   }
 
   if (code) {
-    blocks.push({
-      type: "code",
-      code: code.lines.join("\n").trim(),
-      language: code.language
-    });
+    pushCodeBlock(code);
   }
 
   flushParagraph();
   flushList();
 
-  return blocks.length > 0 ? blocks : [{
-    type: "paragraph",
-    text: markdown
-  }];
+  return blocks;
 }
 
 export function isStrategyAnswerShortHeading(value: string) {
   return STRATEGY_SHORT_HEADING_PATTERN.test(value.trim());
+}
+
+export function isMarkdownDisplayNoiseLine(value: string) {
+  const line = value.trim();
+
+  return /^(?:TEXT|复制)$/i.test(line)
+    || /^(?:-{3,}|={3,}|\*{3,}|#{3,})$/.test(line)
+    || /^\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?$/.test(line);
+}
+
+export function formatMarkdownTableRowAsText(value: string) {
+  const line = value.trim();
+
+  if (!line.includes("|") || (!line.startsWith("|") && !line.endsWith("|"))) {
+    return null;
+  }
+
+  const cells = line
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((cell) => cell.trim())
+    .filter(Boolean);
+
+  if (cells.length < 2) {
+    return null;
+  }
+
+  return cells.length === 2
+    ? `${cells[0]}：${cells[1]}`
+    : cells.join("；");
 }
 
 function parseInlineMarkdown(text: string, keyPrefix = "inline"): ReactNode[] {

@@ -1,7 +1,11 @@
 import { createHash, randomUUID } from "crypto";
 import { mkdir, readFile, rm, writeFile } from "fs/promises";
 import path from "path";
-import { getFileUploadRule, isImageUploadExtension, type FileUploadPurpose } from "@/lib/file-upload-rules";
+import {
+  getFileUploadRule,
+  isMimeCompatibleWithUploadExtension,
+  type FileUploadPurpose
+} from "@/lib/file-upload-rules";
 import { ApiError } from "@/server/http/api-response";
 import { getFileAllowedExtensions, getFileStorageRoot, getFileUploadMaxBytes, getImageUploadMaxBytes } from "@/server/env";
 import { getRepository } from "@/server/repositories";
@@ -341,29 +345,7 @@ function getAllowedExtensionsForPurpose(purpose: FileUploadPurpose) {
 }
 
 function assertMimeCompatibleWithExtension(mimeType: string, ext: string, allowedExtensions: string[]) {
-  if (!mimeType) {
-    return;
-  }
-
-  const normalizedMime = mimeType.toLowerCase();
-
-  if (isImageUploadExtension(ext)) {
-    if (normalizedMime === "image/png" || normalizedMime === "image/jpeg") {
-      return;
-    }
-
-    throw new ApiError("UNSUPPORTED_FILE_TYPE", formatAllowedUploadMessage(allowedExtensions), 400);
-  }
-
-  if (normalizedMime.startsWith("image/")) {
-    throw new ApiError("UNSUPPORTED_FILE_TYPE", formatAllowedUploadMessage(allowedExtensions), 400);
-  }
-
-  if (
-    normalizedMime.startsWith("text/")
-    || normalizedMime === "application/octet-stream"
-    || normalizedMime === "application/x-python-code"
-  ) {
+  if (isMimeCompatibleWithUploadExtension(mimeType, ext)) {
     return;
   }
 

@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { once } from "node:events";
+import { createHash } from "node:crypto";
 import { getAiTaskConfig } from "../src/server/ai/ai-task-config";
 import { shouldUseStreamingMarkdownForTask } from "../src/server/ai/code-artifact";
 import { getAiSkill } from "../src/server/ai/skills";
@@ -7,6 +8,7 @@ import {
   runOpenAiCompatibleProvider,
   runOpenAiCompatibleProviderStream
 } from "../src/server/ai/providers/openai-compatible-provider";
+import { getStrategyExplanationMode } from "../src/server/ai/strategy-explanation-intent";
 import type { AiProviderInput } from "../src/server/ai/providers/types";
 import type { AiTask, AiTaskType } from "../src/server/domain";
 
@@ -25,16 +27,26 @@ main().catch((error) => {
 
 async function main() {
   process.env.AI_TASK_TIMEOUT_MS = "1000";
+  await testFocusedExplanationIntent();
   await testStrategyAnswerJsonContract();
+  await testFocusedStrategyExplanationMarkdownContract();
+  await testFocusedCodeAnalysisMarkdownContract();
+  await testFullCodeAnalysisMarkdownContract();
   await testFullStrategyMarkdownContract();
+  await testContextualModificationMarkdownContract();
   await testRepairFullStrategyMarkdownRouting();
   await testCodeConversionMarkdownContract();
 
   console.log(JSON.stringify({
     ok: true,
     checked: [
+      "current question classifies focused explanation independently of full code length while modification remains unchanged",
       "strategy answer uses non-stream JSON-only contract",
+      "focused strategy explanation uses one streaming call without full dossier",
+      "focused code analysis preserves natural scoped Markdown",
+      "explicit full code analysis keeps the detailed report contract",
       "full PTrade strategy uses streaming Markdown-only contract and extracts generatedCode",
+      "contextual strategy modification receives the complete reference and returns one complete code artifact",
       "repair/re-output full strategy routes to streaming Markdown without lazy placeholders",
       "code conversion uses natural Markdown, one fenced target code block, and parsed compatibility notes",
       "code conversion prompt has no generic manual-review disclaimer",
@@ -42,6 +54,29 @@ async function main() {
       "streaming system prompt contains Markdown-only rules and no JSON-only sentence"
     ]
   }, null, 2));
+}
+
+async function testFocusedExplanationIntent() {
+  const rawCodeAndQuestion = [
+    "def initialize(context):",
+    "    g.stock_num = 5",
+    "    run_daily(rebalance, time='14:50')",
+    "",
+    "def rebalance(context):",
+    "    order_target_value('000001.XSHE', context.portfolio.total_value / g.stock_num)",
+    "",
+    "分析一下这个策略的买入卖出逻辑。"
+  ].join("\n");
+
+  expect("raw full code plus local question is focused", getStrategyExplanationMode(createTask("strategy_generation", {
+    prompt: rawCodeAndQuestion
+  })) === "focused_explanation");
+  expect("explicit full analysis is full", getStrategyExplanationMode(createTask("strategy_generation", {
+    prompt: "请逐模块完整解析这份策略。"
+  })) === "full_explanation");
+  expect("strategy modification is not explanation", getStrategyExplanationMode(createTask("strategy_generation", {
+    prompt: "请把止损线从 5% 修改为 8%。"
+  })) === "other");
 }
 
 async function testStrategyAnswerJsonContract() {
@@ -106,6 +141,99 @@ async function testStrategyAnswerJsonContract() {
   }
 }
 
+async function testFocusedStrategyExplanationMarkdownContract() {
+  const markdown = [
+    "直接结论：",
+    "这个策略每天 14:50 调仓，先卖出不再属于目标列表的持仓，再按等权目标补足新标的。",
+    "",
+    "卖出逻辑：",
+    "1. 当前持仓掉出目标列表时清仓。",
+    "2. 停牌或当天没有可卖数量时跳过。",
+    "",
+    "买入逻辑：",
+    "1. 从目标列表中选择尚未持有的股票。",
+    "2. 每只股票目标市值为总资产的五分之一。"
+  ].join("\n");
+  const result = await runStreamingScenario("strategy_generation", {
+    prompt: "分析一下这个策略的买入卖出逻辑。",
+    inputCode: createCompleteAnalysisFixture()
+  }, markdown, (payload) => {
+    const systemMessage = readSystemMessage(payload);
+
+    expect("strategy focused mode prompt", systemMessage.includes("服务端解释模式：focused_explanation"));
+    expect("strategy focused prompt forbids tables", systemMessage.includes("不要输出完整策略档案") && systemMessage.includes("Markdown 表格"));
+    expect("strategy focused prompt prioritizes current question", systemMessage.includes("当前用户问题的范围高于输入代码长度"));
+  });
+  const report = readRecord(result.result.reportJson);
+
+  expect("focused strategy markdown preserved", result.finalAnswerMarkdown === markdown);
+  expect("focused strategy remains answer mode", report?.responseMode === "strategy_answer");
+  expect("focused strategy has no full dossier", !result.finalAnswerMarkdown.includes("策略概览") && !result.finalAnswerMarkdown.includes("关键参数"));
+  expect("focused strategy generatedCode null", result.result.generatedCode === null);
+}
+
+async function testFocusedCodeAnalysisMarkdownContract() {
+  const markdown = [
+    "直接结论：",
+    "策略每天 14:45 检查止损，价格跌至持仓成本的 95% 以下时清仓。",
+    "",
+    "卖出逻辑：",
+    "1. 14:45 先检查成本止损。",
+    "2. 14:50 调仓时卖出掉出目标列表的持仓。",
+    "3. 停牌或没有可卖数量时，本次卖出会跳过。"
+  ].join("\n");
+  const result = await runStreamingScenario("code_analysis", {
+    prompt: "这个策略什么时候卖出？",
+    inputCode: createCompleteAnalysisFixture()
+  }, markdown, (payload) => {
+    const systemMessage = readSystemMessage(payload);
+
+    expect("analysis focused mode prompt", systemMessage.includes("服务端解释模式：focused_explanation"));
+    expect("analysis focused prompt avoids mandatory full report", !systemMessage.includes("最终回答必须包含且只使用这些二级标题"));
+    expect("analysis focused prompt forbids table and nested headings", systemMessage.includes("Markdown 表格") && systemMessage.includes("多层 Markdown 标题"));
+  });
+  const report = readRecord(result.result.reportJson);
+
+  expect("focused analysis markdown preserved", result.finalAnswerMarkdown === markdown);
+  expect("focused analysis response mode", report?.responseMode === "focused_explanation");
+  expect("focused analysis has no normalized overview", !Array.isArray(report?.overview));
+  expect("focused analysis answers only sell scope", !result.finalAnswerMarkdown.includes("选股算法") && !result.finalAnswerMarkdown.includes("参数速查"));
+}
+
+async function testFullCodeAnalysisMarkdownContract() {
+  const markdown = [
+    "## 策略概览",
+    "- 核心思路：用目标列表管理持仓，并在尾盘调仓。",
+    "",
+    "## 交易逻辑",
+    "- 买入逻辑：14:50 按等权目标补足持仓。",
+    "- 卖出逻辑：14:45 检查止损，14:50 卖出掉出目标列表的持仓。",
+    "",
+    "## 关键参数",
+    "- 目标持仓数：5 只。",
+    "",
+    "## 风险提醒",
+    "- 交易可达性风险：停牌时无法下单。",
+    "",
+    "## 优化建议",
+    "- 回测验证：检查不可交易场景。"
+  ].join("\n");
+  const result = await runStreamingScenario("code_analysis", {
+    prompt: "请逐模块完整解析这份策略。",
+    inputCode: createCompleteAnalysisFixture()
+  }, markdown, (payload) => {
+    const systemMessage = readSystemMessage(payload);
+
+    expect("analysis full mode prompt", systemMessage.includes("服务端解释模式：full_explanation"));
+    expect("analysis full prompt keeps detailed headings", systemMessage.includes("## 策略概览") && systemMessage.includes("## 交易逻辑"));
+  });
+  const report = readRecord(result.result.reportJson);
+
+  expect("full analysis response mode", report?.responseMode === "full_explanation");
+  expect("full analysis keeps overview report", Array.isArray(report?.overview));
+  expect("full analysis keeps detailed markdown", result.finalAnswerMarkdown.includes("## 策略概览") && result.finalAnswerMarkdown.includes("## 优化建议"));
+}
+
 async function testFullStrategyMarkdownContract() {
   const markdown = [
     "## 完整策略代码",
@@ -135,6 +263,77 @@ async function testFullStrategyMarkdownContract() {
   expect("full strategy final is not JSON", !result.finalAnswerMarkdown.trim().startsWith("{"));
   expect("full strategy fenced code", /```python[\s\S]+def initialize[\s\S]+```/.test(result.finalAnswerMarkdown));
   expect("full strategy generatedCode extracted", Boolean(result.result.generatedCode?.includes("def initialize")));
+}
+
+async function testContextualModificationMarkdownContract() {
+  const baseline = [
+    createCompleteAnalysisFixture(),
+    ...Array.from({ length: 220 }, (_, index) => [
+      `def audit_helper_${index}(context):`,
+      `    audit_value_${index} = ${index}`,
+      `    return audit_value_${index}`
+    ].join("\n"))
+  ].join("\n\n");
+  expect("context modification fixture exceeds 5000 chars", baseline.length > 5000);
+  const modified = baseline.replace("time='14:50'", "time='14:52'");
+  const markdown = [
+    "已将买入调仓时间从 14:50 调整为 14:52，其余策略逻辑保持不变。",
+    "",
+    "```python",
+    modified,
+    "```"
+  ].join("\n");
+  const result = await runStreamingScenario("strategy_generation", {
+    prompt: "把买入时间从 14:50 改成 14:52，其他逻辑不变。",
+    sourcePlatform: "PTrade"
+  }, markdown, (payload) => {
+    const systemMessage = readSystemMessage(payload);
+    const userMessage = readUserMessage(payload);
+
+    expect("context modification prompt preserves strategy semantics", systemMessage.includes("只修改用户当前轮明确要求的行为"));
+    expect("context modification prompt requires complete output", systemMessage.includes("一个完整连续且闭合的 python 代码块"));
+    expect("context modification prompt forbids omitted remainder", systemMessage.includes("不能用“其余不变”"));
+    expect("context modification receives full reference code", userMessage.includes(baseline));
+    expect("context modification receives reference tail beyond old summaries", userMessage.includes("def audit_helper_219"));
+    expect("context modification reference is separate from memory", userMessage.includes("会话参考策略完整代码") && userMessage.includes("最近对话记忆"));
+  }, (input) => {
+    input.referenceStrategyCode = {
+      version: 1,
+      code: baseline,
+      source: "historical_input",
+      taskId: "baseline-task",
+      conversationId: "contract-conversation",
+      platform: "PTrade",
+      contentSha256: createHash("sha256").update(baseline, "utf8").digest("hex"),
+      codeLineCount: baseline.split(/\r?\n/).filter((line) => line.trim()).length,
+      createdAt: "2026-07-14T00:00:00.000Z"
+    };
+  });
+
+  expect("context modification returns complete generated code", result.result.generatedCode === modified);
+  expect("context modification keeps one closed python block", (result.finalAnswerMarkdown.match(/```/g) ?? []).length === 2);
+}
+
+function createCompleteAnalysisFixture() {
+  return [
+    "def initialize(context):",
+    "    g.stock_num = 5",
+    "    g.stop_loss = 0.95",
+    "    run_daily(check_stop, time='14:45')",
+    "    run_daily(rebalance, time='14:50')",
+    "",
+    "def check_stop(context):",
+    "    for stock, position in context.portfolio.positions.items():",
+    "        if position.price <= position.avg_cost * g.stop_loss:",
+    "            order_target(stock, 0)",
+    "",
+    "def rebalance(context):",
+    "    target = ['000001.XSHE']",
+    "    for stock in list(context.portfolio.positions):",
+    "        if stock not in target:",
+    "            order_target(stock, 0)",
+    "    order_target_value(target[0], context.portfolio.total_value / g.stock_num)"
+  ].join("\n");
 }
 
 async function testRepairFullStrategyMarkdownRouting() {
@@ -209,7 +408,8 @@ async function runStreamingScenario(
   type: AiTaskType,
   overrides: Partial<Pick<AiTask, "prompt" | "inputCode" | "sourcePlatform" | "targetPlatform">>,
   markdown: string,
-  inspectPayload?: (payload: Record<string, unknown>) => void
+  inspectPayload?: (payload: Record<string, unknown>) => void,
+  configureInput?: (input: AiProviderInput) => void
 ) {
   const server = createServer((request, response) => {
     void readJsonBody(request).then((payload) => {
@@ -248,7 +448,10 @@ async function runStreamingScenario(
   const baseUrl = await listen(server);
 
   try {
-    return await runOpenAiCompatibleProviderStream(createProviderInput(type, overrides), {
+    const providerInput = createProviderInput(type, overrides);
+    configureInput?.(providerInput);
+
+    return await runOpenAiCompatibleProviderStream(providerInput, {
       runtimeConfig: createRuntimeConfig(baseUrl)
     });
   } finally {
@@ -370,6 +573,13 @@ function readSystemMessage(payload: Record<string, unknown> | null) {
   const system = messages.find((message) => readRecord(message)?.role === "system");
 
   return typeof readRecord(system)?.content === "string" ? readRecord(system)?.content as string : "";
+}
+
+function readUserMessage(payload: Record<string, unknown> | null) {
+  const messages = Array.isArray(payload?.messages) ? payload.messages : [];
+  const user = messages.find((message) => readRecord(message)?.role === "user");
+
+  return typeof readRecord(user)?.content === "string" ? readRecord(user)?.content as string : "";
 }
 
 function writeSseHeaders(response: ServerResponse) {

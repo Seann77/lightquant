@@ -8,13 +8,20 @@ type FileUploadRule = {
 };
 
 const IMAGE_EXTENSIONS = [".png", ".jpg"] as const;
+const TEXT_UPLOAD_MIME_TYPES = new Set([
+  "text/plain",
+  "text/x-python",
+  "application/x-python-code",
+  "application/x-python",
+  "application/octet-stream"
+]);
 
 const FILE_UPLOAD_RULES: Record<FileUploadPurpose, FileUploadRule> = {
   strategy_generation: {
-    accept: ".txt,.log,.png,.jpg",
-    allowedExtensions: [".txt", ".log", ...IMAGE_EXTENSIONS],
-    buttonLabel: "上传 .txt / .log / .png / .jpg",
-    description: "仅支持上传 .txt / .log / .png / .jpg 文件"
+    accept: ".py,.txt,.log,.png,.jpg",
+    allowedExtensions: [".py", ".txt", ".log", ...IMAGE_EXTENSIONS],
+    buttonLabel: "上传 .py / .txt / .log / .png / .jpg",
+    description: "仅支持上传 .py / .txt / .log / .png / .jpg 文件"
   },
   code_conversion: {
     accept: ".py,.txt",
@@ -23,10 +30,10 @@ const FILE_UPLOAD_RULES: Record<FileUploadPurpose, FileUploadRule> = {
     description: "仅支持上传 .py / .txt 文件"
   },
   code_analysis: {
-    accept: ".txt",
-    allowedExtensions: [".txt"],
-    buttonLabel: "上传 .txt",
-    description: "仅支持上传 .txt 文件"
+    accept: ".py,.txt",
+    allowedExtensions: [".py", ".txt"],
+    buttonLabel: "上传 .py / .txt",
+    description: "仅支持上传 .py / .txt 文件"
   }
 };
 
@@ -50,4 +57,23 @@ export function isImageUploadExtension(ext: string) {
 
 export function isFileExtensionAllowedForPurpose(ext: string, purpose: FileUploadPurpose) {
   return FILE_UPLOAD_RULES[purpose].allowedExtensions.includes(ext.toLowerCase());
+}
+
+export function isMimeCompatibleWithUploadExtension(mimeType: string, ext: string) {
+  const normalizedMime = mimeType.trim().toLowerCase().split(";", 1)[0] ?? "";
+  const normalizedExt = ext.toLowerCase();
+
+  if (!normalizedMime) {
+    return true;
+  }
+
+  if (isImageUploadExtension(normalizedExt)) {
+    return normalizedMime === "image/png" || normalizedMime === "image/jpeg";
+  }
+
+  if (normalizedMime.startsWith("image/")) {
+    return false;
+  }
+
+  return normalizedMime.startsWith("text/") || TEXT_UPLOAD_MIME_TYPES.has(normalizedMime);
 }

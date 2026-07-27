@@ -25,6 +25,7 @@ console.log(JSON.stringify({
   checked: [
     "PTrade complete strategy generation domain rules",
     "existing strategy modification and error repair priorities",
+    "same-conversation complete strategy modification boundary",
     "JoinQuant -> QMT conversion and QMT mode boundary",
     "code conversion uses lightweight document evidence without hard blocking",
     "QMT built-in Python / XtQuant / VBA are not mixed",
@@ -48,9 +49,18 @@ function testDomainRuleSource() {
 
 function testStrategyGenerationPrompt() {
   expectIncludes("strategy has domain heading", strategyPrompt, "LightQuant Domain Rules");
+  expectIncludes("strategy focused explanation priority", strategyPrompt, "当前提问范围高于代码长度和历史模板");
+  expectIncludes("strategy focused explanation avoids dossier", strategyPrompt, "默认不输出完整策略档案、固定 42 项");
+  expectIncludes("strategy explicit full analysis remains", strategyPrompt, "只有用户明确要求完整分析、逐模块解释");
   expectIncludes("PTrade full strategy native boundary", strategyPrompt, "PTrade 代码使用 PTrade 原生生命周期");
   expectIncludes("existing strategy intent preserved", strategyPrompt, "始终保留用户策略意图");
   expectIncludes("existing strategy modification hard failures", strategyPrompt, "修改或修复已有策略时，优先处理语法、运行时、生命周期");
+  expectIncludes("conversation reference code is authoritative", strategyPrompt, "会话参考策略完整代码");
+  expectIncludes("conversation baseline priority is explicit", strategyPrompt, "本轮显式完整代码、最近一次成功且完整的生成代码、最近一次完整历史输入代码");
+  expectIncludes("explanation and invalid output cannot overwrite baseline", strategyPrompt, "纯解释、失败、取消、截断或无效生成结果不能替换有效代码基线");
+  expectIncludes("context modification returns complete code by default", strategyPrompt, "继续修改必须输出一段简短修改摘要和一个完整、连续、闭合、可复制的 `python` 代码块");
+  expectIncludes("combined sell-buy callback is split structurally", strategyPrompt, "原策略在同一回调中先卖后买");
+  expectIncludes("time edits do not use global replacement", strategyPrompt, "不能全局替换相同字符串");
   expectIncludes("error repair includes platform APIs", strategyPrompt, "平台 API");
   expectIncludes("error repair includes future data", strategyPrompt, "未来函数");
   expectIncludes("soft platform constraints", strategyPrompt, "属于普通平台约束");
@@ -87,6 +97,10 @@ function testCodeAnalysisPrompt() {
   expectIncludes("analysis no return prediction", analysisPrompt, "不预测收益");
   expectIncludes("analysis no stock recommendation", analysisPrompt, "不推荐证券");
   expectIncludes("analysis report schema still JSON", analysisPrompt, "必须只返回合法 JSON 对象");
+  expectIncludes("analysis current question beats code length", analysisPrompt, "当前用户提问范围高于代码长度和历史报告模板");
+  expectIncludes("analysis focused mode schema", analysisPrompt, "responseMode: \"focused_explanation\"");
+  expectIncludes("analysis full mode schema", analysisPrompt, "responseMode: \"full_explanation\"");
+  expectIncludes("analysis focused mode forbids tables", analysisPrompt, "不要输出完整策略档案、固定 42 项、Markdown 表格");
 }
 
 function testManifest() {

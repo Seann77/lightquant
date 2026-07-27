@@ -11,6 +11,9 @@ import { stripGeneratedCodeFromMarkdown } from "../src/components/ai/WorkbenchRe
 import { getAiTaskConfig } from "../src/server/ai/ai-task-config";
 import { getAiSkill } from "../src/server/ai/skills";
 import type { AiProviderInput } from "../src/server/ai/providers/types";
+import { createHash } from "node:crypto";
+import { buildStreamingChatCompletionPayload } from "../src/server/ai/providers/openai-compatible-provider";
+import { withConversationStrategyCodeMetadata } from "../src/server/ai/conversation-strategy-code";
 
 const completeCode = [
   "def initialize(context):",
@@ -89,6 +92,75 @@ expect("missing platform entry invalid", validateGeneratedCodeArtifact({
   finalAnswerMarkdown: "```python\nimport math\nvalue = math.sqrt(4)\nprint(value)\n```"
 }).status === "invalid");
 
+const contextualInput = createProviderInput(
+  "strategy_generation",
+  "把买入时间从 14:50 改成 14:52，其他逻辑不变"
+);
+contextualInput.referenceStrategyCode = {
+  version: 1,
+  code: completeCode,
+  source: "historical_input",
+  taskId: "task-baseline",
+  conversationId: "conversation-1",
+  platform: "PTrade",
+  contentSha256: createHash("sha256").update(completeCode, "utf8").digest("hex"),
+  codeLineCount: completeCode.split(/\r?\n/).filter((line) => line.trim()).length,
+  createdAt: "2026-07-23T00:00:00.000Z"
+};
+expect("contextual modification uses streaming markdown", shouldUseStreamingMarkdownForTask({
+  task: contextualInput.task
+}));
+expect("contextual modification expects a full artifact", shouldExpectFullGeneratedCode({
+  task: contextualInput.task
+}));
+
+const contextualPayload = buildStreamingChatCompletionPayload(contextualInput, {
+  provider: "deepseek",
+  baseUrl: "https://api.deepseek.com",
+  apiKey: "test",
+  model: "deepseek-chat",
+  modelMaxOutputTokens: 80000,
+  timeoutMs: 120000,
+  maxRetries: 0,
+  supportsVision: false
+});
+const contextualMessages = contextualPayload.messages as Array<{ role: string; content: string }>;
+const contextualSystemMessage = contextualMessages.find((message) => message.role === "system")?.content ?? "";
+const contextualUserMessage = contextualMessages.find((message) => message.role === "user")?.content ?? "";
+expect("reference code is a separate authoritative section", contextualUserMessage.includes("会话参考策略完整代码（本轮修改的权威基线"));
+expect("reference metadata includes task and hash", contextualUserMessage.includes("taskId: task-baseline") && contextualUserMessage.includes(contextualInput.referenceStrategyCode.contentSha256));
+expect("reference code is included without truncation", contextualUserMessage.includes(completeCode));
+expect("combined callback guidance requires structural split", contextualSystemMessage.includes("结构化拆分"));
+expect("combined callback guidance forbids global replacement", contextualSystemMessage.includes("不得全局替换"));
+expect("combined callback guidance preserves sell and moves buy", contextualSystemMessage.includes("卖出回调保留原时间") && contextualSystemMessage.includes("买入回调使用新时间"));
+expect("combined callback guidance prevents duplicate trading", contextualSystemMessage.includes("不得重复注册回调、重复下单"));
+expect("contextual output contract asks for one full closed python block", contextualSystemMessage.includes("一个完整连续且闭合的 python 代码块"));
+const resultWithReferenceMetadata = withConversationStrategyCodeMetadata({
+  reportJson: {}
+}, contextualInput.referenceStrategyCode);
+const referenceAudit = readRecord(readRecord(resultWithReferenceMetadata.reportJson)?.conversationStrategyCode);
+expect("result audit stores reference source task version and hash", referenceAudit?.source === "historical_input" &&
+  referenceAudit?.taskId === "task-baseline" &&
+  referenceAudit?.version === 1 &&
+  referenceAudit?.contentSha256 === contextualInput.referenceStrategyCode.contentSha256);
+expect("result audit metadata does not duplicate full code", !("code" in (referenceAudit ?? {})));
+
+const partialContextualInput = createProviderInput(
+  "strategy_generation",
+  "把买入时间改成 14:52，只输出修改片段"
+);
+expect("explicit partial request does not require full artifact", !shouldExpectFullGeneratedCode({
+  task: partialContextualInput.task
+}));
+const snippetModificationInput = createProviderInput(
+  "strategy_generation",
+  "修改这个函数中的买入时间"
+);
+snippetModificationInput.task.inputCode = "def buy(context):\n    return None";
+expect("standalone snippet modification keeps partial-code behavior", !shouldExpectFullGeneratedCode({
+  task: snippetModificationInput.task
+}));
+
 const aiService = readFileSync(path.join(process.cwd(), "src/server/ai/ai-service.ts"), "utf8");
 expect("runner checks streaming markdown mode", aiService.includes("shouldUseStreamingMarkdownForTask"));
 expect("runner calls streaming provider for long code", /shouldUseStreamingMarkdownForTask[\s\S]+runAiProviderStream/.test(aiService));
@@ -102,7 +174,13 @@ console.log(JSON.stringify({
     "reportJson artifact stores language/platform/status/lineCount/contentSha256",
     "frontend duplicate Markdown code block is stripped when generatedCode exists",
     "unclosed fence, placeholder, abrupt syntax, and missing platform entry are invalid",
-    "runner uses streaming provider path for long code tasks"
+    "runner uses streaming provider path for long code tasks",
+    "contextual modification requires full streaming artifact by default",
+    "reference code and audit metadata are injected separately without truncation",
+    "result audit stores reference source/version/hash without duplicating code",
+    "combined callback time changes require structural split and forbid global replacement",
+    "explicit partial output remains supported",
+    "standalone snippet modification behavior remains unchanged"
   ]
 }, null, 2));
 

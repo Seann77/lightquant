@@ -4,19 +4,19 @@ const pages = [
   {
     path: "/chat?mode=strategy",
     name: "strategy generation",
-    includes: ["LightQuant", "策略生成"],
+    includes: ["LightQuant", "策略生成", "上传 .py / .txt / .log / .png / .jpg", "accept=\".py,.txt,.log,.png,.jpg\""],
     excludes: ["每次策略生成消耗 50 积分"]
   },
   {
     path: "/chat?mode=convert",
     name: "code conversion",
-    includes: ["LightQuant", "平台代码转换", "开始转换"],
+    includes: ["LightQuant", "平台代码转换", "开始转换", "上传 .py / .txt", "accept=\".py,.txt\""],
     excludes: ["每次平台转换消耗 200 积分"]
   },
   {
     path: "/code-analysis",
     name: "code analysis",
-    includes: ["LightQuant", "代码翻译解析", "开始解析"],
+    includes: ["LightQuant", "代码翻译解析", "开始解析", "上传 .py / .txt", "accept=\".py,.txt\""],
     excludes: ["每次代码解析消耗 100 积分"]
   },
   {

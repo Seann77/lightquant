@@ -136,6 +136,25 @@ async function main() {
   const codeBlock = openFenceBlocks.find((block) => block.type === "code");
   expect("unclosed code fence is previewed", codeBlock?.type === "code" && codeBlock.code.includes("def initialize"));
 
+  const noisyExplanationBlocks = parseStreamingMarkdownBlocks([
+    "#### 卖出逻辑",
+    "| 时间 | 条件 |",
+    "|------|------|",
+    "| 14:45 | 跌至成本的 95% 以下 |",
+    "---",
+    "```TEXT",
+    "复制",
+    "代码中未明确给出其他止盈规则。",
+    "```"
+  ].join("\n"));
+  const noisyExplanationText = noisyExplanationBlocks
+    .map((block) => block.type === "code" ? block.code : block.type === "list" ? block.items.join("\n") : block.text)
+    .join("\n");
+  expect("nested heading markers are not exposed", !noisyExplanationText.includes("####") && noisyExplanationBlocks.some((block) => block.type === "heading" && block.text === "卖出逻辑"));
+  expect("table separator and decoration lines are not exposed", !noisyExplanationText.includes("|------|") && !noisyExplanationText.includes("---"));
+  expect("text fence artifacts render as prose", !noisyExplanationBlocks.some((block) => block.type === "code") && !/\bTEXT\b|复制/.test(noisyExplanationText));
+  expect("table row content remains readable", noisyExplanationText.includes("14:45") && noisyExplanationText.includes("95%"));
+
   const chatClient = await readFile(path.join(root, "src", "app", "chat", "ChatClient.tsx"), "utf8");
   const analysisClient = await readFile(path.join(root, "src", "app", "code-analysis", "CodeAnalysisClient.tsx"), "utf8");
   const thinkingMessage = await readFile(path.join(root, "src", "components", "ai", "AssistantThinkingMessage.tsx"), "utf8");
@@ -144,6 +163,7 @@ async function main() {
   const globalsCss = await readFile(path.join(root, "src", "app", "globals.css"), "utf8");
   const aiService = await readFile(path.join(root, "src", "server", "ai", "ai-service.ts"), "utf8");
   const openaiCompatibleProvider = await readFile(path.join(root, "src", "server", "ai", "providers", "openai-compatible-provider.ts"), "utf8");
+  const conversationStrategyCode = await readFile(path.join(root, "src", "server", "ai", "conversation-strategy-code.ts"), "utf8");
   const commonProviderPrompt = await readFile(path.join(root, "src", "server", "ai", "skills", "content", "common-provider.md"), "utf8");
   const strategyPrompt = await readFile(path.join(root, "src", "server", "ai", "skills", "content", "strategy-generation.md"), "utf8");
   const conversionPrompt = await readFile(path.join(root, "src", "server", "ai", "skills", "content", "code-conversion.md"), "utf8");
@@ -181,13 +201,17 @@ async function main() {
   expect("strategy job status has one-way merge", /function mergeJobStatus/.test(chatClient) && /getJobStatusRank\(nextStatus\) >= getJobStatusRank\(previousStatus\)/.test(chatClient));
   expect("pending no longer overrides running display branch", !/activeJob\?\.status === "queued"/.test(chatClient));
   expect("final delta maps strategy job to answering", /job\.status === "streaming" \|\| finalizingMessage \? "answering"/.test(chatClient));
-  expect("strategy stream emits initial final deltas", /runningTask\.type === "strategy_generation" && delta\.type === "final_delta"/.test(aiService));
+  expect("strategy and focused explanation stream emit initial final deltas", /delta\.type === "final_delta"[\s\S]*runningTask\.type === "strategy_generation"[\s\S]*getStrategyExplanationMode\(runningTask\) === "focused_explanation"/.test(aiService));
+  expect("missing conversation baseline fails before credit reservation", aiService.indexOf("当前会话中没有可用的完整策略代码") < aiService.indexOf("reserveCredits({"));
+  expect("reference strategy code is resolved before provider streaming", /resolveReferenceStrategyCodeForTask\(runningTask\)[\s\S]*runAiProviderStream\([\s\S]*referenceStrategyCode/.test(aiService));
+  expect("reference strategy resolution does not add a model call", !conversationStrategyCode.includes("runAiProvider") && !conversationStrategyCode.includes("fetch("));
+  expect("provider keeps reference code separate from ordinary memory", openaiCompatibleProvider.includes("会话参考策略完整代码") && openaiCompatibleProvider.includes("最近对话记忆"));
   expect("repair stream filters final deltas", /onDelta:\s*\(delta\) => delta\.type === "thinking_delta" \? input\.emit\(delta\) : undefined/.test(aiService));
   expect("repair emits neutral task snapshot", /perfLabel:\s*"stream_repairing"/.test(aiService));
   expect("model identity questions do not inherit historical strategy context", /function isModelIdentityQuestion/.test(openaiCompatibleProvider) && /const context = isModelIdentityQuestion\(prompt\) \? "" : conversationContext/.test(openaiCompatibleProvider));
   expect("model identity final guidance is present for streaming", /只回答 LightQuant 量化策略助手的产品能力/.test(openaiCompatibleProvider));
   expect("common identity prompt uses LightQuant capability answer", /身份类提问以当前轮为准/.test(commonProviderPrompt) && /我是 LightQuant 量化策略助手/.test(commonProviderPrompt));
-  expect("three module prompts have identity answer rules", /策略生成页口径/.test(strategyPrompt) && /代码转换页口径/.test(conversionPrompt) && /代码解析页口径/.test(analysisPrompt));
+  expect("three module prompts have identity answer rules", /只回答 LightQuant 策略开发能力/.test(strategyPrompt) && /只回答 LightQuant 代码转换能力/.test(conversionPrompt) && /代码解析页口径/.test(analysisPrompt));
   expect("strategy repair/finalizing suppresses draft answer", /suppressDraftFinalAnswer/.test(chatClient) && /shouldSuppressStrategyDraftFinalAnswer/.test(chatClient));
   expect("thinking collapse receives final-started state", /hasFinalStarted=\{hasFinalStarted\}/.test(thinkingMessage));
   expect("answering status shows final stream even before first text", /const hasFinalStarted = hasFinal \|\| status === "answering"/.test(thinkingMessage));
@@ -195,8 +219,9 @@ async function main() {
   expect("final answer stream has no title row", !/lq-final-title/.test(thinkingMessage));
   expect("final answer stream removes writing/output labels", !/正在写回答|正在输出/.test(thinkingMessage));
   expect("streaming code preview keeps only primary in-progress label", /label=\{streaming \? "正在生成代码" : undefined\}/.test(thinkingMessage) && !/statusLabel|正在写入/.test(thinkingMessage));
-  expect("unclosed code block tracks open preview state", /open:\s*true/.test(thinkingMessage));
+  expect("unclosed code block tracks open preview state", /pushCodeBlock\(code,\s*true\)/.test(thinkingMessage));
   expect("full code panel only reads generatedCode", /const code = result\.generatedCode\?\.trim\(\) \?\? ""/.test(resultViews));
+  expect("focused code analysis renders natural markdown instead of empty report tabs", /report\?\.responseMode === "focused_explanation"[\s\S]*<StrategyMarkdownResult markdown=\{focusedAnswer\}/.test(resultViews));
   expect("no continuation smoke still guards frontend entry", /frontend has no user-visible continuation entry strings/.test(noContinuationSmoke));
 
   for (const forbidden of ["继续输出", "继续补全", "免费重新整理", "canContinue"]) {
@@ -220,6 +245,8 @@ async function main() {
       "strategy elapsed status renders above assistant output",
       "completed elapsed uses the same user-facing timer chain as running elapsed",
       "billing cost tag moves from final answer body to task meta bar",
+      "missing contextual baseline fails before reservation",
+      "reference strategy resolution adds no second model call and stays separate from ordinary memory",
       "model identity questions use LightQuant product identity guidance",
       "strategy elapsed status supports seconds and minute-second labels",
       "source conversation mapping stays active during local-to-real task switch",
@@ -228,6 +255,7 @@ async function main() {
       "repair/finalizing hides partial draft previews",
       "answering status auto-splits thinking and final answer areas",
       "unclosed streaming code fence preview",
+      "streaming explanation hides nested-heading, table-separator, decoration, and text-fence noise",
       "running code preview is separate from final generatedCode artifact",
       "continuation entry guard remains active"
     ]

@@ -3,6 +3,7 @@ import type { AiTaskConfig } from "@/server/ai/ai-task-config";
 import type { AiSkill } from "@/server/ai/skills";
 import type { AiTaskProgressUpdate } from "@/server/ai/ai-task-progress";
 import type { ApiDocumentContext } from "@/server/ai/api-document-retrieval";
+import type { ConversationStrategyCodeArtifact } from "@/server/ai/conversation-strategy-code";
 
 export type AiProviderResult = Omit<AiTaskResult, "taskId" | "resultType" | "createdAt">;
 
@@ -35,6 +36,7 @@ export type AiProviderInput = {
   skill: AiSkill;
   config: AiTaskConfig;
   conversationContext?: string;
+  referenceStrategyCode?: ConversationStrategyCodeArtifact;
   attachments?: AiProviderAttachment[];
   apiDocumentContext: ApiDocumentContext;
   progressReporter?: (update: AiTaskProgressUpdate) => void | Promise<void>;

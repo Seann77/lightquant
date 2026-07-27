@@ -1237,6 +1237,14 @@ export function formatAiTaskResultAsMarkdown(result: NonNullable<AiTaskData["res
 
   if (taskType === "code_analysis") {
     const report = readRecord(result.reportJson);
+
+    if (report?.responseMode === "focused_explanation") {
+      return readNullableString(report.finalAnswerMarkdown)
+        ?? readNullableString(report.focusedAnswer)
+        ?? result.explanation?.trim()
+        ?? "代码中未明确给出";
+    }
+
     const overview = hasReportMarkdownItems(report?.overview)
       ? report?.overview
       : hasReportMarkdownItems([report?.codeStructure, report?.platformDependencies])

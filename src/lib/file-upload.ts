@@ -1,4 +1,9 @@
-import { getFileExtension, getFileUploadRule, isImageUploadExtension, type FileUploadPurpose } from "@/lib/file-upload-rules";
+import {
+  getFileExtension,
+  getFileUploadRule,
+  isMimeCompatibleWithUploadExtension,
+  type FileUploadPurpose
+} from "@/lib/file-upload-rules";
 
 type ApiResponse<T> =
   | { success: true; data: T; requestId: string }
@@ -58,25 +63,9 @@ function validateUploadFile(file: File, purpose: FileUploadPurpose) {
     throw new Error(`UNSUPPORTED_FILE_TYPE:${rule.description}`);
   }
 
-  if (file.type && !isMimeCompatibleWithExtension(file.type, ext)) {
+  if (!isMimeCompatibleWithUploadExtension(file.type, ext)) {
     throw new Error(`UNSUPPORTED_FILE_TYPE:${rule.description}`);
   }
-}
-
-function isMimeCompatibleWithExtension(mimeType: string, ext: string) {
-  const normalizedMime = mimeType.toLowerCase();
-
-  if (isImageUploadExtension(ext)) {
-    return normalizedMime === "image/png" || normalizedMime === "image/jpeg";
-  }
-
-  if (normalizedMime.startsWith("image/")) {
-    return false;
-  }
-
-  return normalizedMime.startsWith("text/")
-    || normalizedMime === "application/octet-stream"
-    || normalizedMime === "application/x-python-code";
 }
 
 export function getFileUploadFriendlyError(error: unknown) {

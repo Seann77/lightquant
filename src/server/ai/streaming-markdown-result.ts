@@ -11,6 +11,7 @@ import {
   applyGeneratedCodeArtifact,
   extractGeneratedCodeFromMarkdown
 } from "@/server/ai/code-artifact";
+import { getStrategyExplanationMode } from "@/server/ai/strategy-explanation-intent";
 
 type MarkdownSectionKey = "summary" | "code" | "notes" | "risks" | "overview" | "tradingLogic" | "parameters" | "suggestions";
 
@@ -121,6 +122,21 @@ export function parseStreamingMarkdownResult(input: AiProviderInput, markdown: s
   }
 
   if (input.task.type === "code_analysis") {
+    if (getStrategyExplanationMode(input.task) === "focused_explanation") {
+      const explanation = truncateResultText(
+        stripMarkdownNoise(removeCodeFences(finalAnswerMarkdown)),
+        input.config.maxResultChars
+      );
+
+      return buildProviderResult(input, scopeStatus, finalAnswerMarkdown, sections, {
+        explanation: scopeStatus === "out_of_scope" ? input.skill.outOfScopeResponse : explanation,
+        generatedCode: null,
+        migrationNotes: null,
+        riskWarnings: [],
+        analysisMode: "focused_explanation"
+      });
+    }
+
     const analysisReport = buildCodeAnalysisReport(sections);
     const riskWarnings = getReportValues(analysisReport.risks).slice(0, 12);
     const explanation = truncateResultText(formatReportItemsForText(analysisReport.overview), input.config.maxResultChars);
@@ -155,7 +171,7 @@ export function parseStreamingMarkdownResult(input: AiProviderInput, markdown: s
   });
 }
 
-export function normalizeMarkdown(markdown: string, task: Pick<AiTask, "type">) {
+export function normalizeMarkdown(markdown: string, task: Pick<AiTask, "type" | "prompt">) {
   const trimmed = markdown.trim();
 
   if (!trimmed) {
@@ -171,6 +187,10 @@ export function normalizeMarkdown(markdown: string, task: Pick<AiTask, "type">) 
   }
 
   if (task.type === "code_analysis") {
+    if (getStrategyExplanationMode(task) === "focused_explanation") {
+      return trimmed;
+    }
+
     const sections = splitMarkdownSections(trimmed);
     return buildNormalizedMarkdown(trimmed, sections, ANALYSIS_CONTRACT, task);
   }
@@ -187,7 +207,16 @@ export function formatProviderResultAsMarkdown(
   }
 
   if (task.type === "code_analysis") {
-    const report = normalizeCodeAnalysisReportFromUnknown(result.reportJson, {
+    const reportJson = readRecord(result.reportJson);
+
+    if (reportJson?.responseMode === "focused_explanation") {
+      return readTextValue(reportJson.finalAnswerMarkdown)
+        || readTextValue(reportJson.focusedAnswer)
+        || result.explanation?.trim()
+        || "代码中未明确给出";
+    }
+
+    const report = normalizeCodeAnalysisReportFromUnknown(reportJson, {
       explanation: result.explanation,
       riskWarnings: result.riskWarnings
     });
@@ -246,6 +275,7 @@ function buildProviderResult(
     migrationNotes: string | null;
     riskWarnings: string[];
     analysisReport?: CodeAnalysisReport;
+    analysisMode?: "focused_explanation" | "full_explanation";
     strategyMeta?: StrategyStreamingMeta;
   }
 ): AiProviderResult {
@@ -269,7 +299,7 @@ function buildNormalizedMarkdown(
   markdown: string,
   sections: MarkdownSection[],
   contract: MarkdownContract,
-  task: Pick<AiTask, "type">
+  task: Pick<AiTask, "type" | "prompt">
 ) {
   return contract.keys
     .flatMap((key) => [
@@ -285,7 +315,7 @@ function getNormalizedSectionContent(
   key: MarkdownSectionKey,
   markdown: string,
   sections: MarkdownSection[],
-  task: Pick<AiTask, "type">
+  task: Pick<AiTask, "type" | "prompt">
 ) {
   const content = getSectionContent(sections, key);
 
@@ -566,6 +596,7 @@ function buildReportJson(
     migrationNotes: string | null;
     riskWarnings: string[];
     analysisReport?: CodeAnalysisReport;
+    analysisMode?: "focused_explanation" | "full_explanation";
     strategyMeta?: StrategyStreamingMeta;
   }
 ) {
@@ -618,10 +649,20 @@ function buildReportJson(
     };
   }
 
+  if (parsed.analysisMode === "focused_explanation") {
+    return {
+      ...base,
+      responseMode: "focused_explanation",
+      focusedAnswer: parsed.explanation,
+      riskWarnings: parsed.riskWarnings
+    };
+  }
+
   const analysisReport = parsed.analysisReport ?? buildCodeAnalysisReport(sections);
 
   return {
     ...base,
+    responseMode: "full_explanation",
     overview: analysisReport.overview,
     tradingLogic: analysisReport.tradingLogic,
     keyParameters: analysisReport.keyParameters,
@@ -632,12 +673,16 @@ function buildReportJson(
   };
 }
 
-function buildEmptyMarkdown(task: Pick<AiTask, "type">) {
+function buildEmptyMarkdown(task: Pick<AiTask, "type" | "prompt">) {
   if (task.type === "strategy_generation") {
     return "模型未返回有效内容。";
   }
 
   if (task.type === "code_analysis") {
+    if (getStrategyExplanationMode(task) === "focused_explanation") {
+      return "模型未返回有效内容。";
+    }
+
     return [
       `## ${ANALYSIS_CONTRACT.titles.overview}`,
       formatMissingAnalysisSection("overview"),
@@ -1095,4 +1140,14 @@ function looksLikeCode(value: string) {
   }
 
   return /\b(def|class|import|from|return|if|for|while)\b|order_|get_|set_universe|handle_data|initialize|passorder/.test(value);
+}
+
+function readRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function readTextValue(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
 }
