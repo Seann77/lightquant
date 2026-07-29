@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
@@ -140,7 +140,27 @@ const AI_TASK_POLL_INTERVAL_MS = 3000;
 const AI_TASK_POLL_TIMEOUT_MS = 5 * 60 * 1000;
 const DRAFT_CONVERSATION_KEY = "__draft_strategy_conversation__";
 const STRATEGY_THREAD_BOTTOM_THRESHOLD_PX = 100;
+const STRATEGY_COMPOSER_MIN_HEIGHT_PX = 56;
+const STRATEGY_COMPOSER_MAX_HEIGHT_PX = 232;
 const CODE_CONVERSION_MAX_TOTAL_INPUT_CHARS = 150000;
+
+function resizeStrategyComposerTextarea(textarea: HTMLTextAreaElement) {
+  const previousHeight = textarea.getBoundingClientRect().height;
+  const computedStyle = window.getComputedStyle(textarea);
+  const parsedMinHeight = Number.parseFloat(computedStyle.minHeight);
+  const parsedMaxHeight = Number.parseFloat(computedStyle.maxHeight);
+  const minHeight = Number.isFinite(parsedMinHeight) ? parsedMinHeight : STRATEGY_COMPOSER_MIN_HEIGHT_PX;
+  const maxHeight = Number.isFinite(parsedMaxHeight) ? parsedMaxHeight : STRATEGY_COMPOSER_MAX_HEIGHT_PX;
+
+  textarea.style.height = "auto";
+  const contentHeight = textarea.scrollHeight;
+  const nextHeight = Math.min(Math.max(contentHeight, minHeight), maxHeight);
+
+  textarea.style.height = `${nextHeight}px`;
+  textarea.style.overflowY = contentHeight > maxHeight + 1 ? "auto" : "hidden";
+
+  return Math.abs(previousHeight - nextHeight) > 0.5;
+}
 
 export function ChatClient({ mode }: ChatClientProps) {
   if (mode === "convert") {
@@ -168,10 +188,36 @@ function StrategyModeContent() {
   const [cancelingStrategyJobId, setCancelingStrategyJobId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const compositionRef = useRef(false);
+  const composerTextareaRef = useRef<HTMLTextAreaElement>(null);
   const strategyThreadRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const shouldStickToBottomRef = useRef(true);
   const forceScrollToBottomRef = useRef(false);
+  const syncStrategyComposerHeight = useCallback(() => {
+    const textarea = composerTextareaRef.current;
+
+    if (!textarea) {
+      return;
+    }
+
+    const shouldKeepThreadAtBottom = shouldStickToBottomRef.current;
+    const heightChanged = resizeStrategyComposerTextarea(textarea);
+
+    if (!heightChanged || !shouldKeepThreadAtBottom) {
+      return;
+    }
+
+    const thread = strategyThreadRef.current;
+
+    if (thread && thread.scrollHeight > thread.clientHeight + 1) {
+      thread.scrollTop = thread.scrollHeight;
+    } else {
+      bottomRef.current?.scrollIntoView({
+        block: "end",
+        behavior: "auto"
+      });
+    }
+  }, []);
   const conversationIdFromUrl = searchParams.get("conversationId");
   const currentConversationKey = conversation?.id ?? conversationIdFromUrl ?? DRAFT_CONVERSATION_KEY;
   const activeConversationKeyRef = useRef(currentConversationKey);
@@ -207,6 +253,18 @@ function StrategyModeContent() {
   useEffect(() => {
     activeConversationKeyRef.current = currentConversationKey;
   }, [currentConversationKey]);
+
+  useLayoutEffect(() => {
+    syncStrategyComposerHeight();
+  }, [prompt, syncStrategyComposerHeight]);
+
+  useEffect(() => {
+    window.addEventListener("resize", syncStrategyComposerHeight);
+
+    return () => {
+      window.removeEventListener("resize", syncStrategyComposerHeight);
+    };
+  }, [syncStrategyComposerHeight]);
 
   useEffect(() => {
     abortAllStrategyPolls();
@@ -1093,6 +1151,8 @@ function StrategyModeContent() {
               onChange={(event) => setPrompt(event.target.value)}
               onKeyDown={handleComposerKeyDown}
               placeholder="输入策略需求，或粘贴代码片段..."
+              ref={composerTextareaRef}
+              rows={1}
               value={prompt}
             />
             <div className="lq-composer-bottom">

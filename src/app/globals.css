@@ -7181,6 +7181,32 @@ textarea {
   width: 100%;
 }
 
+.lq-strategy-page .lq-composer-textarea {
+  height: 56px;
+  min-height: 56px;
+  max-height: 232px;
+  overflow-y: hidden;
+  overscroll-behavior: contain;
+  padding: 15px 22px;
+  scrollbar-color: #c3c5d7 transparent;
+  scrollbar-width: thin;
+}
+
+.lq-strategy-page .lq-composer-textarea::-webkit-scrollbar {
+  width: 8px;
+}
+
+.lq-strategy-page .lq-composer-textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.lq-strategy-page .lq-composer-textarea::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: #c3c5d7;
+  background-clip: padding-box;
+}
+
 .lq-strategy-page .lq-thinking-message-mark {
   grid-column: 1;
 }
@@ -7708,8 +7734,11 @@ textarea {
   }
 
   .lq-strategy-page .lq-composer-textarea {
-    height: 100px;
-    padding: 18px;
+    height: 56px;
+    min-height: 56px;
+    max-height: 176px;
+    overflow-y: hidden;
+    padding: 14px 18px;
     font-size: 14px;
   }
 
