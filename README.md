@@ -15,17 +15,17 @@
 
 ## 安装
 
-### WorkBuddy
+把仓库地址交给 Agent：
 
-下载 [WorkBuddy 安装包](downloads/lightquant-strategy-toolkit-workbuddy.zip)，在 WorkBuddy 的技能入口导入 ZIP 包。
+```text
+帮我安装 https://github.com/Seann77/lightquant 这个 Skill。
+```
 
-### 支持 Agent Skills 的工具
+也可以用命令安装，完成后让 Agent 重新加载 Skill：
 
 ```bash
 npx skills add Seann77/lightquant --skill lightquant-strategy-toolkit
 ```
-
-也可以把 `skills/lightquant-strategy-toolkit/` 目录交给所用工具安装，或复制到该工具的 Skill 目录。各工具的安装入口和目录可能不同，请按对应工具的说明操作。
 
 ## 开始使用
 
