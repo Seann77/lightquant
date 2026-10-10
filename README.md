@@ -1,28 +1,44 @@
 # LightQuant Strategy Toolkit
 
-面向聚宽（JoinQuant）和 PTrade 的 Codex 技能，帮助量化策略开发者创建、修改、调试、解读策略代码，并在两个平台之间进行语义保真的转换。
+![LightQuant Strategy Toolkit：JoinQuant × PTrade](assets/lightquant-cover.png)
 
-## 能做什么
+面向聚宽（JoinQuant）与 PTrade 的量化策略开发技能，可辅助开发、修改、调试、解读策略，并在两个平台之间转换。
 
-- **开发与修改**：按目标平台原生接口实现选股、信号、调仓、下单和风控逻辑，尽量保持策略原意。
-- **调试与加固**：定位生命周期、API、数据结构、订单状态、回测环境和编码问题。
-- **平台转换**：在聚宽与 PTrade 之间映射调度、行情/财务数据、订单、账户和状态，并标明无法等价转换的部分。
-- **代码解读**：生成中文策略档案，说明运行流程、买卖条件、资金管理、风险控制和代码证据。
+## 使用模式
 
-本项目当前只支持聚宽和 PTrade。策略分析属于代码工程辅助，不构成投资建议，也不承诺收益。
+| 模式 | 适用场景 | 交付结果 |
+| --- | --- | --- |
+| 开发与修改 | 新建策略，或调整指标、信号、调仓和风控 | 按目标平台实现的策略代码与改动说明 |
+| 调试 | 排查 API、运行流程、数据、订单或编码问题 | 问题定位、修复建议或修改后的代码 |
+| 平台转换 | 在聚宽与 PTrade 之间迁移策略 | 转换代码，以及平台差异和待确认项 |
+| 代码解读 | 需要了解策略实际执行逻辑 | 中文策略说明，附代码依据 |
 
-## 使用技能
+## 安装
 
-将 [`skills/lightquant-strategy-toolkit/`](skills/lightquant-strategy-toolkit/) 文件夹复制到 Codex 的 `~/.codex/skills/` 目录，然后在任务中使用 `$lightquant-strategy-toolkit`。
+使用支持 Skill 的安装命令：
 
-入口文件是 [`SKILL.md`](skills/lightquant-strategy-toolkit/SKILL.md)。PTrade、聚宽、转换矩阵和解读模板等配套资料位于同目录的 `references/`。
+```bash
+npx skills add Seann77/lightquant --skill lightquant-strategy-toolkit
+```
 
-## PTrade API 参考
+也可以把 `skills/lightquant-strategy-toolkit/` 目录交给你使用的 Agent 安装，或手动复制到该工具的 Skill 目录。安装后让 Agent 读取该 Skill，即可用自然语言提出策略任务。
 
-仓库同时保留国金版本 PTrade 的原始 API HTML 和配套资源，位于 [`api-docs/raw/ptrade/guojin/`](api-docs/raw/ptrade/guojin/)。版本说明见 [国金 PTrade API 文档版本说明](api-docs/raw/ptrade/guojin/README.md)。
+## 开始使用
 
-该文档列出的最高 API 变更版本为 `PTrade1.0-QTV202401.05.032`，并分别说明 Python 3.5 和 Python 3.11 环境。这个版本标识不代表当前账户实际安装的客户端版本；使用者应向自己的券商核实当前版本、运行环境和接口权限。
+例如：
+
+- “帮我检查这份 PTrade 策略为什么回测没有下单。”
+- “把这份聚宽策略转换为 PTrade，保留原有选股和调仓逻辑。”
+- “用普通中文解释这份策略的买卖条件和仓位控制。”
+
+本项目目前覆盖聚宽与 PTrade。平台接口和运行环境可能因版本或券商部署而不同；具体实现以使用者提供的平台文档和环境为准。
+
+## 内容
+
+- [Skill 入口与完整说明](skills/lightquant-strategy-toolkit/SKILL.md)
+- [Skill 包说明](skills/lightquant-strategy-toolkit/README.md)
+- [PTrade API 文档及版本说明](api-docs/raw/ptrade/guojin/README.md)
 
 ## 许可
 
-[`skills/lightquant-strategy-toolkit/LICENSE`](skills/lightquant-strategy-toolkit/LICENSE) 中的 MIT 许可证只适用于技能目录内由本项目维护者编写的技能内容。`api-docs/raw/ptrade/guojin/` 中的平台 API 手册及其配套材料属于第三方资料，不由该 MIT 许可证重新授权；使用和再分发前应核实相应权利。
+MIT License，详见 [LICENSE](skills/lightquant-strategy-toolkit/LICENSE)。
