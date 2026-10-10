@@ -1,27 +1,36 @@
 # LightQuant Strategy Toolkit
 
-Codex skill for quantitative strategy development, debugging, explanation, and conversion between JoinQuant and PTrade.
+用于聚宽（JoinQuant）与 PTrade 的量化策略技能，覆盖策略开发、修改、调试、平台转换和代码解读。
 
-## Contents
+## 使用模式
 
-- `SKILL.md`: routing, workflows, safety, and the default 42-field strategy dossier.
-- `references/platform-joinquant.md`: JoinQuant workflow and API compatibility checks.
-- `references/platform-ptrade.md`: PTrade workflow and cross-deployment compatibility checks.
-- `references/conversion-matrix.md`: two-way conversion checklist.
-- `references/explanation-dossier.md`: detailed 42-field explanation template and plain-language examples.
-- `references/safety-and-output-rules.md`: scope, encoding, and output requirements.
-- `references/api-docs-policy.md`: guidance for API documentation, version notes, and public releases.
+- **开发与修改**：新建策略，或调整信号、调仓和风控逻辑。
+- **调试**：定位平台 API、运行流程、数据、订单和编码问题。
+- **平台转换**：在聚宽与 PTrade 之间迁移策略，并说明无法直接对应的行为。
+- **代码解读**：生成中文策略说明，并依据代码区分已启用逻辑与未启用逻辑。
 
-## API documentation
+## 安装
 
-The reference files are intentionally concise summaries, not bundled copies of platform manuals. Use the documentation supplied by the user's current platform/broker environment for exact signatures and availability. Before publishing, confirm the terms for any third-party documentation or examples and record the applicable versions and review date. See `references/api-docs-policy.md`.
+### WorkBuddy
 
-## Compatibility
+下载仓库中的 [`WorkBuddy ZIP 安装包`](../../downloads/lightquant-strategy-toolkit-workbuddy.zip)，通过 WorkBuddy 的技能入口导入。
 
-This skill's current scope is JoinQuant and PTrade. No specific PTrade broker deployment or platform version is certified by this repository. Compatibility should be stated per environment and evidence.
+### 支持 Agent Skills 的工具
 
-The locally reviewed PTrade reference is the Guojin deployment documentation. Its API change log lists `PTrade1.0-QTV202401.05.032` as the highest revision present and documents both Python 3.5 and Python 3.11 variants. This is a documentation revision, not confirmation of the currently installed broker client. Confirm the actual client/runtime version with the broker. The PTrade source manuals already tracked in the LightQuant repository are documented at [the Guojin API reference](../../api-docs/raw/ptrade/guojin/README.md), [the strategy API HTML](../../api-docs/raw/ptrade/guojin/ptradeapi.html), and [the financial API HTML](../../api-docs/raw/ptrade/guojin/财务数据api.html). The Guojin manual is not duplicated inside the skill package. Its redistribution rights are separate from this skill license.
+```bash
+npx skills add Seann77/lightquant --skill lightquant-strategy-toolkit
+```
+
+也可以将本目录复制到所用工具的 Skill 目录，然后按该工具的说明加载技能。
+
+## 参考资料
+
+- [`SKILL.md`](SKILL.md)：工作流程与使用边界。
+- [`references/`](references/)：聚宽、PTrade、平台转换和代码解读参考。
+- [PTrade API 文档版本说明](https://github.com/Seann77/lightquant/tree/master/api-docs/raw/ptrade/guojin)：仓库中的国金 PTrade 参考资料。
+
+PTrade 的券商部署、接口版本及运行环境可能不同，请结合实际环境确认 API 可用性。
 
 ## License
 
-This skill package's original content is licensed under the MIT License; see `LICENSE`. The license does not cover third-party platform manuals or materials.
+MIT License，见 [`LICENSE`](LICENSE)。
