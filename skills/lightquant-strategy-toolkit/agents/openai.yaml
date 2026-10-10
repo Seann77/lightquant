@@ -1,0 +1,4 @@
+interface:
+  display_name: "LightQuant Strategy Toolkit"
+  short_description: "Develop, debug, explain, and convert JoinQuant/PTrade strategies"
+  default_prompt: "Help me develop, debug, explain, or convert this JoinQuant/PTrade strategy while preserving its trading intent."
