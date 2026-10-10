@@ -15,17 +15,21 @@
 
 ## 安装
 
-使用支持 Skill 的安装命令：
+### WorkBuddy
+
+下载 [WorkBuddy 安装包](downloads/lightquant-strategy-toolkit-workbuddy.zip)，在 WorkBuddy 的技能入口导入 ZIP 包。
+
+### 支持 Agent Skills 的工具
 
 ```bash
 npx skills add Seann77/lightquant --skill lightquant-strategy-toolkit
 ```
 
-也可以把 `skills/lightquant-strategy-toolkit/` 目录交给你使用的 Agent 安装，或手动复制到该工具的 Skill 目录。安装后让 Agent 读取该 Skill，即可用自然语言提出策略任务。
+也可以把 `skills/lightquant-strategy-toolkit/` 目录交给所用工具安装，或复制到该工具的 Skill 目录。各工具的安装入口和目录可能不同，请按对应工具的说明操作。
 
 ## 开始使用
 
-例如：
+安装后可直接用自然语言描述任务，例如：
 
 - “帮我检查这份 PTrade 策略为什么回测没有下单。”
 - “把这份聚宽策略转换为 PTrade，保留原有选股和调仓逻辑。”

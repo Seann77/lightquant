@@ -11,19 +11,23 @@
 
 ## 安装
 
-通过支持 Skill 的安装命令安装：
+### WorkBuddy
+
+下载仓库中的 [`WorkBuddy ZIP 安装包`](../../downloads/lightquant-strategy-toolkit-workbuddy.zip)，通过 WorkBuddy 的技能入口导入。
+
+### 支持 Agent Skills 的工具
 
 ```bash
 npx skills add Seann77/lightquant --skill lightquant-strategy-toolkit
 ```
 
-也可以将本目录复制到所用 Agent 工具的 Skill 目录，然后按该工具的说明加载技能。
+也可以将本目录复制到所用工具的 Skill 目录，然后按该工具的说明加载技能。
 
 ## 参考资料
 
 - [`SKILL.md`](SKILL.md)：工作流程与使用边界。
 - [`references/`](references/)：聚宽、PTrade、平台转换和代码解读参考。
-- [PTrade API 文档版本说明](../../api-docs/raw/ptrade/guojin/README.md)：仓库中的国金 PTrade 参考资料。
+- [PTrade API 文档版本说明](https://github.com/Seann77/lightquant/tree/master/api-docs/raw/ptrade/guojin)：仓库中的国金 PTrade 参考资料。
 
 PTrade 的券商部署、接口版本及运行环境可能不同，请结合实际环境确认 API 可用性。
 

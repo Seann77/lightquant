@@ -1,6 +1,12 @@
 ---
 name: lightquant-strategy-toolkit
-description: Create, modify, debug, explain, and convert LightQuant quantitative strategies for JoinQuant and PTrade. Use when working on strategy logic, platform APIs, backtest/runtime failures, cross-platform migration, or an auditable plain-Chinese strategy manual. Preserve the user's strategy intent, make platform differences explicit, and avoid investment advice.
+display_name: LightQuant 策略工具包
+display_name_en: LightQuant Strategy Toolkit
+description: Develop, modify, debug, explain, and convert quantitative strategies for JoinQuant and PTrade. Use for strategy logic, platform APIs, runtime issues, cross-platform migration, or plain-Chinese strategy documentation.
+description_zh: 面向聚宽与 PTrade 的策略开发、修改、调试、解读和跨平台转换。
+description_en: Develop, modify, debug, explain, and convert quantitative strategies for JoinQuant and PTrade.
+version: 1.0.0
+author: Seann77
 ---
 
 # LightQuant Strategy Toolkit
